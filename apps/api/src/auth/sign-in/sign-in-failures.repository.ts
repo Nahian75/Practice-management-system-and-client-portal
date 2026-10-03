@@ -52,6 +52,17 @@ export class SignInFailuresRepository {
     return Number(count);
   }
 
+  /** Every kind of sign-in failure from one network address since `since`, across all accounts. */
+  async countForAddressSince(ipAddress: string, since: Date): Promise<number> {
+    const { count } = await this.db
+      .selectFrom('sign_in_failures')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('ip_address', '=', ipAddress)
+      .where('occurred_at', '>', since)
+      .executeTakeFirstOrThrow();
+    return Number(count);
+  }
+
   async countForSession(sessionId: string): Promise<number> {
     const { count } = await this.db
       .selectFrom('sign_in_failures')

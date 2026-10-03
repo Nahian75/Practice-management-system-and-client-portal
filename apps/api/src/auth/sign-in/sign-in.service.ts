@@ -12,7 +12,10 @@ import { TwoFactorService } from '../two-factor/two-factor.service.js';
 import { SignInFailuresRepository } from './sign-in-failures.repository.js';
 import { SignInLimits } from './sign-in-limits.js';
 
-export type SignInResult = { outcome: 'two_factor_required'; token: string } | { outcome: 'rejected' };
+export type SignInResult =
+  | { outcome: 'two_factor_required'; token: string }
+  | { outcome: 'rejected' }
+  | { outcome: 'rate_limited' };
 
 const REJECTED: SignInResult = { outcome: 'rejected' };
 
@@ -41,6 +44,11 @@ export class SignInService implements OnModuleInit {
   }
 
   async signIn(email: string, password: string, context: RequestContext): Promise<SignInResult> {
+    if (await this.limits.isAddressBlocked(context.ipAddress)) {
+      await this.recordAudit({ type: 'anonymous' }, 'auth.sign_in_rate_limited', 'denied', context, 'too_many_failures_from_address');
+      return { outcome: 'rate_limited' };
+    }
+
     const account = await this.accounts.findForSignIn(email.trim().toLowerCase());
     const now = this.clock.now();
 

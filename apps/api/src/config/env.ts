@@ -1,4 +1,36 @@
+import { isIP } from 'node:net';
 import { z } from 'zod';
+
+const PROXY_PRESETS = new Set(['loopback', 'linklocal', 'uniquelocal']);
+
+function isProxyEntry(entry: string): boolean {
+  if (PROXY_PRESETS.has(entry)) {
+    return true;
+  }
+  const [address = '', prefix, ...rest] = entry.split('/');
+  const family = isIP(address);
+  if (family === 0 || rest.length > 0) {
+    return false;
+  }
+  if (prefix === undefined) {
+    return true;
+  }
+  const bits = Number(prefix);
+  return /^\d+$/.test(prefix) && bits <= (family === 4 ? 32 : 128);
+}
+
+/**
+ * Addresses of proxies whose X-Forwarded-For header is believed, comma-separated:
+ * IPs, CIDR ranges, or Express presets. Empty (the default) believes no one, so
+ * a client cannot choose the address it is rate-limited and audited under.
+ */
+export const trustedProxiesSchema = z
+  .string()
+  .default('')
+  .transform((value) => value.split(',').map((entry) => entry.trim()).filter(Boolean))
+  .refine((entries) => entries.every(isProxyEntry), {
+    message: 'must be a comma-separated list of IP addresses, CIDR ranges, loopback, linklocal or uniquelocal',
+  });
 
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'log', 'debug', 'verbose'] as const;
 
@@ -44,6 +76,7 @@ const envSchema = z
     SMTP_URL: z.url({ protocol: /^smtps?$/ }),
     MAIL_FROM_ADDRESS: z.email(),
     MAIL_FROM_NAME: z.string().min(1).max(100).default('Practice Portal'),
+    TRUSTED_PROXIES: trustedProxiesSchema,
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
   .superRefine((env, ctx) => {

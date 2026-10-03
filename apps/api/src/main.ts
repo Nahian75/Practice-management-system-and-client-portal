@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';
 import { loadEnv } from './config/env.js';
@@ -7,7 +8,7 @@ import { createLogger } from './config/logger.js';
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv(process.env);
-  const app = await NestFactory.create(AppModule.forRoot(env), { logger: createLogger(env) });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.forRoot(env), { logger: createLogger(env) });
 
   configureApp(app);
   app.enableShutdownHooks();

@@ -5,6 +5,7 @@ import { requestContext } from '../../common/http/request-context.js';
 import { ResponseSchema } from '../../common/serialization/response-schema.decorator.js';
 import { Public } from '../sessions/access.decorators.js';
 import { clearSessionCookie, readSessionToken, setSessionCookie } from '../sessions/session-cookie.js';
+import { RETRY_AFTER_SECONDS, TooManyAttemptsException } from '../sign-in/too-many-attempts.exception.js';
 import { TwoFactorSignInService } from './two-factor-sign-in.service.js';
 
 const twoFactorSchema = z.strictObject({
@@ -45,6 +46,9 @@ export class TwoFactorSignInController {
         return { account: result.account };
       case 'wrong_code':
         throw new UnauthorizedException(WRONG_CODE_MESSAGE);
+      case 'rate_limited':
+        response.setHeader('Retry-After', RETRY_AFTER_SECONDS);
+        throw new TooManyAttemptsException();
       case 'sign_in_again':
         clearSessionCookie(response);
         throw new UnauthorizedException(SIGN_IN_AGAIN_MESSAGE);

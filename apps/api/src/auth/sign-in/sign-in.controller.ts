@@ -7,6 +7,7 @@ import { Public } from '../sessions/access.decorators.js';
 import { readSessionToken, setSessionCookie } from '../sessions/session-cookie.js';
 import { SessionsService } from '../sessions/sessions.service.js';
 import { SignInService } from './sign-in.service.js';
+import { RETRY_AFTER_SECONDS, TooManyAttemptsException } from './too-many-attempts.exception.js';
 
 // No format rules beyond size: a malformed email should get the same answer
 // as a wrong password, not a different error that reveals the check.
@@ -43,6 +44,10 @@ export class SignInController {
     await this.sessions.signOut(readSessionToken(request), context);
 
     const result = await this.signIns.signIn(body.email, body.password, context);
+    if (result.outcome === 'rate_limited') {
+      response.setHeader('Retry-After', RETRY_AFTER_SECONDS);
+      throw new TooManyAttemptsException();
+    }
     if (result.outcome === 'rejected') {
       throw new UnauthorizedException(SIGN_IN_REJECTED_MESSAGE);
     }

@@ -18,6 +18,9 @@ npm run build -w @practice/api && npm run invite:local -w @practice/api -- --kin
 npm run start:local -w @practice/api
 ```
 
+Behind a load balancer, set `TRUSTED_PROXIES` to its address range. Leave it
+empty when the app is reached directly.
+
 `compose.yaml`:
 - Image pinned by digest, so the exact same image is pulled every time.
 - Port bound to `127.0.0.1` only: not reachable from other machines.

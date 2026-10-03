@@ -19,6 +19,7 @@ describe('loadEnv', () => {
       TOTP_ENCRYPTION_KEY: TOTP_KEY,
       ...MAIL,
       MAIL_FROM_NAME: 'Practice Portal',
+      TRUSTED_PROXIES: [],
     });
   });
 
@@ -59,8 +60,22 @@ describe('loadEnv', () => {
     ['SMTP_URL', 'http://mail.example.com'],
     ['MAIL_FROM_ADDRESS', 'not-an-email'],
     ['MAIL_FROM_NAME', ''],
+    ['TRUSTED_PROXIES', '*'],
+    ['TRUSTED_PROXIES', 'true'],
+    ['TRUSTED_PROXIES', 'proxy.example.com'],
+    ['TRUSTED_PROXIES', '10.0.0.0/33'],
+    ['TRUSTED_PROXIES', '10.0.0.0/8/1'],
   ])('rejects %s=%j', (name, value) => {
     expect(() => loadEnv({ ...minimal, [name]: value })).toThrow(InvalidEnvError);
+  });
+
+  it.each([
+    ['10.0.0.5', ['10.0.0.5']],
+    ['10.0.0.0/8, 192.168.1.10', ['10.0.0.0/8', '192.168.1.10']],
+    ['loopback,uniquelocal', ['loopback', 'uniquelocal']],
+    ['2001:db8::/32', ['2001:db8::/32']],
+  ])('accepts TRUSTED_PROXIES=%j', (value, expected) => {
+    expect(loadEnv({ ...minimal, TRUSTED_PROXIES: value }).TRUSTED_PROXIES).toEqual(expected);
   });
 
   it('names the broken variable without echoing its value', () => {

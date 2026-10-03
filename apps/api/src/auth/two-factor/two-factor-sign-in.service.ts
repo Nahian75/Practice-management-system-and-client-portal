@@ -13,7 +13,8 @@ import { TwoFactorService } from './two-factor.service.js';
 export type TwoFactorSignInResult =
   | { outcome: 'signed_in'; token: string; account: SessionAccount }
   | { outcome: 'sign_in_again' }
-  | { outcome: 'wrong_code' };
+  | { outcome: 'wrong_code' }
+  | { outcome: 'rate_limited' };
 
 const TOTP_CODE = /^\d{6}$/;
 
@@ -34,6 +35,13 @@ export class TwoFactorSignInService {
   ) {}
 
   async complete(token: string | undefined, input: string, context: RequestContext): Promise<TwoFactorSignInResult> {
+    if (await this.limits.isAddressBlocked(context.ipAddress)) {
+      await this.recordAudit({ type: 'anonymous' }, 'auth.sign_in_rate_limited', 'denied', context, {
+        reason: 'too_many_failures_from_address',
+      });
+      return { outcome: 'rate_limited' };
+    }
+
     const pending = await this.sessions.resolve(token);
     if (pending?.stage !== 'two_factor_pending') {
       return { outcome: 'sign_in_again' };

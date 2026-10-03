@@ -36,7 +36,7 @@ authorization decisions.
 | Module | Status |
 |---|---|
 | Audit | Table and `AuditService` built; no callers yet |
-| Auth | Steps 1–4 of 5: full sign-in, sessions, route guard, sign-out, email, invitations, password reset |
+| Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
 | Users / Roles | Not started |
 | Clients | Not started |
 | Matters | Not started |

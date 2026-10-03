@@ -40,6 +40,13 @@ queued email has reached Mailpit, so "no email was sent" is a real result, not a
 timeout that happened to be too short. Integration tests have a 20-second limit
 (`vitest.config.ts`); Vitest's 5-second default is meant for unit tests.
 
+## Network addresses in tests
+
+Test apps believe `X-Forwarded-For` from loopback, and give every request a
+random address from 198.18.0.0/15 (reserved for testing) unless the test sets
+one. Many tests fail sign-ins on purpose; without this they would all share
+127.0.0.1 and trip the per-address limit for each other.
+
 ## Running
 
 ```sh

@@ -144,6 +144,15 @@ process before it accepts any request.
 - Rule: never log passwords, tokens, session IDs, request bodies or client
   personal data. Log IDs and outcomes instead.
 
+## Client addresses
+
+`TRUSTED_PROXIES` (comma-separated IPs, CIDR ranges, or `loopback`,
+`linklocal`, `uniquelocal`) lists the proxies allowed to report the client's
+address in `X-Forwarded-For`. Empty by default: the address is always the TCP
+peer. Rate limits and the audit log use this address, so trusting too much lets
+an attacker choose it. Tested: with no trusted proxies, a forged header changes
+neither the limit nor the recorded address.
+
 ## Database access
 
 - The API connects as `pms_app` and is only given `DATABASE_URL`. It never

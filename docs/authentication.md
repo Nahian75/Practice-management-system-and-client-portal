@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-04):** Steps 1–4 done: sign-in end to end, invitations, password reset and security notice emails. Invitations are sent from the command line until staff roles exist. Not built yet: per-IP rate limiting (step 5).
+**Current state (2026-10-04):** All five steps built: sign-in with password and 2FA, sessions, invitations, password reset, security notice emails, per-account and per-address limits. Invitations are sent from the command line until staff roles exist.
 
 ## Decisions
 
@@ -92,8 +92,21 @@ Follows NCSC and NIST SP 800-63B guidance.
 | Limit | Rule |
 |---|---|
 | Per account | After 10 wrong passwords or 2FA codes (combined) in 15 minutes, sign-in is blocked for 15 minutes. The account holder is emailed (step 4) |
-| Per IP address | 30 sign-in attempts per 15 minutes, across all accounts |
+| Per network address | 30 **failed** sign-in attempts (wrong password, unknown email, wrong 2FA code) per 15 minutes, across all accounts. Then 429 with `Retry-After: 900`, at both sign-in steps |
 | Per 2FA challenge | 5 codes, then the challenge is cancelled |
+
+The per-address limit counts failures only. A firm's staff usually share one
+office internet address; counting successful sign-ins would block the office
+at 9 am. Failures from one address across many accounts are what password
+spraying looks like, which the per-account limit cannot see.
+
+The address is the TCP connection's, unless `TRUSTED_PROXIES` lists the proxy
+it came through: then the proxy's `X-Forwarded-For` is believed. Empty by
+default, so a client cannot pick the address it is limited and audited under.
+In production, set it to the load balancer's address range only.
+
+Flooding with large volumes of requests is stopped in front of the app (load
+balancer or web application firewall), not by these limits.
 
 Temporary blocks, not permanent lockout: a permanent lock would let anyone
 lock a partner out by typing their email ten times.
@@ -202,7 +215,7 @@ Each step ships with positive and negative tests and is reviewed before the next
 2. **Sessions and sign-in (password step):** sessions table, cookie, guards, sign-out, lockout, staff/client separation.
 3. **Two-factor:** TOTP enrolment and verification, encrypted secrets, backup codes.
 4. **Invitations and password reset:** needs email sending; locally Mailpit, a mail catcher in Docker, so no real email leaves the machine.
-5. **Per-IP rate limiting.**
+5. **Per-address rate limiting.** Done.
 
 ## Not in scope yet
 
