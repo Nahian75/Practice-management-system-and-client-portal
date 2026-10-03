@@ -7,6 +7,7 @@ type DatabaseSet<T> = ColumnType<T, never, never>;
 type InsertOnly<T> = ColumnType<T, T, never>;
 type Writable<T> = ColumnType<T, T, T>;
 type WritableWithDefault<T> = ColumnType<T, T | undefined, T>;
+type UpdateOnly<T> = ColumnType<T, never, T>;
 
 export type AccountKind = 'staff' | 'client';
 export type AccountStatus = 'invited' | 'active' | 'disabled';
@@ -38,7 +39,26 @@ export interface AuditEventsTable {
 
 export type AuditMetadataValue = string | number | boolean | null;
 
+export type SessionStage = 'two_factor_pending' | 'authenticated';
+export type SessionEndReason = 'signed_out' | 'expired' | 'revoked';
+
+export interface SessionsTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  token_hash: InsertOnly<Buffer>;
+  stage: Writable<SessionStage>;
+  created_at: DatabaseSet<Date>;
+  authenticated_at: Writable<Date | null>;
+  last_seen_at: Writable<Date>;
+  expires_at: Writable<Date>;
+  ended_at: UpdateOnly<Date | null>;
+  end_reason: UpdateOnly<SessionEndReason | null>;
+  ip_address: InsertOnly<string | null>;
+  user_agent: InsertOnly<string | null>;
+}
+
 export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
+  sessions: SessionsTable;
 }

@@ -12,10 +12,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { z } from 'zod';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { ResponseSchema } from '../serialization/response-schema.decorator.js';
+import { Public } from '../../auth/sessions/access.decorators.js';
 
 const SECRET_DETAIL = 'connection to db-prod-1 failed for user app_admin';
 const emptySchema = z.object({});
 
+@Public()
 @Controller('errors')
 class ErrorsFixtureController {
   @Get('unexpected')

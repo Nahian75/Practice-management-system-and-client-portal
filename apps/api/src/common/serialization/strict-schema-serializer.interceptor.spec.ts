@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { ResponseSchema } from './response-schema.decorator.js';
+import { Public } from '../../auth/sessions/access.decorators.js';
 
 const portalDocumentSchema = z.object({
   id: z.string(),
@@ -19,6 +20,7 @@ const storedDocument = {
 
 let handlerCalls = 0;
 
+@Public()
 @Controller('documents')
 class DocumentsFixtureController {
   @Get('one')

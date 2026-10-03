@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { ResponseSchema } from '../serialization/response-schema.decorator.js';
+import { Public } from '../../auth/sessions/access.decorators.js';
 
 const createClientSchema = z.strictObject({
   name: z.string().min(1).max(200),
@@ -16,6 +17,7 @@ const clientSchema = z.object({
 
 let handlerCalls = 0;
 
+@Public()
 @Controller('clients')
 class ClientsFixtureController {
   @Post()

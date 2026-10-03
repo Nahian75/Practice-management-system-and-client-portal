@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-03):** Approved. Step 1 done: `accounts` table, Argon2id hashing, password rules and the breached-password check (`apps/api/src/auth/passwords/`). No sign-in yet.
+**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2a done: sessions, session cookie, route guard, sign-out (`apps/api/src/auth/sessions/`). Sign-in itself (step 2b) not built yet, so no session can be created through the API.
 
 ## Decisions
 
