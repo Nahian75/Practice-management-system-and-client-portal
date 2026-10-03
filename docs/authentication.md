@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-04):** Steps 1–3 done. Sign-in works end to end: password, then authenticator code or backup code. Not built yet: invitations, password reset, setting up 2FA through the API (step 4), per-IP rate limiting (step 5). Until step 4, accounts can only be set up from code.
+**Current state (2026-10-04):** Steps 1–3 and 4b done: sign-in works end to end, and accounts are created by invitation. Invitations are sent from the command line only, until staff roles exist. Not built yet: password reset and the blocked-account email (4c), per-IP rate limiting (step 5).
 
 ## Decisions
 
@@ -130,6 +130,20 @@ as Redis) is needed at this scale.
 
 - Links carry a 32-byte random token. The database stores only its hash.
 - Invitation: valid 7 days. Accepting it sets a password and enrols 2FA in one flow.
+  - Sent with `npm run invite -- --kind staff|client --email … --name "…"`.
+    Until staff roles exist this is the only way to create an account, so only
+    someone with server access can do it. It also creates the first administrator.
+  - The link is `APP_BASE_URL/accept-invitation#token=…`. The token is in the
+    fragment, which browsers never send to a server, so it cannot appear in
+    server or proxy logs or a Referer header.
+  - Acceptance: `inspect` (who it is for) → `password` (rules and breach
+    check, returns the 2FA secret) → `complete` (2FA code; returns 10 backup
+    codes once; activates the account). Until `complete` succeeds the account
+    stays `invited` and cannot sign in.
+  - Sending a new invitation closes the old one. Inviting an account that is
+    already active, or as a different kind, is refused.
+  - Each acceptance call carries the 256-bit token, so guessing is not
+    feasible and no rate limit is needed.
 - Password reset: valid 30 minutes, single use. Requesting one gives the same
   answer whether or not the email exists. Reset does **not** remove 2FA: the
   user still needs their code to sign in afterwards.

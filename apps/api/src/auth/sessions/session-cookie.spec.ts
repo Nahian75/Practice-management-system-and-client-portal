@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import { clearSessionCookie, readSessionToken, setSessionCookie } from './session-cookie.js';
-import { generateSessionToken } from './session-token.js';
+import { generateOpaqueToken } from '../../common/crypto/opaque-token.js';
 
-const TOKEN = generateSessionToken();
+const TOKEN = generateOpaqueToken();
 
 const requestWithCookie = (cookie: string | undefined) => ({ headers: { cookie } }) as Request;
 
@@ -32,7 +32,7 @@ describe('readSessionToken', () => {
     ['a value in the wrong format', '__Host-session=not-a-token'],
     ['a value too short', `__Host-session=${TOKEN.slice(1)}`],
     ['a value with injected attributes', `__Host-session=${TOKEN}%3B%20Path%3D%2F`],
-    ['the cookie sent twice', `__Host-session=${TOKEN}; __Host-session=${generateSessionToken()}`],
+    ['the cookie sent twice', `__Host-session=${TOKEN}; __Host-session=${generateOpaqueToken()}`],
   ])('returns nothing for %s', (_case, header) => {
     expect(readSessionToken(requestWithCookie(header))).toBeUndefined();
   });

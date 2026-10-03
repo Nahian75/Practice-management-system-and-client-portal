@@ -4,8 +4,12 @@ import { CLOCK, systemClock } from '../common/time/clock.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { DatabaseModule } from '../database/database.module.js';
+import { MailModule } from '../mail/mail.module.js';
 import { AccountsRepository } from './accounts/accounts.repository.js';
 import { AuthController } from './auth.controller.js';
+import { InvitationsController } from './invitations/invitations.controller.js';
+import { InvitationsRepository } from './invitations/invitations.repository.js';
+import { InvitationsService } from './invitations/invitations.service.js';
 import { PasswordsModule } from './passwords/passwords.module.js';
 import { SessionGuard } from './sessions/session.guard.js';
 import { SessionsRepository } from './sessions/sessions.repository.js';
@@ -25,8 +29,8 @@ import { TwoFactorService } from './two-factor/two-factor.service.js';
 const CURRENT_KEY_VERSION = 1;
 
 @Module({
-  imports: [DatabaseModule, AuditModule, PasswordsModule],
-  controllers: [AuthController, SignInController, TwoFactorSignInController],
+  imports: [DatabaseModule, AuditModule, PasswordsModule, MailModule],
+  controllers: [AuthController, SignInController, TwoFactorSignInController, InvitationsController],
   providers: [
     { provide: CLOCK, useValue: systemClock },
     AccountsRepository,
@@ -46,7 +50,9 @@ const CURRENT_KEY_VERSION = 1;
     BackupCodesRepository,
     BackupCodesService,
     TwoFactorSignInService,
+    InvitationsRepository,
+    InvitationsService,
   ],
-  exports: [SessionsService, SessionGuard, TwoFactorService, BackupCodesService],
+  exports: [SessionsService, SessionGuard, TwoFactorService, BackupCodesService, InvitationsService],
 })
 export class AuthModule {}

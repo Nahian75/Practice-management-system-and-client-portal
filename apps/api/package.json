@@ -9,6 +9,8 @@
     "start:local": "node --env-file=.env --enable-source-maps dist/main.js",
     "migrate": "node --enable-source-maps dist/database/migrate.js",
     "migrate:local": "node --env-file=.env --enable-source-maps dist/database/migrate.js",
+    "invite": "node --enable-source-maps dist/cli/invite.js",
+    "invite:local": "node --env-file=.env --enable-source-maps dist/cli/invite.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

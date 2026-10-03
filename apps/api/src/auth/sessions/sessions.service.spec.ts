@@ -9,7 +9,7 @@ import { ConfigModule } from '../../config/config.module.js';
 import { DATABASE } from '../../database/database.module.js';
 import type { Database } from '../../database/schema.js';
 import { AuthModule } from '../auth.module.js';
-import { hashSessionToken } from './session-token.js';
+import { hashOpaqueToken } from '../../common/crypto/opaque-token.js';
 import { SessionsService } from './sessions.service.js';
 
 const CONTEXT = { ipAddress: '198.51.100.20', userAgent: 'Vitest' };
@@ -23,7 +23,7 @@ describe('SessionsService', () => {
   let client: TestAccount;
 
   const sessionRow = (token: string) =>
-    db.selectFrom('sessions').selectAll().where('token_hash', '=', hashSessionToken(token)).executeTakeFirstOrThrow();
+    db.selectFrom('sessions').selectAll().where('token_hash', '=', hashOpaqueToken(token)).executeTakeFirstOrThrow();
   const auditActions = (accountId: string) =>
     db
       .selectFrom('audit_events')
@@ -62,7 +62,7 @@ describe('SessionsService', () => {
       const row = await sessionRow(token);
 
       expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-      expect(row.token_hash.equals(hashSessionToken(token))).toBe(true);
+      expect(row.token_hash.equals(hashOpaqueToken(token))).toBe(true);
       expect(JSON.stringify(row)).not.toContain(token);
     });
 

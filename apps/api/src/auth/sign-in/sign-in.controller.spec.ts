@@ -10,7 +10,7 @@ import { enrolTwoFactor } from '../../../test/two-factor.js';
 import { DATABASE } from '../../database/database.module.js';
 import type { Database } from '../../database/schema.js';
 import { PasswordHasher } from '../passwords/password-hasher.js';
-import { hashSessionToken } from '../sessions/session-token.js';
+import { hashOpaqueToken } from '../../common/crypto/opaque-token.js';
 import { SessionsService } from '../sessions/sessions.service.js';
 import { TwoFactorService } from '../two-factor/two-factor.service.js';
 import { MAX_GUESSES } from './sign-in-limits.js';
@@ -102,7 +102,7 @@ describe('POST /auth/sign-in', () => {
       const session = await db
         .selectFrom('sessions')
         .select('stage')
-        .where('token_hash', '=', hashSessionToken(token!))
+        .where('token_hash', '=', hashOpaqueToken(token!))
         .executeTakeFirstOrThrow();
       const protectedRoute = await request(app.getHttpServer()).get('/auth/session').set('Cookie', `__Host-session=${token}`);
 

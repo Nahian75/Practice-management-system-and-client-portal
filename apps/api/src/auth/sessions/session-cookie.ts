@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { SESSION_TOKEN_PATTERN } from './session-token.js';
+import { OPAQUE_TOKEN_PATTERN } from '../../common/crypto/opaque-token.js';
 
 export const SESSION_COOKIE = '__Host-session';
 
@@ -25,7 +25,7 @@ export function readSessionToken(request: Request): string | undefined {
     .map((pair) => pair.slice(SESSION_COOKIE.length + 1));
 
   const [token] = values;
-  return values.length === 1 && token !== undefined && SESSION_TOKEN_PATTERN.test(token) ? token : undefined;
+  return values.length === 1 && token !== undefined && OPAQUE_TOKEN_PATTERN.test(token) ? token : undefined;
 }
 
 export function setSessionCookie(response: Response, token: string): void {

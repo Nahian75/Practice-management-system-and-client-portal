@@ -9,7 +9,7 @@ import {
   SESSION_LIMITS,
   TWO_FACTOR_PENDING_LIFETIME_MS,
 } from './session-policy.js';
-import { generateSessionToken, hashSessionToken } from './session-token.js';
+import { generateOpaqueToken, hashOpaqueToken } from '../../common/crypto/opaque-token.js';
 import { SessionsRepository } from './sessions.repository.js';
 
 const MAX_USER_AGENT_LENGTH = 512;
@@ -29,13 +29,13 @@ export class SessionsService {
     context: RequestContext,
   ): Promise<string> {
     const now = this.clock.now();
-    const token = generateSessionToken();
+    const token = generateOpaqueToken();
     const lifetimeMs =
       stage === 'authenticated' ? SESSION_LIMITS[account.kind].absoluteMs : TWO_FACTOR_PENDING_LIFETIME_MS;
 
     await this.repository.insert({
       account_id: account.id,
-      token_hash: hashSessionToken(token),
+      token_hash: hashOpaqueToken(token),
       stage,
       authenticated_at: stage === 'authenticated' ? now : null,
       last_seen_at: now,
@@ -57,7 +57,7 @@ export class SessionsService {
       return undefined;
     }
 
-    const row = await this.repository.findOpenByTokenHash(hashSessionToken(token));
+    const row = await this.repository.findOpenByTokenHash(hashOpaqueToken(token));
     if (!row) {
       return undefined;
     }

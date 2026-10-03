@@ -27,6 +27,12 @@ an empty test database: `docker compose down -v && docker compose up -d`.
 Tests that send email deliver to Mailpit and read it back through its API
 (`test/mailpit.ts`). Each test uses its own random address.
 
+## Offline by default
+
+`createTestApp` replaces the breached-password service with one that answers
+"not listed", so no test reaches the internet. A test can pass its own `fetch`
+to simulate a breached password.
+
 ## Running
 
 ```sh
