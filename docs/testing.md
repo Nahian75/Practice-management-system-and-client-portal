@@ -33,6 +33,13 @@ Tests that send email deliver to Mailpit and read it back through its API
 "not listed", so no test reaches the internet. A test can pass its own `fetch`
 to simulate a breached password.
 
+## Waiting for email
+
+Tests never wait a fixed time for email. `MailOutbox.drain()` resolves once every
+queued email has reached Mailpit, so "no email was sent" is a real result, not a
+timeout that happened to be too short. Integration tests have a 20-second limit
+(`vitest.config.ts`); Vitest's 5-second default is meant for unit tests.
+
 ## Running
 
 ```sh

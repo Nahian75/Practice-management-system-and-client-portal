@@ -51,6 +51,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `totp_credentials` | `0005_totp_credentials.sql` | `SELECT`, `INSERT`; `UPDATE` of everything except `account_id`. No `DELETE`. A trigger stops the used time step moving backwards, for every role | [authentication.md](authentication.md#secret-storage) |
 | `backup_codes` | `0006_two_factor_sign_in.sql` | `SELECT`, `INSERT`; `UPDATE` of `spent_at`, `spent_reason` only. No `DELETE`. A trigger stops a spent code being changed, for every role | [authentication.md](authentication.md#sign-in) |
 | `invitations` | `0007_invitations.sql` | `SELECT`, `INSERT`; `UPDATE` of `closed_at`, `close_reason` only. No `DELETE`. One open invitation per account (unique index). A trigger keeps closed invitations closed, for every role | [authentication.md](authentication.md#invitations-and-password-reset) |
+| `password_resets` | `0008_password_resets.sql` | `SELECT`, `INSERT`; `UPDATE` of `closed_at`, `close_reason` only. No `DELETE`. One open reset per account. A trigger keeps closed resets closed, for every role | [authentication.md](authentication.md#invitations-and-password-reset) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

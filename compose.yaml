@@ -31,7 +31,8 @@ services:
     restart: unless-stopped
     environment:
       MP_DISABLE_VERSION_CHECK: "true"
-      MP_MAX_MESSAGES: "500"
+      # High enough that tests never lose an email they are about to read.
+      MP_MAX_MESSAGES: "20000"
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"

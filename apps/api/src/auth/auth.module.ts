@@ -10,6 +10,10 @@ import { AuthController } from './auth.controller.js';
 import { InvitationsController } from './invitations/invitations.controller.js';
 import { InvitationsRepository } from './invitations/invitations.repository.js';
 import { InvitationsService } from './invitations/invitations.service.js';
+import { SecurityNoticesService } from './notices/security-notices.service.js';
+import { PasswordResetController } from './password-reset/password-reset.controller.js';
+import { PasswordResetService } from './password-reset/password-reset.service.js';
+import { PasswordResetsRepository } from './password-reset/password-resets.repository.js';
 import { PasswordsModule } from './passwords/passwords.module.js';
 import { SessionGuard } from './sessions/session.guard.js';
 import { SessionsRepository } from './sessions/sessions.repository.js';
@@ -30,7 +34,13 @@ const CURRENT_KEY_VERSION = 1;
 
 @Module({
   imports: [DatabaseModule, AuditModule, PasswordsModule, MailModule],
-  controllers: [AuthController, SignInController, TwoFactorSignInController, InvitationsController],
+  controllers: [
+    AuthController,
+    SignInController,
+    TwoFactorSignInController,
+    InvitationsController,
+    PasswordResetController,
+  ],
   providers: [
     { provide: CLOCK, useValue: systemClock },
     AccountsRepository,
@@ -52,6 +62,9 @@ const CURRENT_KEY_VERSION = 1;
     TwoFactorSignInService,
     InvitationsRepository,
     InvitationsService,
+    SecurityNoticesService,
+    PasswordResetsRepository,
+    PasswordResetService,
   ],
   exports: [SessionsService, SessionGuard, TwoFactorService, BackupCodesService, InvitationsService],
 })

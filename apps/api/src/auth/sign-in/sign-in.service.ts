@@ -62,6 +62,7 @@ export class SignInService implements OnModuleInit {
     if (!(await this.hasher.verify(password, account.password_hash))) {
       await this.failures.record({ accountId: account.id, reason: 'wrong_password', ipAddress: context.ipAddress }, now);
       await this.recordAudit(actor, 'auth.sign_in_failed', 'denied', context, 'wrong_password');
+      await this.limits.afterWrongGuess(account.id);
       return REJECTED;
     }
 

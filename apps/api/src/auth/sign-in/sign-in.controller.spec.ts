@@ -6,8 +6,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createTestAccount, setAccountStatus, type TestAccount } from '../../../test/accounts.js';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { FakeClock, MINUTE_MS } from '../../../test/fake-clock.js';
+import { inbox } from '../../../test/mailpit.js';
 import { enrolTwoFactor } from '../../../test/two-factor.js';
 import { DATABASE } from '../../database/database.module.js';
+import { MailOutbox } from '../../mail/mail-outbox.js';
 import type { Database } from '../../database/schema.js';
 import { PasswordHasher } from '../passwords/password-hasher.js';
 import { hashOpaqueToken } from '../../common/crypto/opaque-token.js';
@@ -210,6 +212,22 @@ describe('POST /auth/sign-in', () => {
         outcome: 'denied',
         metadata: { reason: 'too_many_wrong_attempts' },
       });
+    });
+
+    it('emails the account holder once when the block starts', async () => {
+      await failTimes(staff.email, MAX_GUESSES + 3);
+
+      await app.get(MailOutbox).drain();
+      const notices = (await inbox(staff.email)).filter((e) => e.subject === 'Sign-in to your account was blocked');
+      expect(notices).toHaveLength(1);
+      expect(notices[0]?.text).toContain('blocked for 15 minutes');
+    });
+
+    it('sends no block email before the limit is reached', async () => {
+      await failTimes(staff.email, MAX_GUESSES - 1);
+
+      await app.get(MailOutbox).drain();
+      expect(await inbox(staff.email)).toEqual([]);
     });
 
     it('does not block one attempt early', async () => {

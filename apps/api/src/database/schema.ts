@@ -103,11 +103,23 @@ export interface InvitationsTable {
   close_reason: UpdateOnly<'accepted' | 'replaced' | null>;
 }
 
+export interface PasswordResetsTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  token_hash: InsertOnly<Buffer>;
+  created_at: InsertOnly<Date>;
+  expires_at: InsertOnly<Date>;
+  requested_ip: InsertOnly<string | null>;
+  closed_at: UpdateOnly<Date | null>;
+  close_reason: UpdateOnly<'used' | 'replaced' | null>;
+}
+
 export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
   invitations: InvitationsTable;
+  password_resets: PasswordResetsTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
   totp_credentials: TotpCredentialsTable;

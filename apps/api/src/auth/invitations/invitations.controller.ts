@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, HttpCode, HttpStatus, NotFoundEx
 import { z } from 'zod';
 import { OPAQUE_TOKEN_PATTERN } from '../../common/crypto/opaque-token.js';
 import { ResponseSchema } from '../../common/serialization/response-schema.decorator.js';
-import type { PasswordProblem } from '../passwords/password-policy.js';
+import { PASSWORD_PROBLEM_MESSAGES } from '../passwords/password-problem-messages.js';
 import { Public } from '../sessions/access.decorators.js';
 import { InvitationsService } from './invitations.service.js';
 
@@ -25,13 +25,6 @@ const completedSchema = z.object({
 });
 
 export const INVALID_INVITATION_MESSAGE = 'This invitation link is invalid or has expired';
-
-const PASSWORD_PROBLEM_MESSAGES: Record<PasswordProblem, string> = {
-  too_short: 'Use at least 12 characters',
-  too_long: 'Use at most 128 characters',
-  contains_email: 'Do not include your email address',
-  breached: 'This password has appeared in a data breach. Choose a different one',
-};
 
 /**
  * Accepting an invitation. Public because the person has no account yet; each

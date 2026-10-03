@@ -61,6 +61,7 @@ export class TwoFactorSignInService {
         this.clock.now(),
       );
       await this.recordAudit(actor, 'auth.two_factor_failed', 'denied', context, { method });
+      await this.limits.afterWrongGuess(account.id);
 
       if (await this.limits.isSignInAttemptExhausted(sessionId)) {
         await this.sessions.end(sessionId, 'revoked');

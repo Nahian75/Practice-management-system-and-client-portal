@@ -12,6 +12,8 @@
 | POST | `/auth/invitations/inspect` | Public, needs invitation token | `{"token"}` → `{email, displayName, kind}` or 404 |
 | POST | `/auth/invitations/password` | Public, needs invitation token | `{"token","password"}` → `{"twoFactor": {secret, uri}}`, or 400 with the reasons the password was refused |
 | POST | `/auth/invitations/complete` | Public, needs invitation token | `{"token","code"}` → `{"backupCodes": [10 codes]}`, shown once. Activates the account |
+| POST | `/auth/password-reset/request` | Public | `{"email"}` → always 204 |
+| POST | `/auth/password-reset/complete` | Public, needs reset token | `{"token","password"}` → 204, 404 (invalid or expired link), or 400 with the reasons the password was refused |
 | GET | `/auth/session` | Any signed-in account | The signed-in account: id, kind, display name |
 | POST | `/auth/sign-out` | Public | Ends the current session if there is one, clears the cookie. Always 204 |
 

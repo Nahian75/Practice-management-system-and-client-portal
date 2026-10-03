@@ -98,6 +98,11 @@ export class SessionsService {
     }
   }
 
+  /** Ends every open session for the account, for example after a password reset. Returns how many. */
+  endAllForAccount(accountId: string, reason: SessionEndReason): Promise<number> {
+    return this.repository.endAllForAccount(accountId, reason, this.clock.now());
+  }
+
   /** Ends a session. The caller records the reason in the audit log. */
   async end(sessionId: string, reason: SessionEndReason): Promise<void> {
     await this.repository.end(sessionId, reason, this.clock.now());

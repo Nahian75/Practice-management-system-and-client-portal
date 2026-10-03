@@ -11,5 +11,7 @@ if (existsSync(LOCAL_ENV_FILE)) {
 export default defineConfig({
   test: {
     globalSetup: ['test/global-setup.ts'],
+    // Integration tests talk to PostgreSQL and Mailpit; Vitest's 5-second default is meant for unit tests.
+    testTimeout: 20_000,
   },
 });

@@ -25,6 +25,14 @@ export class AccountsRepository {
       .executeTakeFirst();
   }
 
+  findById(accountId: string) {
+    return this.db
+      .selectFrom('accounts')
+      .select(['id', 'kind', 'email', 'display_name', 'status'])
+      .where('id', '=', accountId)
+      .executeTakeFirst();
+  }
+
   async createInvited(account: { kind: AccountKind; email: string; displayName: string }): Promise<string> {
     const { id } = await this.db
       .insertInto('accounts')

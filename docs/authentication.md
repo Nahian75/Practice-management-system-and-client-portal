@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-04):** Steps 1–3 and 4b done: sign-in works end to end, and accounts are created by invitation. Invitations are sent from the command line only, until staff roles exist. Not built yet: password reset and the blocked-account email (4c), per-IP rate limiting (step 5).
+**Current state (2026-10-04):** Steps 1–4 done: sign-in end to end, invitations, password reset and security notice emails. Invitations are sent from the command line until staff roles exist. Not built yet: per-IP rate limiting (step 5).
 
 ## Decisions
 
@@ -147,8 +147,32 @@ as Redis) is needed at this scale.
 - Password reset: valid 30 minutes, single use. Requesting one gives the same
   answer whether or not the email exists. Reset does **not** remove 2FA: the
   user still needs their code to sign in afterwards.
+  - `POST /auth/password-reset/request` always answers 204. Only active
+    accounts get an email, at most 3 an hour, so it cannot flood an inbox.
+  - The email is sent in the background, so response time does not reveal
+    whether the address has an account. Measured locally: 0.265 s for a real
+    account, 0.243 s for an unknown one; the remaining difference is a database
+    insert, not the email.
+  - `POST /auth/password-reset/complete` checks the new password against the
+    same rules, closes the link before changing anything (so two simultaneous
+    uses cannot both succeed), ends every session for the account and emails a
+    "your password was changed" notice.
+  - Requesting a new link closes the previous one.
 - Lost 2FA device and no backup codes: staff-assisted reset only, after
   identity checks, recorded in the audit log. Never self-service.
+
+## Security notice emails
+
+Sent in the background, never slowing or failing the action that caused them:
+
+| Email | When |
+|---|---|
+| Sign-in blocked | The wrong guess that starts a 15-minute block (sent once per block) |
+| Password changed | A password reset completes |
+
+Background email (`MailOutbox`) waits for anything still sending when the app
+shuts down, but a crash can lose a message. A persistent queue replaces it
+before production.
 
 ## Secrets this module needs
 
