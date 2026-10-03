@@ -98,6 +98,11 @@ export class SessionsService {
     }
   }
 
+  /** Ends a session. The caller records the reason in the audit log. */
+  async end(sessionId: string, reason: SessionEndReason): Promise<void> {
+    await this.repository.end(sessionId, reason, this.clock.now());
+  }
+
   private async endWithAudit(
     sessionId: string,
     account: SessionAccount,

@@ -12,16 +12,21 @@ import { SessionsRepository } from './sessions/sessions.repository.js';
 import { SessionsService } from './sessions/sessions.service.js';
 import { SignInFailuresRepository } from './sign-in/sign-in-failures.repository.js';
 import { SignInController } from './sign-in/sign-in.controller.js';
+import { SignInLimits } from './sign-in/sign-in-limits.js';
 import { SignInService } from './sign-in/sign-in.service.js';
+import { BackupCodesRepository } from './two-factor/backup-codes.repository.js';
+import { BackupCodesService } from './two-factor/backup-codes.service.js';
 import { SecretBox } from './two-factor/secret-box.js';
 import { TotpCredentialsRepository } from './two-factor/totp-credentials.repository.js';
+import { TwoFactorSignInController } from './two-factor/two-factor-sign-in.controller.js';
+import { TwoFactorSignInService } from './two-factor/two-factor-sign-in.service.js';
 import { TwoFactorService } from './two-factor/two-factor.service.js';
 
 const CURRENT_KEY_VERSION = 1;
 
 @Module({
   imports: [DatabaseModule, AuditModule, PasswordsModule],
-  controllers: [AuthController, SignInController],
+  controllers: [AuthController, SignInController, TwoFactorSignInController],
   providers: [
     { provide: CLOCK, useValue: systemClock },
     AccountsRepository,
@@ -29,6 +34,7 @@ const CURRENT_KEY_VERSION = 1;
     SessionsService,
     SessionGuard,
     SignInFailuresRepository,
+    SignInLimits,
     SignInService,
     {
       provide: SecretBox,
@@ -37,7 +43,10 @@ const CURRENT_KEY_VERSION = 1;
     },
     TotpCredentialsRepository,
     TwoFactorService,
+    BackupCodesRepository,
+    BackupCodesService,
+    TwoFactorSignInService,
   ],
-  exports: [SessionsService, SessionGuard, TwoFactorService],
+  exports: [SessionsService, SessionGuard, TwoFactorService, BackupCodesService],
 })
 export class AuthModule {}

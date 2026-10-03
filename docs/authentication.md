@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2 done: sessions, route guard, sign-out, and the password step of sign-in (`apps/api/src/auth/sessions/`, `apps/api/src/auth/sign-in/`). A correct password creates a session waiting for 2FA, which cannot open any protected route. Step 3a done: TOTP codes, encrypted secret storage, enrolment (`apps/api/src/auth/two-factor/`). Step 3b (the 2FA sign-in step and backup codes) not built yet.
+**Current state (2026-10-04):** Steps 1–3 done. Sign-in works end to end: password, then authenticator code or backup code. Not built yet: invitations, password reset, setting up 2FA through the API (step 4), per-IP rate limiting (step 5). Until step 4, accounts can only be set up from code.
 
 ## Decisions
 
@@ -49,6 +49,11 @@ Follows NCSC and NIST SP 800-63B guidance.
   incorrect"), and the same work is done when the email does not exist, so
   the response cannot be used to discover which emails have accounts.
 - A 2FA challenge allows 5 code attempts, then it is cancelled.
+- When the code is accepted, the waiting session is ended and a new session
+  with a new token is issued. A token seen during sign-in never becomes usable.
+- Wrong codes count towards the same account block as wrong passwords, so
+  starting new sign-ins does not give unlimited code guesses.
+- An active account without confirmed 2FA cannot sign in.
 - A TOTP code can be used only once, even within its 30-second window. Enforced
   twice: the code check refuses steps at or before the last used one, and the
   database update only succeeds if the step is newer (atomic, so two
@@ -75,12 +80,18 @@ Follows NCSC and NIST SP 800-63B guidance.
 - TOTP itself is implemented with `node:crypto` and tested against the
   RFC 4226, RFC 6238 and RFC 4648 test vectors.
 - A backup code can replace the TOTP code. Each works once.
+  - 10 per account, 16 base32 characters (80 random bits), shown as
+    `XXXX-XXXX-XXXX-XXXX`; any case, dashes and spaces accepted.
+  - Stored as SHA-256 hashes only. 80 bits is too much to brute-force from a
+    leaked hash, so a slow hash is not needed.
+  - Issuing a new set retires every unused code. A spent code can never be
+    made usable again: a trigger enforces this for every role.
 
 ## Lockout and rate limits
 
 | Limit | Rule |
 |---|---|
-| Per account | After 10 failed attempts in 15 minutes, sign-in is blocked for 15 minutes. The account holder is emailed |
+| Per account | After 10 wrong passwords or 2FA codes (combined) in 15 minutes, sign-in is blocked for 15 minutes. The account holder is emailed (step 4) |
 | Per IP address | 30 sign-in attempts per 15 minutes, across all accounts |
 | Per 2FA challenge | 5 codes, then the challenge is cancelled |
 

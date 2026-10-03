@@ -8,10 +8,9 @@ import { AccountsRepository } from '../accounts/accounts.repository.js';
 import { PasswordHasher } from '../passwords/password-hasher.js';
 import { auditActorFor } from '../sessions/authenticated-session.js';
 import { SessionsService } from '../sessions/sessions.service.js';
+import { TwoFactorService } from '../two-factor/two-factor.service.js';
 import { SignInFailuresRepository } from './sign-in-failures.repository.js';
-
-export const MAX_WRONG_PASSWORDS = 10;
-export const WRONG_PASSWORD_WINDOW_MS = 15 * 60_000;
+import { SignInLimits } from './sign-in-limits.js';
 
 export type SignInResult = { outcome: 'two_factor_required'; token: string } | { outcome: 'rejected' };
 
@@ -29,7 +28,9 @@ export class SignInService implements OnModuleInit {
   constructor(
     private readonly accounts: AccountsRepository,
     private readonly failures: SignInFailuresRepository,
+    private readonly limits: SignInLimits,
     private readonly hasher: PasswordHasher,
+    private readonly twoFactor: TwoFactorService,
     private readonly sessions: SessionsService,
     private readonly audit: AuditService,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -41,33 +42,38 @@ export class SignInService implements OnModuleInit {
 
   async signIn(email: string, password: string, context: RequestContext): Promise<SignInResult> {
     const account = await this.accounts.findForSignIn(email.trim().toLowerCase());
+    const now = this.clock.now();
 
     if (!account?.password_hash) {
       await this.hasher.verify(password, this.dummyHash);
-      await this.failures.record(null, 'unknown_account', context.ipAddress, this.clock.now());
+      await this.failures.record({ accountId: null, reason: 'unknown_account', ipAddress: context.ipAddress }, now);
       await this.recordAudit({ type: 'anonymous' }, 'auth.sign_in_failed', 'denied', context, 'unknown_account');
       return REJECTED;
     }
 
     const actor = auditActorFor(account);
 
-    if (await this.isBlocked(account.id)) {
+    if (await this.limits.isAccountBlocked(account.id)) {
       await this.hasher.verify(password, this.dummyHash);
-      await this.recordAudit(actor, 'auth.sign_in_blocked', 'denied', context, 'too_many_wrong_passwords');
+      await this.recordAudit(actor, 'auth.sign_in_blocked', 'denied', context, 'too_many_wrong_attempts');
       return REJECTED;
     }
 
     if (!(await this.hasher.verify(password, account.password_hash))) {
-      await this.failures.record(account.id, 'wrong_password', context.ipAddress, this.clock.now());
+      await this.failures.record({ accountId: account.id, reason: 'wrong_password', ipAddress: context.ipAddress }, now);
       await this.recordAudit(actor, 'auth.sign_in_failed', 'denied', context, 'wrong_password');
       return REJECTED;
     }
 
     // Checked only after the password, so a guesser cannot learn which
-    // accounts are disabled.
+    // accounts are disabled or not yet set up.
     if (account.status !== 'active') {
-      await this.failures.record(account.id, 'account_not_active', context.ipAddress, this.clock.now());
+      await this.failures.record({ accountId: account.id, reason: 'account_not_active', ipAddress: context.ipAddress }, now);
       await this.recordAudit(actor, 'auth.sign_in_failed', 'denied', context, 'account_not_active');
+      return REJECTED;
+    }
+    if (!(await this.twoFactor.isEnrolled(account.id))) {
+      await this.recordAudit(actor, 'auth.sign_in_failed', 'denied', context, 'two_factor_not_enrolled');
       return REJECTED;
     }
 
@@ -78,11 +84,6 @@ export class SignInService implements OnModuleInit {
     const token = await this.sessions.start(account, 'two_factor_pending', context);
     await this.recordAudit(actor, 'auth.password_accepted', 'success', context);
     return { outcome: 'two_factor_required', token };
-  }
-
-  private async isBlocked(accountId: string): Promise<boolean> {
-    const windowStart = new Date(this.clock.now().getTime() - WRONG_PASSWORD_WINDOW_MS);
-    return (await this.failures.countWrongPasswordsSince(accountId, windowStart)) >= MAX_WRONG_PASSWORDS;
   }
 
   private recordAudit(

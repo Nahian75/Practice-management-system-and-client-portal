@@ -40,7 +40,7 @@ export interface AuditEventsTable {
 export type AuditMetadataValue = string | number | boolean | null;
 
 export type SessionStage = 'two_factor_pending' | 'authenticated';
-export type SessionEndReason = 'signed_out' | 'expired' | 'revoked';
+export type SessionEndReason = 'signed_out' | 'expired' | 'revoked' | 'replaced';
 
 export interface SessionsTable {
   id: DatabaseSet<string>;
@@ -57,12 +57,17 @@ export interface SessionsTable {
   user_agent: InsertOnly<string | null>;
 }
 
-export type SignInFailureReason = 'unknown_account' | 'wrong_password' | 'account_not_active';
+export type SignInFailureReason =
+  | 'unknown_account'
+  | 'wrong_password'
+  | 'account_not_active'
+  | 'wrong_two_factor_code';
 
 export interface SignInFailuresTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string | null>;
   reason: InsertOnly<SignInFailureReason>;
+  session_id: InsertOnly<string | null>;
   ip_address: InsertOnly<string | null>;
   occurred_at: InsertOnly<Date>;
 }
@@ -78,9 +83,19 @@ export interface TotpCredentialsTable {
   last_used_step: ColumnType<string | null, number | null, number | null>;
 }
 
+export interface BackupCodesTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  code_hash: InsertOnly<Buffer>;
+  created_at: InsertOnly<Date>;
+  spent_at: UpdateOnly<Date | null>;
+  spent_reason: UpdateOnly<'used' | 'replaced' | null>;
+}
+
 export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
+  backup_codes: BackupCodesTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
   totp_credentials: TotpCredentialsTable;

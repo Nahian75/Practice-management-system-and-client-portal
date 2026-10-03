@@ -6,12 +6,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createTestAccount, setAccountStatus, type TestAccount } from '../../../test/accounts.js';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { FakeClock, MINUTE_MS } from '../../../test/fake-clock.js';
+import { enrolTwoFactor } from '../../../test/two-factor.js';
 import { DATABASE } from '../../database/database.module.js';
 import type { Database } from '../../database/schema.js';
 import { PasswordHasher } from '../passwords/password-hasher.js';
 import { hashSessionToken } from '../sessions/session-token.js';
 import { SessionsService } from '../sessions/sessions.service.js';
-import { MAX_WRONG_PASSWORDS } from './sign-in.service.js';
+import { TwoFactorService } from '../two-factor/two-factor.service.js';
+import { MAX_GUESSES } from './sign-in-limits.js';
 
 const PASSWORD = 'tidy-otter-quartz-lantern';
 const WRONG = 'tidy-otter-quartz-lanterns';
@@ -48,8 +50,16 @@ describe('POST /auth/sign-in', () => {
       .selectFrom('audit_events')
       .select(['action', 'outcome', 'metadata'])
       .where('actor_id', '=', accountId)
+      .where('action', '!=', 'auth.two_factor_enrolled')
       .orderBy('occurred_at')
       .execute();
+
+  /** An active account with a known password and 2FA set up: able to sign in. */
+  async function readyAccount(kind: 'staff' | 'client', hash = passwordHash): Promise<TestAccount> {
+    const account = await createTestAccount(db, kind, { passwordHash: hash });
+    await enrolTwoFactor(app.get(TwoFactorService), account, clock);
+    return account;
+  }
 
   async function failTimes(email: string, times: number) {
     for (let i = 0; i < times; i += 1) {
@@ -70,7 +80,7 @@ describe('POST /auth/sign-in', () => {
 
   beforeEach(async () => {
     clock.reset();
-    staff = await createTestAccount(db, 'staff', { passwordHash });
+    staff = await readyAccount('staff');
   });
 
   afterEach(() => {
@@ -122,7 +132,7 @@ describe('POST /auth/sign-in', () => {
     });
 
     it('upgrades a password hash made with older, weaker settings', async () => {
-      const legacy = await createTestAccount(db, 'client', { passwordHash: weakerArgon2idHash(PASSWORD) });
+      const legacy = await readyAccount('client', weakerArgon2idHash(PASSWORD));
 
       expect((await signIn(legacy.email, PASSWORD)).status).toBe(200);
 
@@ -142,6 +152,7 @@ describe('POST /auth/sign-in', () => {
         return [staff.email, PASSWORD];
       }],
       ['something that is not an email at all', async () => ['not-an-email', PASSWORD]],
+      ['an active account that has not set up 2FA', async () => [(await createTestAccount(db, 'staff', { passwordHash })).email, PASSWORD]],
     ])('%s', async (_case, makeAttempt) => {
       const [email, password] = await makeAttempt();
 
@@ -187,8 +198,8 @@ describe('POST /auth/sign-in', () => {
   });
 
   describe('blocking after repeated wrong passwords', () => {
-    it(`blocks the account after ${MAX_WRONG_PASSWORDS} wrong passwords, even for the right one`, async () => {
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS);
+    it(`blocks the account after ${MAX_GUESSES} wrong passwords, even for the right one`, async () => {
+      await failTimes(staff.email, MAX_GUESSES);
 
       const response = await signIn(staff.email, PASSWORD);
 
@@ -197,18 +208,18 @@ describe('POST /auth/sign-in', () => {
       expect((await auditFor(staff.id)).at(-1)).toEqual({
         action: 'auth.sign_in_blocked',
         outcome: 'denied',
-        metadata: { reason: 'too_many_wrong_passwords' },
+        metadata: { reason: 'too_many_wrong_attempts' },
       });
     });
 
     it('does not block one attempt early', async () => {
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS - 1);
+      await failTimes(staff.email, MAX_GUESSES - 1);
 
       expect((await signIn(staff.email, PASSWORD)).status).toBe(200);
     });
 
     it('lifts the block after 15 minutes', async () => {
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS);
+      await failTimes(staff.email, MAX_GUESSES);
 
       clock.advance(15 * MINUTE_MS);
 
@@ -216,7 +227,7 @@ describe('POST /auth/sign-in', () => {
     });
 
     it('does not let attempts during the block extend it', async () => {
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS);
+      await failTimes(staff.email, MAX_GUESSES);
       clock.advance(10 * MINUTE_MS);
       await failTimes(staff.email, 5);
 
@@ -226,14 +237,14 @@ describe('POST /auth/sign-in', () => {
     });
 
     it('only blocks the account under attack', async () => {
-      const colleague = await createTestAccount(db, 'staff', { passwordHash });
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS);
+      const colleague = await readyAccount('staff');
+      await failTimes(staff.email, MAX_GUESSES);
 
       expect((await signIn(colleague.email, PASSWORD)).status).toBe(200);
     });
 
     it('forgets wrong passwords made before the last completed sign-in', async () => {
-      await failTimes(staff.email, MAX_WRONG_PASSWORDS - 1);
+      await failTimes(staff.email, MAX_GUESSES - 1);
       clock.advance(1_000);
       await app.get(SessionsService).start(staff, 'authenticated', {});
       clock.advance(1_000);

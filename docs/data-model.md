@@ -47,8 +47,9 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 |---|---|---|---|
 | `accounts` | `0002_accounts.sql` | `SELECT`, `INSERT`; `UPDATE` on `display_name`, `status`, `password_hash`, `password_changed_at` only. No `DELETE` | [authentication.md](authentication.md) |
 | `sessions` | `0003_sessions.sql` | `SELECT`; `INSERT` without `id`, `created_at`, `ended_at`; `UPDATE` of stage, timestamps and end only. No `DELETE`. A trigger stops ended sessions changing and authenticated sessions going back to pending, for every role | [authentication.md](authentication.md#sessions) |
-| `sign_in_failures` | `0004_sign_in_failures.sql` | `SELECT`, `INSERT`. No `UPDATE` or `DELETE` | [authentication.md](authentication.md#lockout-and-rate-limits) |
+| `sign_in_failures` | `0004`, `0006` (adds `session_id`, `wrong_two_factor_code`) | `SELECT`, `INSERT`. No `UPDATE` or `DELETE` | [authentication.md](authentication.md#lockout-and-rate-limits) |
 | `totp_credentials` | `0005_totp_credentials.sql` | `SELECT`, `INSERT`; `UPDATE` of everything except `account_id`. No `DELETE`. A trigger stops the used time step moving backwards, for every role | [authentication.md](authentication.md#secret-storage) |
+| `backup_codes` | `0006_two_factor_sign_in.sql` | `SELECT`, `INSERT`; `UPDATE` of `spent_at`, `spent_reason` only. No `DELETE`. A trigger stops a spent code being changed, for every role | [authentication.md](authentication.md#sign-in) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.
