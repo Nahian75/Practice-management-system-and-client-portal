@@ -57,8 +57,19 @@ export interface SessionsTable {
   user_agent: InsertOnly<string | null>;
 }
 
+export type SignInFailureReason = 'unknown_account' | 'wrong_password' | 'account_not_active';
+
+export interface SignInFailuresTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string | null>;
+  reason: InsertOnly<SignInFailureReason>;
+  ip_address: InsertOnly<string | null>;
+  occurred_at: InsertOnly<Date>;
+}
+
 export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   sessions: SessionsTable;
+  sign_in_failures: SignInFailuresTable;
 }

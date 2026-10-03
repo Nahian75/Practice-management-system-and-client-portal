@@ -36,7 +36,7 @@ authorization decisions.
 | Module | Status |
 |---|---|
 | Audit | Table and `AuditService` built; no callers yet |
-| Auth | Steps 1 and 2a of 5: accounts, passwords, sessions, route guard, sign-out |
+| Auth | Steps 1 and 2 of 5: accounts, passwords, sessions, route guard, sign-in password step, sign-out |
 | Users / Roles | Not started |
 | Clients | Not started |
 | Matters | Not started |

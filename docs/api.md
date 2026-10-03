@@ -7,6 +7,7 @@
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
+| POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, or 401 `Email or password is incorrect` for every kind of failure |
 | GET | `/auth/session` | Any signed-in account | The signed-in account: id, kind, display name |
 | POST | `/auth/sign-out` | Public | Ends the current session if there is one, clears the cookie. Always 204 |
 

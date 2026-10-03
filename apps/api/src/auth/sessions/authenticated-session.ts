@@ -15,7 +15,7 @@ export interface ResolvedSession {
   account: SessionAccount;
 }
 
-export function auditActorFor(account: SessionAccount): AuditActor {
+export function auditActorFor(account: Pick<SessionAccount, 'id' | 'kind'>): AuditActor {
   return account.kind === 'staff' ? { type: 'user', id: account.id } : { type: 'client', id: account.id };
 }
 

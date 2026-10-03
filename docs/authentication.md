@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2a done: sessions, session cookie, route guard, sign-out (`apps/api/src/auth/sessions/`). Sign-in itself (step 2b) not built yet, so no session can be created through the API.
+**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2 done: sessions, route guard, sign-out, and the password step of sign-in (`apps/api/src/auth/sessions/`, `apps/api/src/auth/sign-in/`). A correct password creates a session waiting for 2FA, which cannot open any protected route until step 3 is built.
 
 ## Decisions
 
@@ -63,8 +63,17 @@ Follows NCSC and NIST SP 800-63B guidance.
 Temporary blocks, not permanent lockout: a permanent lock would let anyone
 lock a partner out by typing their email ten times.
 
-Counters are kept in PostgreSQL. No extra service (such as Redis) is needed at
-this scale.
+Counters are kept in PostgreSQL (`sign_in_failures`). No extra service (such
+as Redis) is needed at this scale.
+
+- Only wrong passwords count towards the account block. Attempts made while
+  blocked are not recorded, so an attacker cannot keep extending the block.
+- A completed sign-in (password and 2FA) clears the count.
+- Failure times come from the same app clock that checks the limit. Mixing the
+  database clock and the app clock would make the 15-minute boundary unreliable.
+- Two requests arriving at the same moment can both be checked before either
+  is recorded, so the limit can be exceeded by one or two attempts. Acceptable:
+  the limit slows guessing, it is not the only defence.
 
 ## Sessions
 

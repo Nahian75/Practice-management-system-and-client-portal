@@ -47,6 +47,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 |---|---|---|---|
 | `accounts` | `0002_accounts.sql` | `SELECT`, `INSERT`; `UPDATE` on `display_name`, `status`, `password_hash`, `password_changed_at` only. No `DELETE` | [authentication.md](authentication.md) |
 | `sessions` | `0003_sessions.sql` | `SELECT`; `INSERT` without `id`, `created_at`, `ended_at`; `UPDATE` of stage, timestamps and end only. No `DELETE`. A trigger stops ended sessions changing and authenticated sessions going back to pending, for every role | [authentication.md](authentication.md#sessions) |
+| `sign_in_failures` | `0004_sign_in_failures.sql` | `SELECT`, `INSERT`. No `UPDATE` or `DELETE` | [authentication.md](authentication.md#lockout-and-rate-limits) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.
