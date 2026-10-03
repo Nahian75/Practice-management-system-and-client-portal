@@ -100,6 +100,10 @@ office internet address; counting successful sign-ins would block the office
 at 9 am. Failures from one address across many accounts are what password
 spraying looks like, which the per-account limit cannot see.
 
+An IPv6 address counts as its whole /64, since one connection is normally given
+a /64 and could otherwise use a new address for every guess. IPv4 addresses that
+arrive in IPv6 form (`::ffff:1.2.3.4`) are recorded as plain IPv4.
+
 The address is the TCP connection's, unless `TRUSTED_PROXIES` lists the proxy
 it came through: then the proxy's `X-Forwarded-For` is believed. Empty by
 default, so a client cannot pick the address it is limited and audited under.

@@ -110,6 +110,35 @@ describe('Per-address sign-in limit', () => {
     expect(response.status).toBe(429);
   });
 
+  it('treats a whole IPv6 /64 as one source, so rotating addresses inside it does not help', async () => {
+    const block = `2001:db8:${randomUUID().slice(0, 4)}:${randomUUID().slice(0, 4)}`;
+    for (let i = 1; i <= MAX_FAILURES_PER_ADDRESS; i += 1) {
+      await signInFrom(`${block}::${i.toString(16)}`, `someone-${randomUUID()}@example.com`, 'Summer2026!Summer');
+    }
+
+    expect((await signInFrom(`${block}::ffff`, account.email, PASSWORD)).status).toBe(429);
+  });
+
+  it('keeps neighbouring IPv6 /64 blocks separate', async () => {
+    const block = `2001:db8:${randomUUID().slice(0, 4)}:${randomUUID().slice(0, 3)}0`;
+    const neighbour = `${block.slice(0, -1)}1`;
+    for (let i = 1; i <= MAX_FAILURES_PER_ADDRESS; i += 1) {
+      await signInFrom(`${block}::${i.toString(16)}`, `someone-${randomUUID()}@example.com`, 'Summer2026!Summer');
+    }
+
+    expect((await signInFrom(`${neighbour}::1`, account.email, PASSWORD)).status).toBe(200);
+  });
+
+  it('counts an IPv4 client the same whether it arrives as IPv4 or IPv4-mapped IPv6', async () => {
+    const v4 = randomTestAddress();
+    for (let i = 0; i < MAX_FAILURES_PER_ADDRESS; i += 1) {
+      const from = i % 2 === 0 ? v4 : `::ffff:${v4}`;
+      await signInFrom(from, `someone-${randomUUID()}@example.com`, 'Summer2026!Summer');
+    }
+
+    expect((await signInFrom(v4, account.email, PASSWORD)).status).toBe(429);
+  });
+
   it('records the refused attempt with its address', async () => {
     await sprayFrom(address, MAX_FAILURES_PER_ADDRESS);
     await signInFrom(address, account.email, PASSWORD);

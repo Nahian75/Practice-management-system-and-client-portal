@@ -144,6 +144,15 @@ process before it accepts any request.
 - Rule: never log passwords, tokens, session IDs, request bodies or client
   personal data. Log IDs and outcomes instead.
 
+## Security reviews
+
+| Date | Scope | Report |
+|---|---|---|
+| 2026-10-04 | Authentication module | [reviews/2026-10-04-authentication.md](reviews/2026-10-04-authentication.md) |
+
+Open items from reviews that must be closed before production: F2 (load
+balancer rate limiting), F3 (retention), F5 (persistent email outbox).
+
 ## Client addresses
 
 `TRUSTED_PROXIES` (comma-separated IPs, CIDR ranges, or `loopback`,

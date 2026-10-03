@@ -3,6 +3,8 @@ import { sql, type Kysely } from 'kysely';
 import { DATABASE } from '../../database/database.module.js';
 import type { Database, SignInFailureReason } from '../../database/schema.js';
 
+const IPV6_SOURCE_PREFIX = 64;
+
 /** Failures that mean someone tried a credential for this account and got it wrong. */
 const GUESSES: SignInFailureReason[] = ['wrong_password', 'wrong_two_factor_code'];
 
@@ -52,12 +54,20 @@ export class SignInFailuresRepository {
     return Number(count);
   }
 
-  /** Every kind of sign-in failure from one network address since `since`, across all accounts. */
+  /**
+   * Every kind of sign-in failure from one network address since `since`,
+   * across all accounts. An IPv6 address counts as its whole /64: a single
+   * connection is normally given a /64, so rotating within it is the same source.
+   */
   async countForAddressSince(ipAddress: string, since: Date): Promise<number> {
+    const sameSource = ipAddress.includes(':')
+      ? sql<boolean>`ip_address <<= network(set_masklen(${ipAddress}::inet, ${IPV6_SOURCE_PREFIX}))`
+      : sql<boolean>`ip_address = ${ipAddress}::inet`;
+
     const { count } = await this.db
       .selectFrom('sign_in_failures')
       .select((eb) => eb.fn.countAll<string>().as('count'))
-      .where('ip_address', '=', ipAddress)
+      .where(sameSource)
       .where('occurred_at', '>', since)
       .executeTakeFirstOrThrow();
     return Number(count);
