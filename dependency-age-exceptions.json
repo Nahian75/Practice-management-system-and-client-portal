@@ -1,0 +1,8 @@
+[
+  {
+    "package": "nodemailer",
+    "version": "10.0.13",
+    "reason": "Fixes 5 published advisories (two pre-auth denial of service) present in every version old enough for the 7-day rule. Approved by the project owner on 2026-10-04. Signed SLSA provenance, zero dependencies.",
+    "expires": "2026-10-07"
+  }
+]

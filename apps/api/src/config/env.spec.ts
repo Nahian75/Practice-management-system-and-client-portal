@@ -5,7 +5,8 @@ const LOCAL_DATABASE_URL = 'postgres://pms_app:local-password@127.0.0.1:5432/pms
 const PRODUCTION_DATABASE_URL = 'postgres://pms_app:prod-password@db.internal:5432/pms';
 
 const TOTP_KEY = Buffer.alloc(32, 7).toString('base64');
-const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL, TOTP_ENCRYPTION_KEY: TOTP_KEY };
+const MAIL = { APP_BASE_URL: 'http://localhost:3000', SMTP_URL: 'smtp://127.0.0.1:1025', MAIL_FROM_ADDRESS: 'no-reply@example.com' };
+const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL, TOTP_ENCRYPTION_KEY: TOTP_KEY, ...MAIL };
 
 describe('loadEnv', () => {
   it('applies safe defaults for optional settings', () => {
@@ -16,6 +17,8 @@ describe('loadEnv', () => {
       LOG_LEVEL: 'log',
       DATABASE_URL: LOCAL_DATABASE_URL,
       TOTP_ENCRYPTION_KEY: TOTP_KEY,
+      ...MAIL,
+      MAIL_FROM_NAME: 'Practice Portal',
     });
   });
 
@@ -30,7 +33,7 @@ describe('loadEnv', () => {
     expect(env).not.toHaveProperty('MIGRATION_DATABASE_URL');
   });
 
-  it.each(['NODE_ENV', 'DATABASE_URL', 'TOTP_ENCRYPTION_KEY'])('refuses to start without %s', (name) => {
+  it.each(['NODE_ENV', 'DATABASE_URL', 'TOTP_ENCRYPTION_KEY', 'APP_BASE_URL', 'SMTP_URL', 'MAIL_FROM_ADDRESS'])('refuses to start without %s', (name) => {
     const source: Record<string, string> = { ...minimal };
     delete source[name];
 
@@ -51,6 +54,11 @@ describe('loadEnv', () => {
     ['TOTP_ENCRYPTION_KEY', 'not base64!'],
     ['TOTP_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
     ['TOTP_ENCRYPTION_KEY', Buffer.alloc(64).toString('base64')],
+    ['APP_BASE_URL', 'javascript:alert(1)'],
+    ['APP_BASE_URL', 'ftp://example.com'],
+    ['SMTP_URL', 'http://mail.example.com'],
+    ['MAIL_FROM_ADDRESS', 'not-an-email'],
+    ['MAIL_FROM_NAME', ''],
   ])('rejects %s=%j', (name, value) => {
     expect(() => loadEnv({ ...minimal, [name]: value })).toThrow(InvalidEnvError);
   });
@@ -65,7 +73,7 @@ describe('loadEnv', () => {
   });
 
   describe('in production', () => {
-    const production = { NODE_ENV: 'production', TOTP_ENCRYPTION_KEY: TOTP_KEY };
+    const production = { NODE_ENV: 'production', TOTP_ENCRYPTION_KEY: TOTP_KEY, ...MAIL, APP_BASE_URL: 'https://portal.example.com' };
 
     it('requires the database connection to verify the server certificate', () => {
       expect(() => loadEnv({ ...production, DATABASE_URL: PRODUCTION_DATABASE_URL })).toThrow(
@@ -83,6 +91,12 @@ describe('loadEnv', () => {
       const env = loadEnv({ ...production, DATABASE_URL: `${PRODUCTION_DATABASE_URL}?sslmode=verify-full` });
 
       expect(env.NODE_ENV).toBe('production');
+    });
+
+    it('requires links in emails to use https', () => {
+      expect(() =>
+        loadEnv({ ...production, DATABASE_URL: `${PRODUCTION_DATABASE_URL}?sslmode=verify-full`, APP_BASE_URL: 'http://portal.example.com' }),
+      ).toThrow(/APP_BASE_URL: must use https in production/);
     });
 
     it('does not print the database password when rejecting the URL', () => {

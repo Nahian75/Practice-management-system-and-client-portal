@@ -208,3 +208,31 @@ Passkeys are stronger and are planned as an addition, not a replacement.
 
 **Cost:** Session lookups hit the database on every request. Fine at
 law-firm scale; an index on the token hash keeps it fast.
+
+---
+
+## ADR-008: Email over SMTP with nodemailer; Mailpit locally
+
+**Date:** 2026-10-04
+**Status:** Accepted
+
+**Decision:** The API sends plain-text email over SMTP using nodemailer.
+Locally all mail goes to Mailpit, a mail catcher in Docker. The production
+provider is not chosen yet; any provider that offers SMTP works.
+
+**Why SMTP:** every candidate provider (Microsoft 365, Amazon SES, SendGrid,
+Postmark) supports it, so the provider can be chosen later without code changes.
+
+**Why nodemailer:** SMTP with TLS, authentication and correct encoding is easy
+to get subtly wrong. nodemailer is the standard Node.js library: zero
+dependencies, signed build provenance.
+
+**7-day rule exception:** every nodemailer version old enough for the rule
+(≤ 10.0.12) has 5 published advisories, including two pre-authentication
+denial-of-service flaws. 10.0.13 fixes all of them but was 4 days old. The
+project owner approved an exception for nodemailer 10.0.13 only, recorded in
+`dependency-age-exceptions.json` with an expiry of 2026-10-07. The age check
+fails once an exception expires, so it cannot quietly become permanent.
+
+**Plain text only:** no HTML email, so nothing in a message can be rendered as
+markup or carry tracking pixels.

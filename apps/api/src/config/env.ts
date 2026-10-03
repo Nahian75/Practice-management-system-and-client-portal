@@ -38,8 +38,19 @@ const envSchema = z
     LOG_LEVEL: z.enum(LOG_LEVELS).default('log'),
     DATABASE_URL: postgresUrlSchema,
     TOTP_ENCRYPTION_KEY: encryptionKeySchema,
+    /** Where users open the app. Links in emails point here. */
+    APP_BASE_URL: z.url({ protocol: /^https?$/ }),
+    /** smtp://host:port for STARTTLS or a local catcher, smtps://user:pass@host:465 for implicit TLS. */
+    SMTP_URL: z.url({ protocol: /^smtps?$/ }),
+    MAIL_FROM_ADDRESS: z.email(),
+    MAIL_FROM_NAME: z.string().min(1).max(100).default('Practice Portal'),
   })
-  .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'));
+  .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === 'production' && new URL(env.APP_BASE_URL).protocol !== 'https:') {
+      ctx.addIssue({ code: 'custom', path: ['APP_BASE_URL'], message: 'must use https in production' });
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

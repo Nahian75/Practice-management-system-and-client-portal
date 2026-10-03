@@ -23,6 +23,10 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     LOG_LEVEL: 'error',
     DATABASE_URL: testAppDatabaseUrl(),
     TOTP_ENCRYPTION_KEY: TEST_TOTP_ENCRYPTION_KEY,
+    APP_BASE_URL: 'http://localhost:3000',
+    SMTP_URL: process.env['TEST_SMTP_URL'] ?? 'smtp://127.0.0.1:1025',
+    MAIL_FROM_ADDRESS: 'no-reply@practice.test',
+    MAIL_FROM_NAME: 'Practice Portal',
     ...overrides,
   };
 }

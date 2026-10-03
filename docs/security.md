@@ -48,6 +48,10 @@ Every new dependency is justified in the change that adds it. Template
 extras that send data to external services (`@nestjs/observe`) or exist to
 sell a hosting product (`@nestjs/mau`) are not installed.
 
+Exceptions to the 7-day rule need the project owner's approval and are listed in
+`dependency-age-exceptions.json` with a reason and an expiry date. Current: nodemailer
+10.0.13 until 2026-10-07 (see ADR-008).
+
 `npm run check:dependency-age` re-checks every package in the lockfile against
 the registry, because `npm ci` installs locked versions without re-checking ages.
 

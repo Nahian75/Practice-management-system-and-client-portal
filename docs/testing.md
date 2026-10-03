@@ -22,6 +22,11 @@ Before any test runs, `test/global-setup.ts` applies the real migrations to
 database, so tests identify their own rows by a random actor ID. To start from
 an empty test database: `docker compose down -v && docker compose up -d`.
 
+## Email tests
+
+Tests that send email deliver to Mailpit and read it back through its API
+(`test/mailpit.ts`). Each test uses its own random address.
+
 ## Running
 
 ```sh
