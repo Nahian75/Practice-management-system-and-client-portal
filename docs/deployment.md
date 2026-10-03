@@ -9,7 +9,7 @@ Requirements: Node.js 24 LTS, Docker Desktop, gitleaks.
 ```sh
 cp .env.example .env              # then fill every value with a random password
 docker compose up -d              # PostgreSQL 18 on 127.0.0.1:5432
-cp apps/api/.env.example apps/api/.env    # then fill the four database URLs
+cp apps/api/.env.example apps/api/.env    # then fill the database URLs and TOTP_ENCRYPTION_KEY
 npm ci
 npm run build -w @practice/api
 npm run migrate:local -w @practice/api

@@ -4,7 +4,8 @@ import { InvalidEnvError, loadEnv } from './env.js';
 const LOCAL_DATABASE_URL = 'postgres://pms_app:local-password@127.0.0.1:5432/pms';
 const PRODUCTION_DATABASE_URL = 'postgres://pms_app:prod-password@db.internal:5432/pms';
 
-const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL };
+const TOTP_KEY = Buffer.alloc(32, 7).toString('base64');
+const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL, TOTP_ENCRYPTION_KEY: TOTP_KEY };
 
 describe('loadEnv', () => {
   it('applies safe defaults for optional settings', () => {
@@ -14,6 +15,7 @@ describe('loadEnv', () => {
       PORT: 3000,
       LOG_LEVEL: 'log',
       DATABASE_URL: LOCAL_DATABASE_URL,
+      TOTP_ENCRYPTION_KEY: TOTP_KEY,
     });
   });
 
@@ -28,7 +30,7 @@ describe('loadEnv', () => {
     expect(env).not.toHaveProperty('MIGRATION_DATABASE_URL');
   });
 
-  it.each(['NODE_ENV', 'DATABASE_URL'])('refuses to start without %s', (name) => {
+  it.each(['NODE_ENV', 'DATABASE_URL', 'TOTP_ENCRYPTION_KEY'])('refuses to start without %s', (name) => {
     const source: Record<string, string> = { ...minimal };
     delete source[name];
 
@@ -46,6 +48,9 @@ describe('loadEnv', () => {
     ['DATABASE_URL', 'not a url'],
     ['DATABASE_URL', 'mysql://user:pass@host/db'],
     ['DATABASE_URL', 'https://example.com'],
+    ['TOTP_ENCRYPTION_KEY', 'not base64!'],
+    ['TOTP_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
+    ['TOTP_ENCRYPTION_KEY', Buffer.alloc(64).toString('base64')],
   ])('rejects %s=%j', (name, value) => {
     expect(() => loadEnv({ ...minimal, [name]: value })).toThrow(InvalidEnvError);
   });
@@ -60,7 +65,7 @@ describe('loadEnv', () => {
   });
 
   describe('in production', () => {
-    const production = { NODE_ENV: 'production' };
+    const production = { NODE_ENV: 'production', TOTP_ENCRYPTION_KEY: TOTP_KEY };
 
     it('requires the database connection to verify the server certificate', () => {
       expect(() => loadEnv({ ...production, DATABASE_URL: PRODUCTION_DATABASE_URL })).toThrow(

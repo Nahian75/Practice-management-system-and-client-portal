@@ -1,6 +1,6 @@
 # Authentication
 
-**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2 done: sessions, route guard, sign-out, and the password step of sign-in (`apps/api/src/auth/sessions/`, `apps/api/src/auth/sign-in/`). A correct password creates a session waiting for 2FA, which cannot open any protected route until step 3 is built.
+**Current state (2026-10-03):** Approved. Step 1 done (accounts, passwords). Step 2 done: sessions, route guard, sign-out, and the password step of sign-in (`apps/api/src/auth/sessions/`, `apps/api/src/auth/sign-in/`). A correct password creates a session waiting for 2FA, which cannot open any protected route. Step 3a done: TOTP codes, encrypted secret storage, enrolment (`apps/api/src/auth/two-factor/`). Step 3b (the 2FA sign-in step and backup codes) not built yet.
 
 ## Decisions
 
@@ -49,7 +49,31 @@ Follows NCSC and NIST SP 800-63B guidance.
   incorrect"), and the same work is done when the email does not exist, so
   the response cannot be used to discover which emails have accounts.
 - A 2FA challenge allows 5 code attempts, then it is cancelled.
-- A TOTP code can be used only once, even within its 30-second window.
+- A TOTP code can be used only once, even within its 30-second window. Enforced
+  twice: the code check refuses steps at or before the last used one, and the
+  database update only succeeds if the step is newer (atomic, so two
+  simultaneous requests with the same code cannot both succeed). A trigger also
+  stops the stored step moving backwards, for every role.
+- Codes from one step either side of the current one are accepted, for phone
+  clocks that are slightly off.
+
+### Enrolment
+
+- 2FA is set up only while accepting an invitation (step 4) or from a fully
+  signed-in session. Never straight after the password step: otherwise anyone
+  holding a stolen password could attach their own authenticator app.
+- A new secret is unconfirmed until the account enters a code from the app. An
+  unconfirmed secret can be replaced; a confirmed one cannot be replaced by enrolment.
+- An active account without confirmed 2FA cannot sign in.
+
+### Secret storage
+
+- 20 random bytes per account, sealed with AES-256-GCM under
+  `TOTP_ENCRYPTION_KEY`. The account ID is bound into the authentication tag,
+  so a secret copied onto another account fails to open.
+- Each row records the key version, so the key can be rotated later.
+- TOTP itself is implemented with `node:crypto` and tested against the
+  RFC 4226, RFC 6238 and RFC 4648 test vectors.
 - A backup code can replace the TOTP code. Each works once.
 
 ## Lockout and rate limits

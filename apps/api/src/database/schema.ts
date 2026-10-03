@@ -67,9 +67,21 @@ export interface SignInFailuresTable {
   occurred_at: InsertOnly<Date>;
 }
 
+export interface TotpCredentialsTable {
+  account_id: InsertOnly<string>;
+  key_version: Writable<number>;
+  nonce: Writable<Buffer>;
+  ciphertext: Writable<Buffer>;
+  auth_tag: Writable<Buffer>;
+  created_at: Writable<Date>;
+  confirmed_at: Writable<Date | null>;
+  last_used_step: ColumnType<string | null, number | null, number | null>;
+}
+
 export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
+  totp_credentials: TotpCredentialsTable;
 }

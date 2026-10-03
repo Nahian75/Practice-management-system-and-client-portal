@@ -158,6 +158,15 @@ process before it accepts any request.
 - Role privileges are covered by integration tests
   (`apps/api/src/database/database.module.spec.ts`).
 
+## Application secrets
+
+| Secret | Purpose | If lost | If leaked |
+|---|---|---|---|
+| `TOTP_ENCRYPTION_KEY` | Encrypts 2FA secrets | Every account must re-enrol 2FA | With a copy of the database, an attacker could generate 2FA codes. Rotate the key and require re-enrolment |
+
+Locally in `apps/api/.env` (git-ignored). In production from the secret manager,
+never from a file in the image.
+
 ## Files Git never tracks
 
 `.gitignore` excludes environment files (except `.env.example`), keys and

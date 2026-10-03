@@ -1,4 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import type { Env } from '../src/config/env.js';
+
+// Fresh for every test process: secrets sealed in one run are never readable in another.
+const TEST_TOTP_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 
 function required(name: string): string {
   const value = process.env[name];
@@ -18,6 +22,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     PORT: 0,
     LOG_LEVEL: 'error',
     DATABASE_URL: testAppDatabaseUrl(),
+    TOTP_ENCRYPTION_KEY: TEST_TOTP_ENCRYPTION_KEY,
     ...overrides,
   };
 }

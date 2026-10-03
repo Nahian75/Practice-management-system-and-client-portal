@@ -5,6 +5,15 @@ export const LOG_LEVELS = ['fatal', 'error', 'warn', 'log', 'debug', 'verbose'] 
 export const nodeEnvSchema = z.enum(['development', 'test', 'production']);
 export const postgresUrlSchema = z.url({ protocol: /^postgres(ql)?$/ });
 
+const ENCRYPTION_KEY_BYTES = 32;
+
+/** A random 256-bit key, base64-encoded. */
+export const encryptionKeySchema = z
+  .base64()
+  .refine((value) => Buffer.from(value, 'base64').length === ENCRYPTION_KEY_BYTES, {
+    message: `must be ${ENCRYPTION_KEY_BYTES} random bytes, base64-encoded`,
+  });
+
 /**
  * In production the database connection must be encrypted and the server's
  * certificate checked, otherwise credentials and client data cross the network
@@ -28,6 +37,7 @@ const envSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z.enum(LOG_LEVELS).default('log'),
     DATABASE_URL: postgresUrlSchema,
+    TOTP_ENCRYPTION_KEY: encryptionKeySchema,
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'));
 
