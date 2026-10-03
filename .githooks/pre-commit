@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed. Commit blocked." >&2
+  echo "Install it, then retry: winget install Gitleaks.Gitleaks" >&2
+  exit 1
+fi
+
+if ! gitleaks git --pre-commit --staged --redact --no-banner --ignore-gitleaks-allow; then
+  echo "" >&2
+  echo "pre-commit: possible secret in staged changes. Commit blocked." >&2
+  echo "Remove it from the file and unstage it. Never commit real credentials." >&2
+  exit 1
+fi

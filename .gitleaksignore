@@ -1,0 +1,5 @@
+# Reviewed false positives. Each line: fingerprint, then why it is safe.
+# A fingerprint covers one exact finding, not the whole file.
+
+# Made-up password in a test proving outage logs contain no password data.
+apps/api/src/auth/passwords/breached-password-checker.spec.ts:generic-api-key:72

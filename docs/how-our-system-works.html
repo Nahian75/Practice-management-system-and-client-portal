@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How Our System Works</title>
+<style>
+  @page { size: A4; margin: 16mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1f2933; font-size: 11pt; line-height: 1.45; margin: 0; background: #fff; }
+  h1 { font-size: 22pt; margin: 0 0 2mm; color: #12355b; }
+  .sub { color: #52606d; margin: 0 0 6mm; }
+  h2 { font-size: 13.5pt; color: #12355b; margin: 7mm 0 3mm; border-bottom: 1.5px solid #d9e2ec; padding-bottom: 1.5mm; }
+  p { margin: 0 0 3mm; }
+  .parts { display: flex; gap: 4mm; }
+  .part { flex: 1; border: 1px solid #d9e2ec; border-radius: 3mm; padding: 3.5mm; background: #f5f8fb; }
+  .part b { display: block; font-size: 11.5pt; color: #12355b; margin-bottom: 1mm; }
+  .part .tech { font-size: 8.5pt; color: #7b8794; margin-top: 2mm; }
+  .arrow { align-self: center; font-size: 16pt; color: #9aa5b1; }
+  ol, ul { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.6mm; }
+  .stop { background: #fdf3f2; border-left: 4px solid #c0392b; padding: 3mm 4mm; margin: 3mm 0; }
+  .flow { display: flex; flex-wrap: nowrap; gap: 1.2mm; align-items: center; margin: 2mm 0 3mm; }
+  .step { border: 1px solid #bcccdc; border-radius: 2mm; padding: 1.5mm 2mm; font-size: 8.8pt; white-space: nowrap; background: #fff; }
+  .step.check { background: #eef6ee; border-color: #9cc59c; }
+  .step.human { background: #fff8e6; border-color: #e3c16f; }
+  .step.live { background: #12355b; color: #fff; border-color: #12355b; }
+  .flow .a { color: #9aa5b1; }
+  table { border-collapse: collapse; width: 100%; font-size: 10pt; margin-bottom: 3mm; }
+  th, td { text-align: left; padding: 1.8mm 2.5mm; border-bottom: 1px solid #e4e7eb; vertical-align: top; }
+  th { background: #f5f8fb; color: #12355b; }
+  .yes { color: #2f7d32; font-weight: 600; }
+  .no { color: #c0392b; font-weight: 600; }
+  .page-break { break-before: page; }
+  .foot { color: #7b8794; font-size: 8.5pt; margin-top: 6mm; }
+</style>
+</head>
+<body>
+
+<h1>How Our System Works</h1>
+<p class="sub">A plain-English guide to the firm's case-management system and client portal, and how we keep it safe.</p>
+
+<h2>1. The three parts</h2>
+<p>Think of the system as a well-run law office.</p>
+<div class="parts">
+  <div class="part"><b>The reception desk</b>
+    What people see and click: the staff screens and the client portal. It looks good, but it holds no secrets and makes no decisions.
+    <div class="tech">Built with: Next.js</div></div>
+  <div class="arrow">→</div>
+  <div class="part"><b>The security office</b>
+    Every request comes here first. It checks who you are, what you're allowed to see, and writes everything in the logbook.
+    <div class="tech">Built with: NestJS</div></div>
+  <div class="arrow">→</div>
+  <div class="part"><b>The locked vault</b>
+    Where client records, matters, money and documents are kept. Only the security office has the key.
+    <div class="tech">Built with: PostgreSQL + private file storage</div></div>
+</div>
+
+<h2>2. What happens when a client opens a document</h2>
+<ol>
+  <li>The client logs in with their password <b>and</b> a code from their phone.</li>
+  <li>They click a document on the portal (the reception desk).</li>
+  <li>The request goes to the security office, which asks: <i>Is this really them? Is this their matter? Is this document shared with clients, or is it internal?</i></li>
+  <li>Only if every answer is "yes" does the vault hand over the document, through a link that stops working after a few minutes.</li>
+  <li>The visit is written in the logbook, which no one can edit or erase.</li>
+</ol>
+<div class="stop"><b>If any answer is "no", the client gets nothing.</b> Hiding a button on the screen is never treated as security. The check always happens in the security office.</div>
+
+<h2>3. Who can see what</h2>
+<table>
+  <tr><th>Information</th><th>Firm staff (with permission)</th><th>Clients</th></tr>
+  <tr><td>Their own matters and shared documents</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+  <tr><td>Other clients or other matters</td><td>Only if assigned</td><td class="no">Never</td></tr>
+  <tr><td>Internal notes and internal documents</td><td class="yes">Yes</td><td class="no">Never</td></tr>
+  <tr><td>Money-laundering checks and risk notes</td><td>Compliance staff only</td><td class="no">Never</td></tr>
+  <tr><td>Firm accounts and staff/HR records</td><td>Authorised staff only</td><td class="no">Never</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>4. How a change gets built: our safety pipeline</h2>
+<p>Every improvement to the system, however small, goes through the same route before anyone can use it:</p>
+<div class="flow">
+  <span class="step">Change is written</span><span class="a">→</span>
+  <span class="step check">Automatic checks</span><span class="a">→</span>
+  <span class="step human">A person reviews it</span><span class="a">→</span>
+  <span class="step check">Tried out with fake data</span><span class="a">→</span>
+  <span class="step live">Goes live</span>
+</div>
+<p><b>The automatic checks</b> run every time, and look for:</p>
+<ul>
+  <li><b>Mistakes:</b> does it still do what it should?</li>
+  <li><b>Break-in attempts:</b> do the tests prove a client <i>cannot</i> see someone else's file, even by trying tricks?</li>
+  <li><b>Leaked passwords:</b> has anyone accidentally left a password or key in the work?</li>
+  <li><b>Unsafe parts:</b> do any of the outside building blocks we use have known security holes?</li>
+</ul>
+<div class="stop"><b>If any safety check fails, the change stops.</b> It cannot go live until it is fixed. Nobody is allowed to switch a check off to get past it.</div>
+
+<h2>5. Our golden rules</h2>
+<ul>
+  <li><b>Real client data never leaves the live system.</b> Building and testing only ever use made-up names and documents.</li>
+  <li><b>Everything important is logged:</b> logins, failed logins, document downloads, permission changes, money movements and approvals.</li>
+  <li><b>Client money and office money are kept apart.</b> Payments need approval, and the person who requests a payment cannot approve it. Mistakes are corrected with a new entry, never by deleting the old one.</li>
+  <li><b>Uploaded files are checked</b> for viruses and the correct file type before they are stored.</li>
+  <li><b>Data is stored encrypted and backed up</b>, with UK hosting planned.</li>
+  <li><b>Anything written by AI is only a draft</b> until a qualified person reads and approves it.</li>
+</ul>
+
+<p class="foot">Version 1 · 3 October 2026 · The system is being built now. This guide describes how it is designed to work.</p>
+</body>
+</html>

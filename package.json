@@ -1,0 +1,13 @@
+{
+  "name": "practice-management",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "check:dependency-age": "node scripts/check-dependency-age.mjs"
+  }
+}

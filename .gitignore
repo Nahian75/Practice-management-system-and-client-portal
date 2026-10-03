@@ -1,0 +1,40 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Local data — never commit uploads, dumps or databases
+uploads/
+storage/
+*.sql.gz
+*.dump
+*.sqlite
+*.db
+
+# Logs
+*.log
+logs/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
