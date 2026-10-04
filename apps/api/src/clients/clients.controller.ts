@@ -322,8 +322,8 @@ export class ClientsController {
     switch (await this.clients.takeOver(clientId, body.reason, actorFor(session, request))) {
       case 'not_found':
         throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
-      case 'responsible_active':
-        throw new ConflictException('The person responsible for this client is still active');
+      case 'responsible_has_access':
+        throw new ConflictException('The person responsible for this client can still see it');
       case 'taken_over':
         return;
     }

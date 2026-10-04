@@ -1,7 +1,8 @@
 import { sql, type Insertable, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestAccount, setAccountStatus, type TestAccount } from '../../test/accounts.js';
+import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
+import { permissionsFor, STAFF_ROLES } from '../auth/permissions/permissions.js';
 import { createDatabase } from '../database/database.js';
 import type {
   ClientContactsTable,
@@ -156,6 +157,7 @@ describe('clients tables', () => {
 
     beforeEach(async () => {
       creator = await createTestAccount(db, 'staff');
+      await grantTestRole(db, creator.id, 'fee_earner');
       partner = await createTestAccount(db, 'staff');
       clientId = (await createClient('individual', { individual: individual() }, creator.id)).id;
     });
@@ -172,12 +174,36 @@ describe('clients tables', () => {
       expect(await responsibleFor(clientId)).toBe(partner.id);
     });
 
+    it('moves to the new person when the responsible person no longer holds a role that sees clients', async () => {
+      await revokeTestRole(db, creator.id, 'fee_earner');
+      await grantTestRole(db, creator.id, 'accounts');
+
+      await recordChange();
+
+      expect(await responsibleFor(clientId)).toBe(partner.id);
+    });
+
     it.each<[string, () => Promise<unknown>, RegExp]>([
-      ['from an account that is still active', () => recordChange(), /only from a disabled account/],
+      ['from someone who can still see the client', () => recordChange(), /can no longer see it/],
       ['from someone who is not responsible', () => recordChange({ from_account_id: partner.id, to_account_id: creator.id }), /is not the responsibility of/],
     ])('refuses a change %s', async (_case, attempt, error) => {
       await expect(attempt()).rejects.toThrow(error);
       expect(await responsibleFor(clientId)).toBe(creator.id);
+    });
+
+    // The trigger keeps its own list of roles that see clients; this keeps it in step with permissions.ts.
+    it.each(STAFF_ROLES)('agrees with the permission table about an active %s', async (role) => {
+      const holder = await createTestAccount(db, 'staff');
+      await grantTestRole(db, holder.id, role);
+      const theirClient = (await createClient('individual', { individual: individual() }, holder.id)).id;
+
+      const attempt = recordChange({ client_id: theirClient, from_account_id: holder.id });
+
+      if (permissionsFor([role]).has('clients.view')) {
+        await expect(attempt).rejects.toThrow(/can no longer see it/);
+      } else {
+        await expect(attempt).resolves.toBeDefined();
+      }
     });
 
     it.each<[string, () => Promise<TestAccount>]>([

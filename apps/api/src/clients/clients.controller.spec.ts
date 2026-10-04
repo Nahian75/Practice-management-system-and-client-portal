@@ -728,12 +728,21 @@ describe('Clients', () => {
       expect(await changesOf(clientId)).toEqual([]);
       expect((await as(partnerToken).get(`/clients/${clientId}`)).status).toBe(404);
       expect(await takeOverEvents(clientId)).toEqual([
-        { actor_id: partner.id, action: 'client.take_over_refused', outcome: 'denied', metadata: { reason: 'responsible_active' } },
+        { actor_id: partner.id, action: 'client.take_over_refused', outcome: 'denied', metadata: { reason: 'responsible_has_access' } },
       ]);
     });
 
     it('does not find a client that does not exist', async () => {
       expect((await as(partnerToken).post('/clients/00000000-0000-7000-8000-000000000000/take-over', REASON)).status).toBe(404);
+    });
+
+    // Review C3: the responsible person moved to another team, still at work but unable to see clients.
+    it('takes over from someone still active who no longer holds a role that sees clients', async () => {
+      await revokeTestRole(db, feeEarner.id, 'fee_earner');
+      await grantTestRole(db, feeEarner.id, 'accounts');
+
+      expect((await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON)).status).toBe(204);
+      expect((await as(partnerToken).get(`/clients/${clientId}`)).status).toBe(200);
     });
   });
 });

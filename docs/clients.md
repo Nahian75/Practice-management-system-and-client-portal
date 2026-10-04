@@ -2,8 +2,9 @@
 
 **Current state (2026-10-04):** Built: creating a client, opening and listing
 the clients you can see, searching every client by name or reference, editing
-details, a partner taking over a client whose responsible person is disabled,
-and contacts of organisation clients. The module's security review is next.
+details, a partner taking over a client whose responsible person can no longer see it,
+and contacts of organisation clients. Security review done; review items C2
+and C8 are being built.
 
 ## Decisions
 
@@ -14,7 +15,7 @@ and contacts of organisation clients. The module's security review is next.
 | Who sees a client's details | The person who created it, until a matter exists; then that matter's team | Project owner |
 | Finding existing clients | Anyone who can create clients can search every client by name, seeing only reference, type and name | Project owner |
 | Portal logins | Per person: each contact, or an individual client themself, may get their own login | Project owner |
-| Client whose responsible person is disabled | A partner can take it over, giving a reason ([below](#taking-over-a-client)) | Project owner |
+| Client whose responsible person is disabled or has lost `clients.view` | A partner can take it over, giving a reason ([below](#taking-over-a-client)) | Project owner |
 | Deleting clients | Never. Clients are archived; retention is handled with Compliance | Rule: records are kept |
 
 ## What a client is
@@ -69,7 +70,7 @@ New permissions, added to the table in [authorization.md](authorization.md):
 | `clients.view` — open a client you can see | | ✓ | ✓ | | |
 | `clients.search` — find any client by name (reference, type, name only) | | ✓ | ✓ | | |
 | `clients.edit` — change details and contacts of a client you can see | | ✓ | ✓ | | |
-| `clients.take_over` — become responsible for a client whose responsible person is disabled | | ✓ | | | |
+| `clients.take_over` — become responsible for a client whose responsible person can no longer see it | | ✓ | | | |
 
 A permission is not enough to see a client's details: layer 3 also applies.
 The reverse holds too: someone whose fee earner role is revoked loses access
@@ -113,7 +114,7 @@ race happen on every run. Sending the same values again records nothing.
 | GET | `/clients/search?q=` | `clients.search` | Reference, kind and name only |
 | GET | `/clients/:id` | `clients.view` + layer 3 | Full details and contacts. 404 if not visible |
 | PATCH | `/clients/:id` | `clients.edit` + layer 3 | Change details. `kind` and `reference` cannot be changed |
-| POST | `/clients/:id/take-over` | `clients.take_over` | `{"reason"}` → 204. 404 no such client, 409 the responsible person is still active |
+| POST | `/clients/:id/take-over` | `clients.take_over` | `{"reason"}` → 204. 404 no such client, 409 the responsible person can still see the client |
 | POST | `/clients/:id/contacts` | `clients.edit` + layer 3 | `{givenNames, familyName, jobTitle?, email?, phone?}` → 201 `{id}`. 409 for an individual client |
 | PATCH | `/clients/:id/contacts/:contactId` | `clients.edit` + layer 3 | Change details, or `{"active": false}` to mark inactive (and `true` to undo). 404 unless the contact belongs to this client |
 
@@ -133,7 +134,7 @@ must contain a letter or a digit ([review C1](reviews/2026-10-04-clients.md)).
 | `client.created` | kind |
 | `client.updated` | names of the fields that changed, never their values |
 | `client.taken_over` | id of the `client_responsibility_changes` row, previous responsible person. The reason stays in that row |
-| `client.take_over_refused` | `responsible_active`: a takeover tried while the responsible person was still active |
+| `client.take_over_refused` | `responsible_has_access`: a takeover tried while the responsible person could still see the client |
 | `client.contact_added` | contact id |
 | `client.contact_updated` | contact id, names of the fields that changed |
 
@@ -157,17 +158,19 @@ team (compliance, with a reason) are audited when Matters is built.
 
 ## Taking over a client
 
-Decided by the project owner: if the person responsible for a client is
-disabled before a matter is opened, **a partner can take the client over**,
-giving a reason.
+Decided by the project owner: if the person responsible for a client can no
+longer see it, **a partner can take the client over**, giving a reason. That
+is the case when their account is disabled, or when it is still active but no
+longer holds a role granting `clients.view`, for example after moving to the
+accounts team ([review C3](reviews/2026-10-04-clients.md)).
 
 - `clients` gains `responsible_id`, which starts as the creator. Visibility
   follows the responsible person; `created_by` stays as the historical record.
 - `POST /clients/:id/take-over` with `{"reason"}` (10 to 500 characters),
   permission `clients.take_over` (partners only).
-- Allowed **only while the responsible person's account is disabled**: 409
-  otherwise. Without that limit any partner could take any client, which would
-  undo the visibility rule. The partner finds the client through search, which
+- Allowed **only while the responsible person cannot see the client**: 409
+  while they can. Without that limit any partner could take any client, which
+  would undo the visibility rule. The partner finds the client through search, which
   is why this endpoint answers for clients the caller cannot see.
 - Each takeover is kept in `client_responsibility_changes` (client, from, to,
   reason, when). The reason lives there, not in the audit log, because free
@@ -178,12 +181,18 @@ giving a reason.
 
 The app has no right to change `responsible_id`. Recording a row in
 `client_responsibility_changes` is what changes it: a trigger checks that the
-handover comes from the current responsible person, that their account is
-disabled, and that the new person is active staff, then applies it. The
-trigger runs as the table owner (`SECURITY DEFINER`, with a fixed
-`search_path`). So no bug in the app can move a client without a history row
-and a reason, or take one from someone still at work; a test removes the
-service's own check and the database still refuses.
+handover comes from the current responsible person, that they can no longer
+see the client (disabled, or holding no role that grants `clients.view`), and
+that the new person is active staff, then applies it. The trigger runs as the
+table owner (`SECURITY DEFINER`, with a fixed `search_path`). So no bug in the
+app can move a client without a history row and a reason, or take one from
+someone who still has it; a test removes the service's own check and the
+database still refuses.
+
+The trigger keeps its own list of roles that see clients (`partner`,
+`fee_earner`), because it cannot read `permissions.ts`. A test runs every role
+through both and fails if they disagree, so giving another role `clients.view`
+without updating the trigger cannot go unnoticed.
 
 Takeovers of one client queue on an advisory lock, so two partners trying at
 once get 204 and 409. A test holds the lock from another connection to make
@@ -197,4 +206,4 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
 - **7d.** Contacts. Done.
-- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1 fixed; C2, C3 and C8 decided, to be built next.
+- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1 and C3 fixed; C2 and C8 decided, to be built next.

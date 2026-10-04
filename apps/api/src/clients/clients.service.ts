@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
+import { permissionsFor } from '../auth/permissions/permissions.js';
+import { RolesRepository } from '../auth/permissions/roles.repository.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { ClientKind } from '../database/schema.js';
 import type {
@@ -35,6 +37,7 @@ export class ClientsService {
   constructor(
     private readonly clients: ClientsRepository,
     private readonly audit: AuditService,
+    private readonly roles: RolesRepository,
   ) {}
 
   /** The audit record names the kind only: client details are personal data and stay out of the log. */
@@ -182,10 +185,11 @@ export class ClientsService {
   }
 
   /**
-   * Makes the caller responsible for a client whose responsible person's
-   * account is disabled. Works for clients the caller cannot see yet: they
-   * find it through search. The reason is stored with the change, not in the
-   * audit log, which points to it instead.
+   * Makes the caller responsible for a client whose responsible person can no
+   * longer see it: their account is disabled, or they no longer hold
+   * `clients.view`. Works for clients the caller cannot see yet: they find it
+   * through search. The reason is stored with the change, not in the audit
+   * log, which points to it instead.
    */
   async takeOver(clientId: string, reason: string, by: ClientActor): Promise<TakeOverResult> {
     const result = await this.clients.transaction(async (trx): Promise<TakeOverResult> => {
@@ -194,8 +198,9 @@ export class ClientsService {
       if (!current) {
         return 'not_found';
       }
-      if (current.status !== 'disabled') {
-        return 'responsible_active';
+      const responsibleRoles = await this.roles.activeRoles(current.responsible_id, trx);
+      if (current.status !== 'disabled' && permissionsFor(responsibleRoles).has('clients.view')) {
+        return 'responsible_has_access';
       }
 
       const changeId = await this.clients.recordResponsibilityChange(
@@ -216,14 +221,14 @@ export class ClientsService {
       return 'taken_over';
     });
 
-    // Trying to take a client from someone still at work is worth noticing.
-    if (result === 'responsible_active') {
+    // Trying to take a client from someone who still has it is worth noticing.
+    if (result === 'responsible_has_access') {
       await this.audit.record({
         actor: by.actor,
         action: 'client.take_over_refused',
         outcome: 'denied',
         resource: { type: 'client', id: clientId },
-        metadata: { reason: 'responsible_active' },
+        metadata: { reason: 'responsible_has_access' },
         ...by.context,
       });
     }
@@ -231,7 +236,7 @@ export class ClientsService {
   }
 }
 
-export type TakeOverResult = 'taken_over' | 'not_found' | 'responsible_active';
+export type TakeOverResult = 'taken_over' | 'not_found' | 'responsible_has_access';
 
 export type AddContactResult = { outcome: 'added'; contactId: string } | { outcome: 'not_found' | 'not_organisation' };
 
