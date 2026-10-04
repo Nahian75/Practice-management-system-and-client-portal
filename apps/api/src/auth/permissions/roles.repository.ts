@@ -47,21 +47,21 @@ export class RolesRepository {
   }
 
   /**
-   * Serialises every change that could remove an administrator, until the
-   * transaction ends. Without it, two administrators removing each other at
+   * Serialises every change that could remove a protected role's holder, until
+   * the transaction ends. Without it, two administrators removing each other at
    * the same moment would each see the other still there, and both succeed.
    */
-  async lockAdministratorChanges(trx: Kysely<Database>): Promise<void> {
-    await sql`select pg_advisory_xact_lock(hashtextextended('app.administrators', 0))`.execute(trx);
+  async lockProtectedRoleChanges(trx: Kysely<Database>): Promise<void> {
+    await sql`select pg_advisory_xact_lock(hashtextextended('app.protected_roles', 0))`.execute(trx);
   }
 
-  /** Active accounts holding the administrator role, not counting `accountId`. */
-  async countOtherActiveAdministrators(accountId: string, executor: Kysely<Database> = this.db): Promise<number> {
+  /** Active accounts holding `role`, not counting `accountId`. */
+  async countOtherActiveHolders(role: StaffRole, accountId: string, executor: Kysely<Database> = this.db): Promise<number> {
     const { count } = await executor
       .selectFrom('account_roles')
       .innerJoin('accounts', 'accounts.id', 'account_roles.account_id')
       .select((eb) => eb.fn.countAll<string>().as('count'))
-      .where('account_roles.role', '=', 'administrator')
+      .where('account_roles.role', '=', role)
       .where('account_roles.revoked_at', 'is', null)
       .where('accounts.status', '=', 'active')
       .where('accounts.id', '<>', accountId)

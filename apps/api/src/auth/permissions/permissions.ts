@@ -10,6 +10,14 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export const STAFF_ROLES = ['administrator', 'partner', 'fee_earner', 'accounts', 'compliance'] as const satisfies readonly StaffRole[];
 
+/**
+ * Roles whose last active holder cannot be removed: without an administrator
+ * nobody can manage staff, and without compliance nobody can read the audit log.
+ */
+export const PROTECTED_ROLES = ['administrator', 'compliance'] as const satisfies readonly StaffRole[];
+
+export type ProtectedRole = (typeof PROTECTED_ROLES)[number];
+
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
   administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable'],

@@ -80,7 +80,8 @@ accounts should not be the only ones checking what changed.
   - Nobody can change their own roles, grant or revoke. Otherwise an
     administrator could grant themselves `compliance` and read the audit log.
   - Nobody can disable their own account.
-  - The last active administrator cannot be removed or disabled.
+  - The last active administrator, and the last active `compliance` holder,
+    cannot be removed or disabled.
   - Disabling an account ends all its sessions immediately.
   - Only staff accounts can hold roles; the database enforces it.
 - **Everything is audited:** invitations, role grants and revocations, disabling,
@@ -88,7 +89,8 @@ accounts should not be the only ones checking what changed.
   same transaction as the change, with the caller's address and browser, so a
   change without its record cannot happen.
 - **Refusals are audited too.** Trying to change your own account, or to remove
-  the last administrator, is recorded as `staff.change_refused`.
+  the last administrator or compliance holder, is recorded as
+  `staff.change_refused`.
 
 ### Staff management
 
@@ -110,7 +112,7 @@ accounts should not be the only ones checking what changed.
 - Only staff accounts are found by these endpoints. A client account's id
   gives 404.
 
-### The last administrator
+### The last administrator and compliance holder
 
 Removing the administrator role, and disabling an administrator, both check
 that another **active** administrator remains (invited and disabled ones do not
@@ -119,8 +121,13 @@ change their own account, whoever makes the change is another administrator.
 Two administrators removing each other at the same moment would each see the
 other still there. Both changes therefore take a PostgreSQL advisory lock
 (`pg_advisory_xact_lock`) before counting, so they run one after the other and
-the second is refused. `last-administrator.exclusive.spec.ts` makes that race
+the second is refused. `last-holder.exclusive.spec.ts` makes that race
 happen on every run.
+
+The same rule protects `compliance`: without it nobody can read the audit log
+in the app, and the only record of that gap would be a later grant. The roles
+covered are listed in `PROTECTED_ROLES` (`permissions.ts`); both share one lock.
+The 409 names the role that would be left without a holder.
 
 ### First administrator
 

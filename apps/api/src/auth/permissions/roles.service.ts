@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { Kysely } from 'kysely';
 import type { AuditActor } from '../../audit/audit-event.js';
 import { AuditService } from '../../audit/audit.service.js';
 import type { RequestContext } from '../../common/http/request-context.js';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
-import type { StaffRole } from '../../database/schema.js';
+import type { Database, StaffRole } from '../../database/schema.js';
+import { PROTECTED_ROLES, type ProtectedRole } from './permissions.js';
 import { RolesRepository } from './roles.repository.js';
 
 /** Who is making a change: a signed-in staff member, or the system (command line). */
@@ -18,7 +20,14 @@ export class OwnRoleChangeError extends Error {
   override readonly name = 'OwnRoleChangeError';
 }
 
-export type RevokeResult = 'revoked' | 'not_held' | 'last_administrator';
+/** Why removing a role holder was refused: `'last_administrator'` or `'last_compliance'`. */
+export type LastHolderRefusal = `last_${ProtectedRole}`;
+
+export function isLastHolderRefusal(result: string): result is LastHolderRefusal {
+  return PROTECTED_ROLES.some((role) => result === `last_${role}`);
+}
+
+export type RevokeResult = 'revoked' | 'not_held' | LastHolderRefusal;
 
 @Injectable()
 export class RolesService {
@@ -56,21 +65,22 @@ export class RolesService {
     });
   }
 
-  /** Revokes a role. Refuses to remove the last active administrator. */
+  /** Revokes a role. Refuses to remove the last active holder of a protected role. */
   async revoke(accountId: string, role: StaffRole, by: RoleChangeActor): Promise<RevokeResult> {
     if (by.accountId === accountId) {
       throw new OwnRoleChangeError('Nobody can change their own roles');
     }
 
     return this.roles.transaction(async (trx): Promise<RevokeResult> => {
-      await this.roles.lockAdministratorChanges(trx);
-      if (role === 'administrator' && (await this.roles.countOtherActiveAdministrators(accountId, trx)) === 0) {
-        return 'last_administrator';
-      }
-      const revoked = await this.roles.revoke({ accountId, role, revokedBy: by.accountId, at: this.clock.now() }, trx);
-      if (!revoked) {
+      await this.roles.lockProtectedRoleChanges(trx);
+      if (!(await this.roles.activeRoles(accountId, trx)).includes(role)) {
         return 'not_held';
       }
+      const refusal = await this.lastHolderRefusal(accountId, [role], trx);
+      if (refusal) {
+        return refusal;
+      }
+      await this.roles.revoke({ accountId, role, revokedBy: by.accountId, at: this.clock.now() }, trx);
       await this.audit.record(
         {
           actor: by.actor,
@@ -84,6 +94,24 @@ export class RolesService {
       );
       return 'revoked';
     });
+  }
+
+  /**
+   * Whether taking `roles` away from the account would leave a protected role
+   * with no active holder. Call it inside a transaction that holds
+   * `lockProtectedRoleChanges`, so the answer cannot change before it commits.
+   */
+  async lastHolderRefusal(
+    accountId: string,
+    roles: readonly StaffRole[],
+    trx: Kysely<Database>,
+  ): Promise<LastHolderRefusal | null> {
+    for (const role of PROTECTED_ROLES) {
+      if (roles.includes(role) && (await this.roles.countOtherActiveHolders(role, accountId, trx)) === 0) {
+        return `last_${role}`;
+      }
+    }
+    return null;
   }
 
   activeRoles(accountId: string): Promise<StaffRole[]> {

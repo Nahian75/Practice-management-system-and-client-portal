@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { AccountNotInvitableError, InvitationsService } from '../auth/invitations/invitations.service.js';
 import { RolesRepository } from '../auth/permissions/roles.repository.js';
-import { RolesService, type RevokeResult, type RoleChangeActor } from '../auth/permissions/roles.service.js';
+import {
+  isLastHolderRefusal,
+  RolesService,
+  type LastHolderRefusal,
+  type RevokeResult,
+  type RoleChangeActor,
+} from '../auth/permissions/roles.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import type { StaffRole } from '../database/schema.js';
 import { StaffRepository, type StaffMember } from './staff.repository.js';
@@ -18,12 +24,12 @@ export type InviteResult =
 
 export type GrantResult = 'granted' | 'not_found' | 'own_account' | 'disabled';
 export type RevokeRoleResult = RevokeResult | 'not_found' | 'own_account';
-export type DisableResult = 'disabled' | 'already_disabled' | 'not_found' | 'own_account' | 'last_administrator';
+export type DisableResult = 'disabled' | 'already_disabled' | 'not_found' | 'own_account' | LastHolderRefusal;
 
 /**
  * Managing staff accounts. The rules that keep the firm from locking itself
  * out live here: nobody changes their own roles or disables themselves, and
- * the last active administrator cannot be removed.
+ * the last active administrator or compliance holder cannot be removed.
  */
 @Injectable()
 export class StaffService {
@@ -79,8 +85,8 @@ export class StaffService {
       return 'own_account';
     }
     const result = await this.roles.revoke(account.id, role, by);
-    if (result === 'last_administrator') {
-      await this.recordRefusal(by, account.id, { change: 'revoke_role', role, reason: 'last_administrator' });
+    if (isLastHolderRefusal(result)) {
+      await this.recordRefusal(by, account.id, { change: 'revoke_role', role, reason: result });
     }
     return result;
   }
@@ -100,10 +106,11 @@ export class StaffService {
     }
 
     const result = await this.rolesRepository.transaction(async (trx): Promise<DisableResult> => {
-      await this.rolesRepository.lockAdministratorChanges(trx);
-      const isAdministrator = (await this.rolesRepository.activeRoles(account.id, trx)).includes('administrator');
-      if (isAdministrator && (await this.rolesRepository.countOtherActiveAdministrators(account.id, trx)) === 0) {
-        return 'last_administrator';
+      await this.rolesRepository.lockProtectedRoleChanges(trx);
+      const heldRoles = await this.rolesRepository.activeRoles(account.id, trx);
+      const refusal = await this.roles.lastHolderRefusal(account.id, heldRoles, trx);
+      if (refusal) {
+        return refusal;
       }
       if (!(await this.staff.disable(account.id, trx))) {
         return 'already_disabled';
@@ -123,8 +130,8 @@ export class StaffService {
       return 'disabled';
     });
 
-    if (result === 'last_administrator') {
-      await this.recordRefusal(by, account.id, { change: 'disable', reason: 'last_administrator' });
+    if (isLastHolderRefusal(result)) {
+      await this.recordRefusal(by, account.id, { change: 'disable', reason: result });
     }
     return result;
   }
@@ -133,7 +140,7 @@ export class StaffService {
   private async recordRefusal(
     by: StaffActor,
     accountId: string,
-    metadata: { change: 'grant_role' | 'revoke_role' | 'disable'; role?: StaffRole; reason: 'own_account' | 'last_administrator' },
+    metadata: { change: 'grant_role' | 'revoke_role' | 'disable'; role?: StaffRole; reason: 'own_account' | LastHolderRefusal },
   ): Promise<void> {
     await this.audit.record({
       actor: by.actor,

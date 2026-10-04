@@ -14,15 +14,15 @@ import { StaffModule } from './staff.module.js';
 import { StaffService, type StaffActor } from './staff.service.js';
 
 /*
- * "At least one active administrator" is a rule about the whole database, so
- * these tests run on their own, after every other test file (see
- * vitest.config.ts). Each test starts by revoking every administrator role
- * in the test database.
+ * "At least one active administrator" and "at least one active compliance
+ * holder" are rules about the whole database, so these tests run on their own,
+ * after every other test file (see vitest.config.ts). Each test starts by
+ * revoking every administrator role in the test database.
  */
 
-const ADMINISTRATOR_LOCK = sql`hashtextextended('app.administrators', 0)`;
+const PROTECTED_ROLE_LOCK = sql`hashtextextended('app.protected_roles', 0)`;
 
-describe('The last active administrator', () => {
+describe('The last active holder of a protected role', () => {
   let app: NestExpressApplication;
   let db: Kysely<Database>;
   let staffService: StaffService;
@@ -141,6 +141,91 @@ describe('The last active administrator', () => {
     });
   });
 
+  describe('with one compliance holder left', () => {
+    let complianceHolder: TestAccount;
+
+    const complianceHolders = async () =>
+      (
+        await db
+          .selectFrom('account_roles')
+          .innerJoin('accounts', 'accounts.id', 'account_roles.account_id')
+          .select('accounts.id')
+          .where('account_roles.role', '=', 'compliance')
+          .where('account_roles.revoked_at', 'is', null)
+          .where('accounts.status', '=', 'active')
+          .execute()
+      ).map((row) => row.id);
+
+    beforeEach(async () => {
+      await db
+        .updateTable('account_roles')
+        .set({ revoked_at: new Date() })
+        .where('role', '=', 'compliance')
+        .where('revoked_at', 'is', null)
+        .execute();
+      complianceHolder = await createTestAccount(db, 'staff');
+      await grantTestRole(db, complianceHolder.id, 'compliance');
+    });
+
+    it('refuses to revoke their compliance role, and records the refusal', async () => {
+      expect(await staffService.revokeRole(complianceHolder.id, 'compliance', actor(first))).toBe('last_compliance');
+      expect(await complianceHolders()).toEqual([complianceHolder.id]);
+      expect(await refusalsBy(first)).toEqual([
+        {
+          action: 'staff.change_refused',
+          outcome: 'denied',
+          resource_id: complianceHolder.id,
+          metadata: { change: 'revoke_role', role: 'compliance', reason: 'last_compliance' },
+        },
+      ]);
+    });
+
+    it('refuses to disable them, and records the refusal', async () => {
+      expect(await staffService.disable(complianceHolder.id, actor(first))).toBe('last_compliance');
+      expect(await complianceHolders()).toEqual([complianceHolder.id]);
+      expect(await refusalsBy(first)).toEqual([
+        {
+          action: 'staff.change_refused',
+          outcome: 'denied',
+          resource_id: complianceHolder.id,
+          metadata: { change: 'disable', reason: 'last_compliance' },
+        },
+      ]);
+    });
+
+    it('answers 409 over the API, naming the role', async () => {
+      const token = await sessions.start(first, 'authenticated', {});
+
+      const response = await request(app.getHttpServer())
+        .delete(`/staff/${complianceHolder.id}/roles/compliance`)
+        .set('Cookie', `__Host-session=${token}`);
+
+      expect(response.status).toBe(409);
+      expect(response.body.message).toBe('The firm must keep at least one active compliance holder');
+    });
+
+    it('lets them go once another active holder exists', async () => {
+      const successor = await createTestAccount(db, 'staff');
+      await grantTestRole(db, successor.id, 'compliance');
+
+      expect(await staffService.revokeRole(complianceHolder.id, 'compliance', actor(first))).toBe('revoked');
+      expect(await complianceHolders()).toEqual([successor.id]);
+    });
+
+    it('does not count an invited compliance holder', async () => {
+      const invited = await createTestAccount(db, 'staff', { status: 'invited' });
+      await grantTestRole(db, invited.id, 'compliance');
+
+      expect(await staffService.disable(complianceHolder.id, actor(first))).toBe('last_compliance');
+    });
+
+    it('answers not held, not refused, for someone without the role', async () => {
+      const someoneElse = await createTestAccount(db, 'staff');
+
+      expect(await rolesService.revoke(someoneElse.id, 'compliance', actor(first))).toBe('not_held');
+    });
+  });
+
   /*
    * Over the API the only way to reach the last administrator is a race: two
    * administrators removing each other at the same moment. Holding the lock
@@ -153,7 +238,7 @@ describe('The last active administrator', () => {
       const server = request(app.getHttpServer());
       const firstToken = await sessions.start(first, 'authenticated', {});
       const secondToken = await sessions.start(second, 'authenticated', {});
-      await sql`select pg_advisory_lock(${ADMINISTRATOR_LOCK})`.execute(holder);
+      await sql`select pg_advisory_lock(${PROTECTED_ROLE_LOCK})`.execute(holder);
 
       const revoke = server
         .delete(`/staff/${second.id}/roles/administrator`)
@@ -171,7 +256,7 @@ describe('The last active administrator', () => {
           return Number(rows[0]?.waiting);
         })
         .toBe(2);
-      await sql`select pg_advisory_unlock(${ADMINISTRATOR_LOCK})`.execute(holder);
+      await sql`select pg_advisory_unlock(${PROTECTED_ROLE_LOCK})`.execute(holder);
 
       const statuses = [(await revoke).status, (await disable).status].sort();
       expect(statuses).toEqual([204, 409]);

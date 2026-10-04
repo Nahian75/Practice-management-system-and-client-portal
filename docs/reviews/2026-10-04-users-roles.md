@@ -64,8 +64,8 @@ PostgreSQL and Mailpit with synthetic accounts.
 | Location | `RolesService.revoke`, `StaffService.disable` |
 | Problem | Only administrators are protected from removal of the last one. Revoking or disabling the last person with `compliance` leaves nobody able to read the audit log in the app. |
 | Impact | Oversight stops until an administrator grants the role again, and that grant is the only thing the audit log would then show. |
-| Fix | **Decision for the project owner:** apply the same last-holder rule to `compliance`, or accept it. |
-| Test | If adopted: the same race and count tests as for administrators. |
+| Fix | **Fixed after the review**, by decision of the project owner: `compliance` joins `administrator` in `PROTECTED_ROLES`, under the same lock and count. |
+| Test | `last-holder.exclusive.spec.ts`: "with one compliance holder left". Removing `compliance` from the list fails four tests. |
 
 ### U4 — A disabled account cannot be restored
 

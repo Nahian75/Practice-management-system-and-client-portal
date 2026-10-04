@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { STAFF_ROLES } from '../auth/permissions/permissions.js';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
+import type { LastHolderRefusal } from '../auth/permissions/roles.service.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
 import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-schema.decorator.js';
@@ -48,7 +49,10 @@ const invitedSchema = z.object({
 
 export const STAFF_NOT_FOUND_MESSAGE = 'No staff account with this id';
 export const OWN_ACCOUNT_MESSAGE = 'You cannot change your own account';
-export const LAST_ADMINISTRATOR_MESSAGE = 'The firm must keep at least one active administrator';
+export const LAST_HOLDER_MESSAGES: Readonly<Record<LastHolderRefusal, string>> = {
+  last_administrator: 'The firm must keep at least one active administrator',
+  last_compliance: 'The firm must keep at least one active compliance holder',
+};
 
 function actorFor(session: ResolvedSession, request: Request): StaffActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -112,13 +116,15 @@ export class StaffController {
     @CurrentSession() session: ResolvedSession,
     @Req() request: Request,
   ): Promise<void> {
-    switch (await this.staff.revokeRole(id, revokedRole, actorFor(session, request))) {
+    const result = await this.staff.revokeRole(id, revokedRole, actorFor(session, request));
+    switch (result) {
       case 'not_found':
         throw new NotFoundException(STAFF_NOT_FOUND_MESSAGE);
       case 'own_account':
         throw new ForbiddenException(OWN_ACCOUNT_MESSAGE);
       case 'last_administrator':
-        throw new ConflictException(LAST_ADMINISTRATOR_MESSAGE);
+      case 'last_compliance':
+        throw new ConflictException(LAST_HOLDER_MESSAGES[result]);
       case 'revoked':
       case 'not_held':
         return;
@@ -134,13 +140,15 @@ export class StaffController {
     @CurrentSession() session: ResolvedSession,
     @Req() request: Request,
   ): Promise<void> {
-    switch (await this.staff.disable(id, actorFor(session, request))) {
+    const result = await this.staff.disable(id, actorFor(session, request));
+    switch (result) {
       case 'not_found':
         throw new NotFoundException(STAFF_NOT_FOUND_MESSAGE);
       case 'own_account':
         throw new ForbiddenException(OWN_ACCOUNT_MESSAGE);
       case 'last_administrator':
-        throw new ConflictException(LAST_ADMINISTRATOR_MESSAGE);
+      case 'last_compliance':
+        throw new ConflictException(LAST_HOLDER_MESSAGES[result]);
       case 'disabled':
       case 'already_disabled':
         return;
