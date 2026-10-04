@@ -57,4 +57,23 @@ interface ClientRecord {
   createdAt: Date;
 }
 
-export type Client = (IndividualDetails & ClientRecord) | (OrganisationDetails & ClientRecord);
+export interface ContactDetails {
+  givenNames: string;
+  familyName: string;
+  jobTitle: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+/** Someone the firm deals with at an organisation client. */
+export interface Contact extends ContactDetails {
+  id: string;
+  active: boolean;
+}
+
+/** A change to a contact: a field left out stays as it is. */
+export type ContactPatch = Partial<ContactDetails & { active: boolean }>;
+
+export type Client =
+  | (IndividualDetails & ClientRecord)
+  | (OrganisationDetails & ClientRecord & { contacts: Contact[] });

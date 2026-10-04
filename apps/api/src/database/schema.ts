@@ -144,6 +144,18 @@ export interface ClientsTable {
   responsible_id: DatabaseSet<string>;
 }
 
+export interface ClientContactsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  given_names: Writable<string>;
+  family_name: Writable<string>;
+  job_title: Writable<string | null>;
+  email: Writable<string | null>;
+  phone: Writable<string | null>;
+  active: UpdateOnly<boolean>;
+  created_at: DatabaseSet<Date>;
+}
+
 export interface ClientResponsibilityChangesTable {
   id: DatabaseSet<string>;
   client_id: InsertOnly<string>;
@@ -153,7 +165,7 @@ export interface ClientResponsibilityChangesTable {
   changed_at: DatabaseSet<Date>;
 }
 
-interface ClientContactColumns {
+interface ClientCorrespondenceColumns {
   email: Writable<string | null>;
   phone: Writable<string | null>;
   address_line1: Writable<string | null>;
@@ -163,7 +175,7 @@ interface ClientContactColumns {
   country: Writable<string | null>;
 }
 
-export interface ClientIndividualsTable extends ClientContactColumns {
+export interface ClientIndividualsTable extends ClientCorrespondenceColumns {
   client_id: InsertOnly<string>;
   title: Writable<string | null>;
   given_names: Writable<string>;
@@ -172,7 +184,7 @@ export interface ClientIndividualsTable extends ClientContactColumns {
   date_of_birth: Writable<string | null>;
 }
 
-export interface ClientOrganisationsTable extends ClientContactColumns {
+export interface ClientOrganisationsTable extends ClientCorrespondenceColumns {
   client_id: InsertOnly<string>;
   legal_name: Writable<string>;
   organisation_type: Writable<OrganisationType>;
@@ -184,6 +196,7 @@ export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
+  client_contacts: ClientContactsTable;
   client_individuals: ClientIndividualsTable;
   client_organisations: ClientOrganisationsTable;
   client_responsibility_changes: ClientResponsibilityChangesTable;

@@ -12,6 +12,7 @@ import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
 import { ClientsModule } from './clients.module.js';
+import { ClientsRepository } from './clients.repository.js';
 
 const INDIVIDUAL = { kind: 'individual', givenNames: 'Jane', familyName: 'Doe' };
 const ORGANISATION = { kind: 'organisation', legalName: 'Acme Trading Ltd', organisationType: 'company' };
@@ -454,6 +455,152 @@ describe('Clients', () => {
       });
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe('contacts', () => {
+    const SAM = { givenNames: 'Sam', familyName: 'Lee', jobTitle: 'Finance Director', email: 'Sam.Lee@acme.example' };
+    let organisationId: string;
+
+    const contactEvents = (id: string) =>
+      db
+        .selectFrom('audit_events')
+        .select(['action', 'metadata'])
+        .where('resource_id', '=', id)
+        .where('action', 'like', 'client.contact%')
+        .orderBy('id')
+        .execute();
+
+    beforeEach(async () => {
+      organisationId = (await as(token).post('/clients', ORGANISATION)).body.id;
+    });
+
+    describe('POST /clients/:clientId/contacts', () => {
+      it('adds an active contact, shown with the client', async () => {
+        const added = await as(token).post(`/clients/${organisationId}/contacts`, SAM);
+
+        expect(added.status).toBe(201);
+        expect((await as(token).get(`/clients/${organisationId}`)).body.contacts).toEqual([
+          {
+            id: added.body.id,
+            givenNames: 'Sam',
+            familyName: 'Lee',
+            jobTitle: 'Finance Director',
+            email: 'sam.lee@acme.example',
+            phone: null,
+            active: true,
+          },
+        ]);
+      });
+
+      it('records the contact id only, never their details', async () => {
+        const added = await as(token).post(`/clients/${organisationId}/contacts`, SAM);
+
+        const events = await contactEvents(organisationId);
+        expect(events).toEqual([{ action: 'client.contact_added', metadata: { contactId: added.body.id } }]);
+        expect(JSON.stringify(events)).not.toMatch(/Sam|Lee|acme/);
+      });
+
+      it('refuses a contact for an individual client', async () => {
+        const individualId = (await as(token).post('/clients', INDIVIDUAL)).body.id;
+
+        expect((await as(token).post(`/clients/${individualId}/contacts`, SAM)).status).toBe(409);
+      });
+
+      it('does not find a client someone else is responsible for', async () => {
+        const other = await signedIn(await staffWith('fee_earner'));
+
+        expect((await as(other).post(`/clients/${organisationId}/contacts`, SAM)).status).toBe(404);
+        expect((await as(token).get(`/clients/${organisationId}`)).body.contacts).toEqual([]);
+      });
+
+      it.each<[string, object]>([
+        ['no family name', { givenNames: 'Sam' }],
+        ['an invalid email', { ...SAM, email: 'sam.example' }],
+        ['an active flag', { ...SAM, active: false }],
+        ['a client id', { ...SAM, clientId: '00000000-0000-7000-8000-000000000000' }],
+      ])('refuses %s', async (_case, body) => {
+        expect((await as(token).post(`/clients/${organisationId}/contacts`, body)).status).toBe(400);
+      });
+
+      it.each(['administrator', 'accounts', 'compliance'] as const)('is closed to %s', async (role) => {
+        expect((await as(await signedIn(await staffWith(role))).post(`/clients/${organisationId}/contacts`, SAM)).status).toBe(403);
+      });
+
+      // Through the API the client is checked first; this checks the contact queries keep the rule on their own.
+      it('keeps contact queries to clients the viewer may see', async () => {
+        const contactId = (await as(token).post(`/clients/${organisationId}/contacts`, SAM)).body.id;
+        const repository = app.get(ClientsRepository);
+        const stranger = await staffWith('fee_earner');
+
+        expect(await repository.visibleContacts(organisationId, stranger.id)).toEqual([]);
+        expect(await repository.findVisibleContact(organisationId, contactId, stranger.id)).toBeUndefined();
+        expect(await repository.findVisibleContact(organisationId, contactId, feeEarner.id)).toMatchObject({ id: contactId });
+      });
+    });
+
+    describe('PATCH /clients/:clientId/contacts/:contactId', () => {
+      let contactId: string;
+
+      beforeEach(async () => {
+        contactId = (await as(token).post(`/clients/${organisationId}/contacts`, SAM)).body.id;
+      });
+
+      it('changes the given fields and records which ones changed', async () => {
+        const response = await as(token).patch(`/clients/${organisationId}/contacts/${contactId}`, {
+          jobTitle: 'Chief Executive',
+          phone: '+44 161 496 0000',
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ jobTitle: 'Chief Executive', phone: '+44 161 496 0000', email: 'sam.lee@acme.example' });
+        expect(await contactEvents(organisationId)).toEqual([
+          { action: 'client.contact_added', metadata: { contactId } },
+          { action: 'client.contact_updated', metadata: { contactId, fields: 'jobTitle,phone' } },
+        ]);
+      });
+
+      it('marks a contact inactive, listing active contacts first', async () => {
+        const other = (await as(token).post(`/clients/${organisationId}/contacts`, { givenNames: 'Ana', familyName: 'Zed' })).body.id;
+
+        await as(token).patch(`/clients/${organisationId}/contacts/${contactId}`, { active: false });
+
+        expect((await as(token).get(`/clients/${organisationId}`)).body.contacts.map((c: { id: string; active: boolean }) => [c.id, c.active])).toEqual([
+          [other, true],
+          [contactId, false],
+        ]);
+      });
+
+      it('records nothing when the values are the same as before', async () => {
+        await as(token).patch(`/clients/${organisationId}/contacts/${contactId}`, { givenNames: 'Sam', active: true });
+
+        expect(await contactEvents(organisationId)).toHaveLength(1);
+      });
+
+      it("does not change another client's contact through this client's address", async () => {
+        const otherClient = (await as(token).post('/clients', { ...ORGANISATION, legalName: 'Other Ltd' })).body.id;
+        const theirContact = (await as(token).post(`/clients/${otherClient}/contacts`, { givenNames: 'Kim', familyName: 'Ray' })).body.id;
+
+        const response = await as(token).patch(`/clients/${organisationId}/contacts/${theirContact}`, { familyName: 'Changed' });
+
+        expect(response.status).toBe(404);
+        expect((await as(token).get(`/clients/${otherClient}`)).body.contacts[0].familyName).toBe('Ray');
+      });
+
+      it('does not find a contact of a client someone else is responsible for', async () => {
+        const other = await signedIn(await staffWith('fee_earner'));
+
+        expect((await as(other).patch(`/clients/${organisationId}/contacts/${contactId}`, { familyName: 'X' })).status).toBe(404);
+      });
+
+      it.each<[string, object]>([
+        ['nothing to change', {}],
+        ['a required field cleared', { familyName: null }],
+        ['a client id', { clientId: '00000000-0000-7000-8000-000000000000' }],
+        ['an active flag that is not true or false', { active: 'no' }],
+      ])('refuses %s', async (_case, body) => {
+        expect((await as(token).patch(`/clients/${organisationId}/contacts/${contactId}`, body)).status).toBe(400);
+      });
     });
   });
 

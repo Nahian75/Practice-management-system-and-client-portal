@@ -1,8 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type ExpressionBuilder, type Kysely, type Updateable } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { ClientIndividualsTable, ClientOrganisationsTable, Database } from '../database/schema.js';
-import type { Address, Client, ClientPatch, ClientSummary, NewClient } from './client.js';
+import type { ClientContactsTable, ClientIndividualsTable, ClientOrganisationsTable, Database } from '../database/schema.js';
+import type {
+  Address,
+  Client,
+  ClientPatch,
+  ClientSummary,
+  Contact,
+  ContactDetails,
+  ContactPatch,
+  NewClient,
+} from './client.js';
 
 /**
  * The visibility rule from docs/clients.md, in one place. Every query that
@@ -16,7 +25,7 @@ export function visibleTo(viewerId: string) {
 /** The name a client is known by: the legal name, or given names and family name. */
 const clientName = sql<string>`coalesce(o.legal_name, i.given_names || ' ' || i.family_name)`;
 
-interface ContactColumns {
+interface CorrespondenceColumns {
   email: string | null;
   phone: string | null;
   address_line1: string | null;
@@ -38,7 +47,7 @@ export class ClientsRepository {
       .returning(['id', 'reference'])
       .executeTakeFirstOrThrow();
 
-    const contact = contactColumns(client);
+    const correspondence = correspondenceColumns(client);
     if (client.kind === 'individual') {
       await trx
         .insertInto('client_individuals')
@@ -48,7 +57,7 @@ export class ClientsRepository {
           given_names: client.givenNames,
           family_name: client.familyName,
           date_of_birth: client.dateOfBirth,
-          ...contact,
+          ...correspondence,
         })
         .execute();
     } else {
@@ -59,7 +68,7 @@ export class ClientsRepository {
           legal_name: client.legalName,
           organisation_type: client.organisationType,
           registration_number: client.registrationNumber,
-          ...contact,
+          ...correspondence,
         })
         .execute();
     }
@@ -127,7 +136,77 @@ export class ClientsRepository {
       legalName: required(row.legal_name),
       organisationType: required(row.organisation_type),
       registrationNumber: row.registration_number,
+      contacts: await this.visibleContacts(clientId, viewerId, executor),
     };
+  }
+
+  /** The client's contacts, active ones first, if `viewerId` may see the client. */
+  async visibleContacts(clientId: string, viewerId: string, executor: Kysely<Database> = this.db): Promise<Contact[]> {
+    const rows = await this.contactsOfVisibleClient(clientId, viewerId, executor)
+      .orderBy('client_contacts.active', 'desc')
+      .orderBy('client_contacts.family_name')
+      .orderBy('client_contacts.given_names')
+      .execute();
+    return rows.map(contactFrom);
+  }
+
+  /** One contact of the client, if `viewerId` may see the client. */
+  async findVisibleContact(
+    clientId: string,
+    contactId: string,
+    viewerId: string,
+    executor: Kysely<Database> = this.db,
+  ): Promise<Contact | undefined> {
+    const row = await this.contactsOfVisibleClient(clientId, viewerId, executor)
+      .where('client_contacts.id', '=', contactId)
+      .executeTakeFirst();
+    return row && contactFrom(row);
+  }
+
+  private contactsOfVisibleClient(clientId: string, viewerId: string, executor: Kysely<Database>) {
+    return executor
+      .selectFrom('client_contacts')
+      .innerJoin('clients', 'clients.id', 'client_contacts.client_id')
+      .select([
+        'client_contacts.id',
+        'client_contacts.given_names',
+        'client_contacts.family_name',
+        'client_contacts.job_title',
+        'client_contacts.email',
+        'client_contacts.phone',
+        'client_contacts.active',
+      ])
+      .where('clients.id', '=', clientId)
+      .where(visibleTo(viewerId));
+  }
+
+  async insertContact(clientId: string, contact: ContactDetails, trx: Kysely<Database>): Promise<string> {
+    const { id } = await trx
+      .insertInto('client_contacts')
+      .values({
+        client_id: clientId,
+        given_names: contact.givenNames,
+        family_name: contact.familyName,
+        job_title: contact.jobTitle,
+        email: contact.email,
+        phone: contact.phone,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
+  }
+
+  /** Writes the fields present in `patch`. The caller has checked visibility and locked the client. */
+  async updateContact(contactId: string, patch: ContactPatch, trx: Kysely<Database>): Promise<void> {
+    const columns: Updateable<ClientContactsTable> = {
+      ...(patch.givenNames !== undefined && { given_names: patch.givenNames }),
+      ...(patch.familyName !== undefined && { family_name: patch.familyName }),
+      ...(patch.jobTitle !== undefined && { job_title: patch.jobTitle }),
+      ...(patch.email !== undefined && { email: patch.email }),
+      ...(patch.phone !== undefined && { phone: patch.phone }),
+      ...(patch.active !== undefined && { active: patch.active }),
+    };
+    await trx.updateTable('client_contacts').set(columns).where('id', '=', contactId).execute();
   }
 
   /**
@@ -193,7 +272,7 @@ export class ClientsRepository {
 
   /** Writes the fields present in `patch`. The caller has checked the kind and locked the row. */
   async updateDetails(clientId: string, patch: ClientPatch, trx: Kysely<Database>): Promise<void> {
-    const contact: Updateable<ContactColumns> = {
+    const correspondence: Updateable<CorrespondenceColumns> = {
       ...(patch.email !== undefined && { email: patch.email }),
       ...(patch.phone !== undefined && { phone: patch.phone }),
       ...(patch.address !== undefined && addressColumns(patch.address)),
@@ -201,7 +280,7 @@ export class ClientsRepository {
 
     if (patch.kind === 'individual') {
       const columns: Updateable<ClientIndividualsTable> = {
-        ...contact,
+        ...correspondence,
         ...(patch.title !== undefined && { title: patch.title }),
         ...(patch.givenNames !== undefined && { given_names: patch.givenNames }),
         ...(patch.familyName !== undefined && { family_name: patch.familyName }),
@@ -210,7 +289,7 @@ export class ClientsRepository {
       await trx.updateTable('client_individuals').set(columns).where('client_id', '=', clientId).execute();
     } else {
       const columns: Updateable<ClientOrganisationsTable> = {
-        ...contact,
+        ...correspondence,
         ...(patch.legalName !== undefined && { legal_name: patch.legalName }),
         ...(patch.organisationType !== undefined && { organisation_type: patch.organisationType }),
         ...(patch.registrationNumber !== undefined && { registration_number: patch.registrationNumber }),
@@ -261,11 +340,11 @@ export class ClientsRepository {
   }
 }
 
-function contactColumns(client: NewClient): ContactColumns {
+function correspondenceColumns(client: NewClient): CorrespondenceColumns {
   return { email: client.email, phone: client.phone, ...addressColumns(client.address) };
 }
 
-function addressColumns(address: Address | null): Omit<ContactColumns, 'email' | 'phone'> {
+function addressColumns(address: Address | null): Omit<CorrespondenceColumns, 'email' | 'phone'> {
   return {
     address_line1: address?.line1 ?? null,
     address_line2: address?.line2 ?? null,
@@ -275,7 +354,27 @@ function addressColumns(address: Address | null): Omit<ContactColumns, 'email' |
   };
 }
 
-function addressFrom(row: ContactColumns): Address | null {
+function contactFrom(row: {
+  id: string;
+  given_names: string;
+  family_name: string;
+  job_title: string | null;
+  email: string | null;
+  phone: string | null;
+  active: boolean;
+}): Contact {
+  return {
+    id: row.id,
+    givenNames: row.given_names,
+    familyName: row.family_name,
+    jobTitle: row.job_title,
+    email: row.email,
+    phone: row.phone,
+    active: row.active,
+  };
+}
+
+function addressFrom(row: CorrespondenceColumns): Address | null {
   if (row.address_line1 === null || row.town === null || row.country === null) {
     return null;
   }

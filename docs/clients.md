@@ -1,9 +1,9 @@
 # Clients
 
-**Current state (2026-10-04):** Steps 7a to 7c built: creating a client,
-opening and listing the clients you can see, searching every client by name or
-reference, editing details, and a partner taking over a client whose
-responsible person is disabled. Contacts are designed below and not built yet.
+**Current state (2026-10-04):** Built: creating a client, opening and listing
+the clients you can see, searching every client by name or reference, editing
+details, a partner taking over a client whose responsible person is disabled,
+and contacts of organisation clients. The module's security review is next.
 
 ## Decisions
 
@@ -42,7 +42,7 @@ and is never reused.
 | `client_responsibility_changes` | Every takeover: client, from, to, reason, when (`0012_client_takeover.sql`) | Nothing; inserts only, and no role can change or delete a row |
 | `client_individuals` | One row per individual client: name, date of birth, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
 | `client_organisations` | One row per organisation client: legal name, type, registration number, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
-| `client_contacts` | Contacts of organisation clients | Every detail column and `active`; not `client_id` |
+| `client_contacts` | Contacts of organisation clients: names, job title, email, phone, active (`0013_client_contacts.sql`) | Every detail column and `active`; not `client_id`. New contacts are always active. A trigger refuses contacts for individual clients |
 
 None of them can be deleted by the app. `kind` cannot change: an individual
 never becomes an organisation. Database checks make sure an individual client
@@ -114,8 +114,12 @@ race happen on every run. Sending the same values again records nothing.
 | GET | `/clients/:id` | `clients.view` + layer 3 | Full details and contacts. 404 if not visible |
 | PATCH | `/clients/:id` | `clients.edit` + layer 3 | Change details. `kind` and `reference` cannot be changed |
 | POST | `/clients/:id/take-over` | `clients.take_over` | `{"reason"}` → 204. 404 no such client, 409 the responsible person is still active |
-| POST | `/clients/:id/contacts` | `clients.edit` + layer 3 | Organisations only |
-| PATCH | `/clients/:id/contacts/:contactId` | `clients.edit` + layer 3 | Change details, or mark inactive |
+| POST | `/clients/:id/contacts` | `clients.edit` + layer 3 | `{givenNames, familyName, jobTitle?, email?, phone?}` → 201 `{id}`. 409 for an individual client |
+| PATCH | `/clients/:id/contacts/:contactId` | `clients.edit` + layer 3 | Change details, or `{"active": false}` to mark inactive (and `true` to undo). 404 unless the contact belongs to this client |
+
+Contacts appear in `GET /clients/:id` for organisations, active ones first.
+A contact is always looked up together with its client, so a contact id from
+one client cannot be used through another client's address; a test tries it.
 
 Request bodies are strict: an unknown field is a 400, so `reference`,
 `created_by` or `status` cannot be slipped in.
@@ -128,7 +132,8 @@ Request bodies are strict: an unknown field is a 400, so `reference`,
 | `client.updated` | names of the fields that changed, never their values |
 | `client.taken_over` | id of the `client_responsibility_changes` row, previous responsible person. The reason stays in that row |
 | `client.take_over_refused` | `responsible_active`: a takeover tried while the responsible person was still active |
-| `client.contact_added`, `client.contact_updated` | contact id, names of changed fields |
+| `client.contact_added` | contact id |
+| `client.contact_updated` | contact id, names of the fields that changed |
 
 Values are left out on purpose: the audit log is kept longer and read more
 widely than client records, so copying names and addresses into it would
@@ -189,5 +194,5 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7a.** Migration, permissions, `POST /clients`, `GET /clients/:id` with the visibility rule, audit. Done.
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
-- **7d.** Contacts.
+- **7d.** Contacts. Done.
 - Security review of the module.

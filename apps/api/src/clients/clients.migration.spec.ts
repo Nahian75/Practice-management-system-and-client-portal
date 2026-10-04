@@ -3,7 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestAccount, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
-import type { ClientIndividualsTable, ClientKind, ClientOrganisationsTable, Database } from '../database/schema.js';
+import type {
+  ClientContactsTable,
+  ClientIndividualsTable,
+  ClientKind,
+  ClientOrganisationsTable,
+  Database,
+} from '../database/schema.js';
 
 describe('clients tables', () => {
   let db: Kysely<Database>;
@@ -215,6 +221,51 @@ describe('clients tables', () => {
         /permission denied/,
       );
       await expect(sql`delete from client_responsibility_changes where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  describe('contacts', () => {
+    let organisationId: string;
+
+    const addContact = (overrides: Record<string, unknown> = {}, clientId = organisationId) =>
+      db
+        .insertInto('client_contacts')
+        .values({ client_id: clientId, given_names: 'Sam', family_name: 'Lee', ...overrides } as Insertable<ClientContactsTable>)
+        .returning(['id', 'active'])
+        .executeTakeFirstOrThrow();
+
+    beforeAll(async () => {
+      organisationId = (await createClient('organisation', { organisation: organisation() })).id;
+    });
+
+    it('adds an active contact to an organisation', async () => {
+      expect((await addContact()).active).toBe(true);
+    });
+
+    it('refuses a contact for an individual client', async () => {
+      const individualId = (await createClient('individual', { individual: individual() })).id;
+
+      await expect(addContact({}, individualId)).rejects.toThrow(/is not an organisation client/);
+    });
+
+    it.each<[string, Record<string, unknown>]>([
+      ['blank given names', { given_names: ' ' }],
+      ['an email with capitals', { email: 'Sam@Example.com' }],
+      ['a phone number with letters', { phone: 'call reception' }],
+      ['a blank job title', { job_title: '' }],
+    ])('refuses %s', async (_case, overrides) => {
+      await expect(addContact(overrides)).rejects.toThrow(/violates check constraint/);
+    });
+
+    it.each([
+      ['add a contact that is already inactive', () =>
+        sql`insert into client_contacts (client_id, given_names, family_name, active) values (${organisationId}, 'A', 'B', false)`],
+      ['move a contact to another client', (id: string) => sql`update client_contacts set client_id = uuidv7() where id = ${id}`],
+      ['delete a contact', (id: string) => sql`delete from client_contacts where id = ${id}`],
+    ])('does not let the app %s', async (_case, statement) => {
+      const { id } = await addContact();
+
+      await expect(statement(id).execute(db)).rejects.toThrow(/permission denied/);
     });
   });
 

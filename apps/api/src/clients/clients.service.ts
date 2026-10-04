@@ -3,7 +3,16 @@ import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { ClientKind } from '../database/schema.js';
-import type { Address, Client, ClientPatch, ClientSummary, NewClient } from './client.js';
+import type {
+  Address,
+  Client,
+  ClientPatch,
+  ClientSummary,
+  Contact,
+  ContactDetails,
+  ContactPatch,
+  NewClient,
+} from './client.js';
 import { ClientsRepository } from './clients.repository.js';
 
 export const CLIENTS_PAGE_SIZE = 50;
@@ -102,6 +111,76 @@ export class ClientsService {
     });
   }
 
+  /** Adds a contact to an organisation client the caller can see. */
+  addContact(clientId: string, contact: ContactDetails, by: ClientActor): Promise<AddContactResult> {
+    return this.clients.transaction(async (trx): Promise<AddContactResult> => {
+      const client = (await this.clients.lockVisible(clientId, by.accountId, trx))
+        ? await this.clients.findVisible(clientId, by.accountId, trx)
+        : undefined;
+      if (!client) {
+        return { outcome: 'not_found' };
+      }
+      if (client.kind !== 'organisation') {
+        return { outcome: 'not_organisation' };
+      }
+
+      const contactId = await this.clients.insertContact(clientId, contact, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'client.contact_added',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { contactId },
+          ...by.context,
+        },
+        trx,
+      );
+      return { outcome: 'added', contactId };
+    });
+  }
+
+  /**
+   * Changes a contact's details, or marks them inactive or active again. Like
+   * client changes, the audit record lists field names only.
+   */
+  updateContact(clientId: string, contactId: string, patch: ContactPatch, by: ClientActor): Promise<UpdateContactResult> {
+    return this.clients.transaction(async (trx): Promise<UpdateContactResult> => {
+      const current = (await this.clients.lockVisible(clientId, by.accountId, trx))
+        ? await this.clients.findVisibleContact(clientId, contactId, by.accountId, trx)
+        : undefined;
+      if (!current) {
+        return { outcome: 'not_found' };
+      }
+
+      const before = new Map<string, unknown>(Object.entries(current));
+      const fields = Object.entries(patch)
+        .filter(([field, value]) => value !== undefined && before.get(field) !== value)
+        .map(([field]) => field)
+        .sort();
+      if (fields.length === 0) {
+        return { outcome: 'updated', contact: current };
+      }
+      await this.clients.updateContact(contactId, patch, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'client.contact_updated',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { contactId, fields: fields.join(',') },
+          ...by.context,
+        },
+        trx,
+      );
+      const updated = await this.clients.findVisibleContact(clientId, contactId, by.accountId, trx);
+      if (!updated) {
+        throw new Error('Contact disappeared during its update');
+      }
+      return { outcome: 'updated', contact: updated };
+    });
+  }
+
   /**
    * Makes the caller responsible for a client whose responsible person's
    * account is disabled. Works for clients the caller cannot see yet: they
@@ -153,6 +232,10 @@ export class ClientsService {
 }
 
 export type TakeOverResult = 'taken_over' | 'not_found' | 'responsible_active';
+
+export type AddContactResult = { outcome: 'added'; contactId: string } | { outcome: 'not_found' | 'not_organisation' };
+
+export type UpdateContactResult = { outcome: 'updated'; contact: Contact } | { outcome: 'not_found' };
 
 /** Names of the fields in `patch` whose value differs from `current`, in a stable order. */
 function changedFields(current: Client, patch: ClientPatch): string[] {

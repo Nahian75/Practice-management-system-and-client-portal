@@ -100,7 +100,26 @@ const clientPatchSchema = z.discriminatedUnion('kind', [
     .refine(atLeastOneChange, 'Nothing to change'),
 ]);
 
-const takeOverSchema = z.strictObject({ reason: z.string().trim().min(10).max(500) });
+const newContactSchema = z.strictObject({
+  givenNames: text(100),
+  familyName: text(100),
+  jobTitle: optional(text(100)),
+  email: optional(email),
+  phone: optional(phone),
+});
+
+const contactPatchSchema = z
+  .strictObject({
+    givenNames: text(100).optional(),
+    familyName: text(100).optional(),
+    jobTitle: text(100).nullable().optional(),
+    email: email.nullable().optional(),
+    phone: phone.nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
+
+const takeOverSchema =z.strictObject({ reason: z.string().trim().min(10).max(500) });
 
 const listQuerySchema =z.strictObject({ before: reference.optional() });
 const searchQuerySchema = z.strictObject({ q: z.string().trim().min(2).max(100) });
@@ -118,6 +137,17 @@ const summarySchema = z.object({
 });
 const listSchema = z.object({ clients: z.array(summarySchema), next: z.string().nullable() });
 const searchSchema = z.object({ clients: z.array(summarySchema) });
+
+const contactSchema = z.object({
+  id: z.uuid(),
+  givenNames: z.string(),
+  familyName: z.string(),
+  jobTitle: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  active: z.boolean(),
+});
+const contactAddedSchema = z.object({ id: z.uuid() });
 
 const clientRecordFields = {
   id: z.uuid(),
@@ -151,6 +181,7 @@ const clientSchema = z.discriminatedUnion('kind', [
     legalName: z.string(),
     organisationType: z.string(),
     registrationNumber: z.string().nullable(),
+    contacts: z.array(contactSchema),
     ...clientRecordFields,
   }),
 ]);
@@ -223,6 +254,43 @@ export class ClientsController {
       case 'updated':
         return serialise(result.client);
     }
+  }
+
+  @Post(':clientId/contacts')
+  @RequirePermission('clients.edit')
+  @ResponseSchema(contactAddedSchema)
+  async addContact(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: newContactSchema }) body: z.infer<typeof newContactSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const result = await this.clients.addContact(clientId, body, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+      case 'not_organisation':
+        throw new ConflictException('Only organisation clients have contacts');
+      case 'added':
+        return { id: result.contactId };
+    }
+  }
+
+  @Patch(':clientId/contacts/:contactId')
+  @RequirePermission('clients.edit')
+  @ResponseSchema(contactSchema)
+  async updateContact(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Param('contactId', { schema: z.uuid() }) contactId: string,
+    @Body({ schema: contactPatchSchema }) body: z.infer<typeof contactPatchSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const result = await this.clients.updateContact(clientId, contactId, body, actorFor(session, request));
+    if (result.outcome === 'not_found') {
+      throw new NotFoundException('No contact with this id for this client');
+    }
+    return result.contact;
   }
 
   /** Answers for clients the caller cannot see: a partner finds them through search. */
