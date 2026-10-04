@@ -191,6 +191,45 @@ export interface ClientOrganisationsTable extends ClientCorrespondenceColumns {
   registration_number: Writable<string | null>;
 }
 
+export type MatterType =
+  | 'residential_property'
+  | 'commercial_property'
+  | 'family'
+  | 'litigation'
+  | 'employment'
+  | 'wills_probate'
+  | 'corporate'
+  | 'immigration'
+  | 'crime'
+  | 'other';
+export type MatterStatus = 'awaiting_clearance' | 'open' | 'closed';
+export type MatterTeamRole = 'supervising_partner' | 'fee_earner';
+
+export interface MattersTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  /** Set by the database: the next number for this client. */
+  number: DatabaseSet<number>;
+  /** Set by the database: the client's reference and the number, C-000123/001. */
+  reference: DatabaseSet<string>;
+  title: InsertOnly<string>;
+  matter_type: InsertOnly<MatterType>;
+  status: DatabaseSet<MatterStatus>;
+  opened_by: InsertOnly<string>;
+  opened_at: DatabaseSet<Date>;
+}
+
+export interface MatterTeamTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  account_id: InsertOnly<string>;
+  role: InsertOnly<MatterTeamRole>;
+  added_by: InsertOnly<string>;
+  added_at: DatabaseSet<Date>;
+  removed_by: DatabaseSet<string | null>;
+  removed_at: DatabaseSet<Date | null>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -202,6 +241,8 @@ export interface Database {
   client_responsibility_changes: ClientResponsibilityChangesTable;
   clients: ClientsTable;
   invitations: InvitationsTable;
+  matter_team: MatterTeamTable;
+  matters: MattersTable;
   password_resets: PasswordResetsTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;

@@ -1,7 +1,8 @@
 # Authorization
 
 **Current state (2026-10-04):** Layers 1 and 2 built, including the
-staff-management endpoints. Layer 3 (records) designed in outline, built with Matters.
+staff-management endpoints. Layer 3 (records) built for clients and for matter teams; compliance access
+with a reason comes with Matters step 8e.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -62,6 +63,8 @@ Each module adds its own permissions when it is built. These exist now:
 | `clients.view` — open a client you can see ([visibility](clients.md#who-can-do-what)) | | ✓ | ✓ | | |
 | `clients.search` — find any client by name or reference (summary only) | | ✓ | ✓ | | |
 | `clients.edit` — change the details of a client you can see | | ✓ | ✓ | | |
+| `matters.open` — open matters for clients you can see | | ✓ | ✓ | | |
+| `matters.view` — open matters you are on the team of | | ✓ | ✓ | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 
 Administrators deliberately cannot read the audit log: the people who change
@@ -151,7 +154,7 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters and clients (outline, built with Matters)
+## Layer 3: matters and clients (partly built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 

@@ -1,7 +1,8 @@
 # Matters
 
-**Current state (2026-10-04):** Designed, not built. This file is the proposal
-for review; it is rewritten to match the code as each step is built.
+**Current state (2026-10-04):** Step 8a built: matters and teams, opening a
+matter (without a conflict check yet), seeing your matters, and client
+visibility through matter teams. The rest is designed below and not built yet.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -60,6 +61,24 @@ enforced by the database as well as the API:
   `conflict_clearances`, by the matter's supervising partner (same pattern as
   client takeover: the app cannot set the status directly).
 - Closed matters cannot be changed.
+
+## Built in 8a
+
+- `matters` and `matter_team` (migration `0016`). The number and reference
+  are set by a trigger under a per-client advisory lock; a test opens ten
+  matters for one client at once and gets numbers 1 to 10.
+- The database refuses: a matter opened by a non-staff account; a matter with
+  no supervising partner when its transaction commits; a supervising partner
+  without the partner role; a team member who is not active staff holding
+  `partner` or `fee_earner`; two supervising partners or the same person twice.
+  The trigger keeps its own role list, and a test runs every role through it
+  and the permission table.
+- The app may insert only the client, title, type and opener, and the team
+  rows; it cannot update or delete anything yet.
+- `visibleTo` in `matters.repository.ts` is the matter rule; the client rule in
+  `clients.repository.ts` now also admits active members of the client's matter teams.
+- `matter.opened` (client id, type, status) and one `matter.team_member_added`
+  per member (account and role), in the same transaction. The title stays out.
 
 ## Opening a matter
 
@@ -163,7 +182,7 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **8a.** Tables for matters and teams, permissions, opening a matter,
   `GET /matters`, `GET /matters/:id`, `GET /clients/:id/matters`, team-based
   visibility, and client visibility widened. Matters open without a conflict
-  check in this step; nothing reaches production before 8b.
+  check in this step; nothing reaches production before 8b. Done.
 - **8b.** Other parties and conflict checks, now required for opening:
   `pg_trgm`, matching, possible matches, `awaiting_clearance`, clearance by the
   supervising partner, email to compliance.

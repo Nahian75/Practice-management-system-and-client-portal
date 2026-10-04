@@ -16,14 +16,30 @@ import type {
 /**
  * The visibility rule from docs/clients.md, in one place. Every query that
  * returns or changes a client's details filters with it, so a forgotten check
- * cannot reach someone else's client. Matters widens it to the matter's team.
+ * cannot reach someone else's client: the responsible person, and every
+ * active member of a team on one of the client's matters.
  */
 export function visibleTo(viewerId: string) {
-  return (eb: ExpressionBuilder<Database, 'clients'>) => eb('clients.responsible_id', '=', viewerId);
+  return (eb: ExpressionBuilder<Database, 'clients'>) =>
+    eb.or([
+      eb('clients.responsible_id', '=', viewerId),
+      eb.exists(
+        eb
+          .selectFrom('matters')
+          .innerJoin('matter_team', 'matter_team.matter_id', 'matters.id')
+          .select('matter_team.id')
+          .whereRef('matters.client_id', '=', 'clients.id')
+          .where('matter_team.account_id', '=', viewerId)
+          .where('matter_team.removed_at', 'is', null),
+      ),
+    ]);
 }
 
-/** The name a client is known by: the legal name, or given names and family name. */
-const clientName = sql<string>`coalesce(o.legal_name, i.given_names || ' ' || i.family_name)`;
+/**
+ * The name a client is known by: the legal name, or given names and family
+ * name. Needs `client_individuals as i` and `client_organisations as o` left-joined.
+ */
+export const clientName = sql<string>`coalesce(o.legal_name, i.given_names || ' ' || i.family_name)`;
 
 interface CorrespondenceColumns {
   email: string | null;

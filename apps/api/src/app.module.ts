@@ -4,6 +4,7 @@ import { ConfigModule } from './config/config.module.js';
 import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { MattersModule } from './matters/matters.module.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { StaffModule } from './staff/staff.module.js';
 
@@ -12,7 +13,7 @@ export class AppModule {
   static forRoot(env: Env): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule],
+      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule],
     };
   }
 }

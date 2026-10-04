@@ -77,9 +77,9 @@ The reverse holds too: someone whose fee earner role is revoked loses access
 to the clients they created, because `clients.view` is checked first.
 
 - **Visibility rule:** a client's details are visible to the person
-  responsible for it: the creator, unless a partner has [taken it
-  over](#taking-over-a-client). When Matters is built, this becomes "the
-  responsible person until a matter exists, then the matter's team".
+  responsible for it (the creator, unless a partner has [taken it
+  over](#taking-over-a-client)), and to every active member of a team on one
+  of the client's matters ([matters.md](matters.md)).
 - The rule is applied inside every database query through one function, so a
   forgotten check cannot return another person's client.
 - A client you cannot see answers **404**, not 403, so its existence is not
