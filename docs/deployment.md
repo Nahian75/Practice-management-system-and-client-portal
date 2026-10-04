@@ -13,7 +13,7 @@ cp apps/api/.env.example apps/api/.env    # then fill the database URLs and TOTP
 npm ci
 npm run build -w @practice/api
 npm run migrate:local -w @practice/api
-npm run build -w @practice/api && npm run invite:local -w @practice/api -- --kind staff --email you@practice.test --name "Your Name"
+npm run build -w @practice/api && npm run invite:local -w @practice/api -- --kind staff --email you@practice.test --name "Your Name" --role administrator
 # then open the invitation email in Mailpit: http://127.0.0.1:8025
 npm run start:local -w @practice/api
 ```

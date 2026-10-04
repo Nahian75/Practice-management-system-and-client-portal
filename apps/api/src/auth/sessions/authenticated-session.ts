@@ -27,6 +27,11 @@ export function attachSession(request: Request, session: ResolvedSession): void 
   sessionsByRequest.set(request, session);
 }
 
+/** The session the SessionGuard checked for this request, if any. */
+export function sessionOf(request: Request): ResolvedSession | undefined {
+  return sessionsByRequest.get(request);
+}
+
 export class NoSessionOnRequestError extends Error {
   override readonly name = 'NoSessionOnRequestError';
 }

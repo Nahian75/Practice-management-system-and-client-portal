@@ -236,3 +236,30 @@ fails once an exception expires, so it cannot quietly become permanent.
 
 **Plain text only:** no HTML email, so nothing in a message can be rendered as
 markup or carry tracking pixels.
+
+---
+
+## ADR-009: Fixed permissions in code, role assignments in the database
+
+**Date:** 2026-10-04
+**Status:** Accepted
+
+**Decision:** Permissions are a fixed list in code. Each role maps to a set of
+permissions, also in code. Which staff member holds which role is stored in
+the database, with history.
+
+**Why:**
+- The mapping is reviewed and tested like any other code change, and appears
+  in the git history. A configurable permissions screen would let one
+  administrator quietly widen access with no review.
+- Tests can assert exactly what each role can do.
+- The database answers "who held which role and when", which an investigation
+  or a regulator may ask.
+
+**Rejected:** Fully configurable roles and permissions in the database: more
+flexible, but every change becomes a runtime setting no one reviews, and the
+test suite can no longer say what a role allows.
+
+**Cost:** Adding a role or changing what it allows needs a code change and a
+release. For a law firm, where those changes are rare and should be deliberate,
+that is the right trade-off.

@@ -37,7 +37,7 @@ authorization decisions.
 |---|---|
 | Audit | Table and `AuditService` built; no callers yet |
 | Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
-| Users / Roles | Not started |
+| Users / Roles | Roles, permissions and permission guard built; staff-management endpoints next |
 | Clients | Not started |
 | Matters | Not started |
 | Documents | Not started |

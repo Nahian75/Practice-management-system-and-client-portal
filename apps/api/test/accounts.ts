@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely } from 'kysely';
-import type { AccountKind, AccountStatus, Database } from '../src/database/schema.js';
+import type { AccountKind, AccountStatus, Database, StaffRole } from '../src/database/schema.js';
 
 // A well-formed Argon2id string. Tests that need a real, verifiable password hash it themselves.
 const PLACEHOLDER_HASH =
@@ -39,4 +39,18 @@ export async function createTestAccount(
 
 export async function setAccountStatus(db: Kysely<Database>, accountId: string, status: AccountStatus) {
   await db.updateTable('accounts').set({ status }).where('id', '=', accountId).execute();
+}
+
+export async function grantTestRole(db: Kysely<Database>, accountId: string, role: StaffRole): Promise<void> {
+  await db.insertInto('account_roles').values({ account_id: accountId, role, granted_by: null, granted_at: new Date() }).execute();
+}
+
+export async function revokeTestRole(db: Kysely<Database>, accountId: string, role: StaffRole): Promise<void> {
+  await db
+    .updateTable('account_roles')
+    .set({ revoked_at: new Date() })
+    .where('account_id', '=', accountId)
+    .where('role', '=', role)
+    .where('revoked_at', 'is', null)
+    .execute();
 }

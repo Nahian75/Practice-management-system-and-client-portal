@@ -15,6 +15,10 @@ import { PasswordResetController } from './password-reset/password-reset.control
 import { PasswordResetService } from './password-reset/password-reset.service.js';
 import { PasswordResetsRepository } from './password-reset/password-resets.repository.js';
 import { PasswordsModule } from './passwords/passwords.module.js';
+import { PermissionGuard } from './permissions/permission.guard.js';
+import { PermissionsService } from './permissions/permissions.service.js';
+import { RolesRepository } from './permissions/roles.repository.js';
+import { RolesService } from './permissions/roles.service.js';
 import { SessionGuard } from './sessions/session.guard.js';
 import { SessionsRepository } from './sessions/sessions.repository.js';
 import { SessionsService } from './sessions/sessions.service.js';
@@ -65,7 +69,21 @@ const CURRENT_KEY_VERSION = 1;
     SecurityNoticesService,
     PasswordResetsRepository,
     PasswordResetService,
+    RolesRepository,
+    RolesService,
+    PermissionsService,
+    PermissionGuard,
   ],
-  exports: [SessionsService, SessionGuard, TwoFactorService, BackupCodesService, InvitationsService],
+  exports: [
+    SessionsService,
+    SessionGuard,
+    PermissionGuard,
+    PermissionsService,
+    RolesRepository,
+    RolesService,
+    TwoFactorService,
+    BackupCodesService,
+    InvitationsService,
+  ],
 })
 export class AuthModule {}

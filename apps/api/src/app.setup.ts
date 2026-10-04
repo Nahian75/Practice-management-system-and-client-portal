@@ -1,5 +1,6 @@
 import { Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { PermissionGuard } from './auth/permissions/permission.guard.js';
 import { SessionGuard } from './auth/sessions/session.guard.js';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter.js';
 import { StrictSchemaSerializerInterceptor } from './common/serialization/strict-schema-serializer.interceptor.js';
@@ -15,8 +16,9 @@ export function configureApp(app: NestExpressApplication): void {
   app.useSecurityHeaders();
   app.enableCsrfProtection();
 
-  // app.get throws if AuthModule is not loaded, so the app cannot start without the guard.
-  app.useGlobalGuards(app.get(SessionGuard));
+  // app.get throws if AuthModule is not loaded, so the app cannot start without the
+  // guards. Order matters: the PermissionGuard reads the session the SessionGuard checked.
+  app.useGlobalGuards(app.get(SessionGuard), app.get(PermissionGuard));
   app.useGlobalPipes(new StrictSchemaValidationPipe());
   app.useGlobalInterceptors(new StrictSchemaSerializerInterceptor(app.get(Reflector)));
   app.useGlobalFilters(new AllExceptionsFilter());

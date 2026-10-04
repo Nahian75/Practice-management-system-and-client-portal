@@ -114,7 +114,20 @@ export interface PasswordResetsTable {
   close_reason: UpdateOnly<'used' | 'replaced' | null>;
 }
 
+export type StaffRole = 'administrator' | 'partner' | 'fee_earner' | 'accounts' | 'compliance';
+
+export interface AccountRolesTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  role: InsertOnly<StaffRole>;
+  granted_at: InsertOnly<Date>;
+  granted_by: InsertOnly<string | null>;
+  revoked_at: UpdateOnly<Date | null>;
+  revoked_by: UpdateOnly<string | null>;
+}
+
 export interface Database {
+  account_roles: AccountRolesTable;
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
