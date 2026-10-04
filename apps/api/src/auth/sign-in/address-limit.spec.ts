@@ -185,7 +185,10 @@ describe('Without trusted proxies', () => {
   });
 
   it('records the real connection address, not the forged one', async () => {
-    const forged = randomTestAddress();
+    // Not randomTestAddress(): every test records events under those 2^17
+    // addresses, so the check below would sometimes find another test's event.
+    const id = randomUUID().replaceAll('-', '');
+    const forged = `2001:db8:${id.slice(0, 4)}:${id.slice(4, 8)}:${id.slice(8, 12)}:${id.slice(12, 16)}:${id.slice(16, 20)}:1`;
 
     await request(app.getHttpServer())
       .post('/auth/sign-in')

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
+import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
 import { permissionsFor } from '../auth/permissions/permissions.js';
 import { RolesRepository } from '../auth/permissions/roles.repository.js';
 import type { RequestContext } from '../common/http/request-context.js';
@@ -38,6 +39,7 @@ export class ClientsService {
     private readonly clients: ClientsRepository,
     private readonly audit: AuditService,
     private readonly roles: RolesRepository,
+    private readonly notices: SecurityNoticesService,
   ) {}
 
   /** The audit record names the kind only: client details are personal data and stay out of the log. */
@@ -192,15 +194,15 @@ export class ClientsService {
    * log, which points to it instead.
    */
   async takeOver(clientId: string, reason: string, by: ClientActor): Promise<TakeOverResult> {
-    const result = await this.clients.transaction(async (trx): Promise<TakeOverResult> => {
+    const outcome = await this.clients.transaction(async (trx): Promise<TakeOverOutcome> => {
       await this.clients.lockResponsibility(clientId, trx);
       const current = await this.clients.findResponsible(clientId, trx);
       if (!current) {
-        return 'not_found';
+        return { result: 'not_found' };
       }
       const responsibleRoles = await this.roles.activeRoles(current.responsible_id, trx);
       if (current.status !== 'disabled' && permissionsFor(responsibleRoles).has('clients.view')) {
-        return 'responsible_has_access';
+        return { result: 'responsible_has_access' };
       }
 
       const changeId = await this.clients.recordResponsibilityChange(
@@ -218,11 +220,19 @@ export class ClientsService {
         },
         trx,
       );
-      return 'taken_over';
+      return {
+        result: 'taken_over',
+        notice: { clientReference: current.reference, fromAccountId: current.responsible_id, toAccountId: by.accountId },
+      };
     });
 
+    // Sent once the change has committed, so nobody is told about a takeover that was rolled back.
+    if (outcome.notice) {
+      await this.notices.clientTakenOver(outcome.notice);
+    }
+
     // Trying to take a client from someone who still has it is worth noticing.
-    if (result === 'responsible_has_access') {
+    if (outcome.result === 'responsible_has_access') {
       await this.audit.record({
         actor: by.actor,
         action: 'client.take_over_refused',
@@ -232,11 +242,16 @@ export class ClientsService {
         ...by.context,
       });
     }
-    return result;
+    return outcome.result;
   }
 }
 
 export type TakeOverResult = 'taken_over' | 'not_found' | 'responsible_has_access';
+
+interface TakeOverOutcome {
+  result: TakeOverResult;
+  notice?: { clientReference: string; fromAccountId: string; toAccountId: string };
+}
 
 export type AddContactResult = { outcome: 'added'; contactId: string } | { outcome: 'not_found' | 'not_organisation' };
 

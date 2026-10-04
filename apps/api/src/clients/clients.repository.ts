@@ -311,7 +311,7 @@ export class ClientsRepository {
     return trx
       .selectFrom('clients')
       .innerJoin('accounts', 'accounts.id', 'clients.responsible_id')
-      .select(['clients.responsible_id', 'accounts.status'])
+      .select(['clients.reference', 'clients.responsible_id', 'accounts.status'])
       .where('clients.id', '=', clientId)
       .executeTakeFirst();
   }

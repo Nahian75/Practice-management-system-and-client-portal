@@ -82,6 +82,33 @@ export class SecurityNoticesService {
     }
   }
 
+  /**
+   * Tells every compliance holder, other than the partner who did it. The
+   * client is named by reference only, and the reason stays out: who a firm
+   * acts for is confidential, and email passes through outside providers.
+   */
+  async clientTakenOver(change: { clientReference: string; fromAccountId: string; toAccountId: string }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const from = await this.accounts.findById(change.fromAccountId);
+    const to = await this.accounts.findById(change.toAccountId);
+    if (!from || !to) {
+      return;
+    }
+    for (const holderId of await this.roles.activeHolders('compliance')) {
+      if (holderId === change.toAccountId) {
+        continue;
+      }
+      await this.notify(holderId, `Client ${change.clientReference} was taken over`, (name) => [
+        `Hello ${name},`,
+        '',
+        `${to.display_name} took over client ${change.clientReference} from ${from.display_name} on ${when}.`,
+        '',
+        'You are told because you hold the compliance role. The reason given is recorded',
+        'with the change; the audit log points to it.',
+      ]);
+    }
+  }
+
   async roleRevoked(accountId: string, role: StaffRole, revokedBy: string | null): Promise<void> {
     const when = this.clock.now().toUTCString();
     const by = await this.changedBy(revokedBy);

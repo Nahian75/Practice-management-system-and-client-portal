@@ -6,11 +6,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
+import { inbox } from '../../test/mailpit.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
+import { MailOutbox } from '../mail/mail-outbox.js';
 import { ClientsModule } from './clients.module.js';
 import { ClientsRepository } from './clients.repository.js';
 
@@ -631,10 +633,52 @@ describe('Clients', () => {
         .orderBy('id')
         .execute();
 
+    let reference: string;
+
     beforeEach(async () => {
-      clientId = (await as(token).post('/clients', INDIVIDUAL)).body.id;
+      ({ id: clientId, reference } = (await as(token).post('/clients', INDIVIDUAL)).body);
       partner = await staffWith('partner');
       partnerToken = await signedIn(partner);
+    });
+
+    // Compliance holders receive notices from other tests too, so only emails naming this client count.
+    const noticesAbout = async (address: string, clientReference: string) =>
+      (await inbox(address)).filter((email) => email.subject.includes(clientReference));
+
+    describe('telling compliance (review C8)', () => {
+      beforeEach(async () => {
+        await setAccountStatus(db, feeEarner.id, 'disabled');
+      });
+
+      it('tells every compliance holder, naming the client by reference only', async () => {
+        const holder = await staffWith('compliance');
+
+        await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+
+        await expect.poll(() => noticesAbout(holder.email, reference), { timeout: 15_000 }).toHaveLength(1);
+        const [email] = await noticesAbout(holder.email, reference);
+        expect(email?.subject).toBe(`Client ${reference} was taken over`);
+        expect(email?.text).toContain(`took over client ${reference}`);
+        expect(email?.text).not.toMatch(/Jane|Doe|left the firm/);
+      });
+
+      it('does not tell the partner who took it over, even if they hold compliance', async () => {
+        await grantTestRole(db, partner.id, 'compliance');
+
+        await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+        await app.get(MailOutbox).drain();
+
+        expect(await noticesAbout(partner.email, reference)).toEqual([]);
+      });
+    });
+
+    it('tells nobody when the takeover is refused', async () => {
+      const holder = await staffWith('compliance');
+
+      await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+      await app.get(MailOutbox).drain();
+
+      expect(await noticesAbout(holder.email, reference)).toEqual([]);
     });
 
     describe('when the responsible person is disabled', () => {

@@ -86,6 +86,7 @@ const CURRENT_KEY_VERSION = 1;
     InvitationsRepository,
     CLOCK,
     InvitationsService,
+    SecurityNoticesService,
   ],
 })
 export class AuthModule {}

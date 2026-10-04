@@ -3,8 +3,8 @@
 **Current state (2026-10-04):** Built: creating a client, opening and listing
 the clients you can see, searching every client by name or reference, editing
 details, a partner taking over a client whose responsible person can no longer see it,
-and contacts of organisation clients. Security review done; review items C2
-and C8 are being built.
+and contacts of organisation clients. Security review done; review item C2
+(search limit) is being built.
 
 ## Decisions
 
@@ -176,6 +176,10 @@ accounts team ([review C3](reviews/2026-10-04-clients.md)).
   reason, when). The reason lives there, not in the audit log, because free
   text can hold personal data; the `client.taken_over` audit event points to
   the row.
+- Every active compliance holder, except the partner who did it, is emailed
+  who took over which client from whom, once the change has committed. The
+  client is named by reference only and the reason stays out ([review
+  C8](reviews/2026-10-04-clients.md)).
 
 ### How the database enforces it
 
@@ -206,4 +210,4 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
 - **7d.** Contacts. Done.
-- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1 and C3 fixed; C2 and C8 decided, to be built next.
+- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1, C3 and C8 fixed; C2 decided, to be built next.
