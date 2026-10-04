@@ -49,7 +49,7 @@ Clients have no roles. What a client may see is decided by layer 3 only.
 
 ### Permissions in this module
 
-Each module adds its own permissions when it is built. Only these exist now:
+Each module adds its own permissions when it is built. These exist now:
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---|---|---|---|---|
@@ -58,6 +58,8 @@ Each module adds its own permissions when it is built. Only these exist now:
 | `staff.roles.manage` — grant and revoke roles | ✓ | | | | |
 | `staff.disable` — disable a staff account | ✓ | | | | |
 | `audit.view` — read the audit log | | | | | ✓ |
+| `clients.create` — create a client | | ✓ | ✓ | | |
+| `clients.view` — open a client you can see ([visibility](clients.md#who-can-do-what)) | | ✓ | ✓ | | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.

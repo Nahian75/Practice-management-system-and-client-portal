@@ -4,7 +4,15 @@ import type { StaffRole } from '../../database/schema.js';
  * Every permission in the system. Each module adds its own when it is built.
  * Changes here are reviewed like any other code: see ADR-009.
  */
-export const PERMISSIONS = ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'audit.view'] as const;
+export const PERMISSIONS = [
+  'staff.view',
+  'staff.invite',
+  'staff.roles.manage',
+  'staff.disable',
+  'audit.view',
+  'clients.create',
+  'clients.view',
+] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -28,8 +36,8 @@ export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'complian
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
   administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable'],
-  partner: ['staff.view'],
-  fee_earner: [],
+  partner: ['staff.view', 'clients.create', 'clients.view'],
+  fee_earner: ['clients.create', 'clients.view'],
   accounts: [],
   compliance: ['staff.view', 'audit.view'],
 };

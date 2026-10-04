@@ -126,11 +126,56 @@ export interface AccountRolesTable {
   revoked_by: UpdateOnly<string | null>;
 }
 
+
+export type ClientKind = 'individual' | 'organisation';
+export type ClientStatus = 'active' | 'archived';
+export type OrganisationType = 'company' | 'llp' | 'partnership' | 'charity' | 'trust' | 'other';
+
+export interface ClientsTable {
+  id: DatabaseSet<string>;
+  // bigint arrives as a string, so large values are never rounded.
+  number: DatabaseSet<string>;
+  reference: DatabaseSet<string>;
+  kind: InsertOnly<ClientKind>;
+  status: DatabaseSet<ClientStatus>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+interface ClientContactColumns {
+  email: InsertOnly<string | null>;
+  phone: InsertOnly<string | null>;
+  address_line1: InsertOnly<string | null>;
+  address_line2: InsertOnly<string | null>;
+  town: InsertOnly<string | null>;
+  postcode: InsertOnly<string | null>;
+  country: InsertOnly<string | null>;
+}
+
+export interface ClientIndividualsTable extends ClientContactColumns {
+  client_id: InsertOnly<string>;
+  title: InsertOnly<string | null>;
+  given_names: InsertOnly<string>;
+  family_name: InsertOnly<string>;
+  // A date column arrives as a string (YYYY-MM-DD), so no time zone can shift it.
+  date_of_birth: InsertOnly<string | null>;
+}
+
+export interface ClientOrganisationsTable extends ClientContactColumns {
+  client_id: InsertOnly<string>;
+  legal_name: InsertOnly<string>;
+  organisation_type: InsertOnly<OrganisationType>;
+  registration_number: InsertOnly<string | null>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
+  client_individuals: ClientIndividualsTable;
+  client_organisations: ClientOrganisationsTable;
+  clients: ClientsTable;
   invitations: InvitationsTable;
   password_resets: PasswordResetsTable;
   sessions: SessionsTable;

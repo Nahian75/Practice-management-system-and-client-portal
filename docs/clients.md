@@ -1,7 +1,8 @@
 # Clients
 
-**Current state (2026-10-04):** Designed, not built. This file is the proposal
-for review; it is rewritten to match the code as each step is built.
+**Current state (2026-10-04):** Step 7a built: tables for clients and their
+details, creating a client, and opening one you can see. Search, editing and
+contacts are designed below and not built yet.
 
 ## Decisions
 
@@ -46,7 +47,10 @@ has exactly one `client_individuals` row and no organisation row, and the
 other way round.
 
 Addresses are stored as lines, town, postcode and country (ISO 3166 two-letter
-code). One address per client for now; more types (billing, previous
+code, checked against the list in `country-codes.ts`; `Intl` also accepts
+non-country codes such as `UK` and `EU`). Dates of birth are read from the
+database as `YYYY-MM-DD` strings, never as JavaScript dates, so a time zone
+cannot move them by a day. One address per client for now; more types (billing, previous
 addresses for AML) can be added later.
 
 Portal logins are not part of this module. The Client portal module adds an
@@ -59,10 +63,13 @@ New permissions, added to the table in [authorization.md](authorization.md):
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---|---|---|---|---|
 | `clients.create` — create a client | | ✓ | ✓ | | |
+| `clients.view` — open a client you can see | | ✓ | ✓ | | |
 | `clients.search` — find any client by name (reference, type, name only) | | ✓ | ✓ | | |
 | `clients.edit` — change details and contacts of a client you can see | | ✓ | ✓ | | |
 
 A permission is not enough to see a client's details: layer 3 also applies.
+The reverse holds too: someone whose fee earner role is revoked loses access
+to the clients they created, because `clients.view` is checked first.
 
 - **Visibility rule:** a client's details are visible to the person who
   created it. When Matters is built, this becomes "the creator until a matter
@@ -79,9 +86,9 @@ A permission is not enough to see a client's details: layer 3 also applies.
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | POST | `/clients` | `clients.create` | Body says `kind` and its details. 201 `{id, reference}` |
-| GET | `/clients` | `clients.create` | Clients you can see in full |
+| GET | `/clients` | `clients.view` | Clients you can see in full |
 | GET | `/clients/search?q=` | `clients.search` | Reference, kind and name only |
-| GET | `/clients/:id` | layer 3 | Full details and contacts. 404 if not visible |
+| GET | `/clients/:id` | `clients.view` + layer 3 | Full details and contacts. 404 if not visible |
 | PATCH | `/clients/:id` | `clients.edit` + layer 3 | Change details. `kind` and `reference` cannot be changed |
 | POST | `/clients/:id/contacts` | `clients.edit` + layer 3 | Organisations only |
 | PATCH | `/clients/:id/contacts/:contactId` | `clients.edit` + layer 3 | Change details, or mark inactive |
@@ -125,7 +132,7 @@ team (compliance, with a reason) are audited when Matters is built.
 
 Each step ships with positive and negative tests and is reviewed before the next.
 
-- **7a.** Migration, permissions, `POST /clients`, `GET /clients/:id` with the visibility rule, audit.
+- **7a.** Migration, permissions, `POST /clients`, `GET /clients/:id` with the visibility rule, audit. Done.
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`.
 - **7c.** Contacts.
 - Security review of the module.

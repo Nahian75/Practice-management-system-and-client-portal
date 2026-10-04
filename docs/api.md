@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-04):** Health, authentication and staff management.
+**Current state (2026-10-04):** Health, authentication, staff management, and creating and opening clients.
 
 ## Endpoints
 
@@ -22,6 +22,8 @@
 | DELETE | `/staff/:accountId/roles/:role` | `staff.roles.manage` | Revokes a role. 204, also when not held. 403 on your own account, 404 not a staff account, 409 last active administrator or compliance holder |
 | POST | `/staff/:accountId/disable` | `staff.disable` | Disables the account and ends its sessions. 204, also when already disabled. 403 on your own account, 404 not a staff account, 409 last active administrator or compliance holder |
 | POST | `/staff/:accountId/enable` | `staff.disable` | Re-enables a disabled account: it becomes invited, its password is removed and a new invitation is emailed. 200 `{expiresAt}`. 403 on your own account, 404 not a staff account, 409 not disabled |
+| POST | `/clients` | `clients.create` | Creates an individual or organisation client ([clients.md](clients.md#api)). 201 `{id, reference}`. 400 for any unknown field |
+| GET | `/clients/:clientId` | `clients.view` + visibility | The client's details. 404 if it does not exist or the caller may not see it |
 
 `/health` returns exactly `{"status":"ok"}`. It must never return version
 numbers, environment names, dependency status or anything else an attacker
