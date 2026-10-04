@@ -18,12 +18,7 @@ export class InvitationsRepository {
   /** Closes any open invitation for the account and stores the new one, in one transaction. */
   async replaceOpen(invitation: NewInvitation): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
-      await trx
-        .updateTable('invitations')
-        .set({ closed_at: invitation.createdAt, close_reason: 'replaced' })
-        .where('account_id', '=', invitation.accountId)
-        .where('closed_at', 'is', null)
-        .execute();
+      await this.closeOpenForAccount(invitation.accountId, invitation.createdAt, trx);
       await trx
         .insertInto('invitations')
         .values({
@@ -35,6 +30,15 @@ export class InvitationsRepository {
         })
         .execute();
     });
+  }
+
+  async closeOpenForAccount(accountId: string, at: Date, executor: Kysely<Database> = this.db): Promise<void> {
+    await executor
+      .updateTable('invitations')
+      .set({ closed_at: at, close_reason: 'replaced' })
+      .where('account_id', '=', accountId)
+      .where('closed_at', 'is', null)
+      .execute();
   }
 
   /** The open invitation for a token, with the account it belongs to. Expiry is checked by the caller. */

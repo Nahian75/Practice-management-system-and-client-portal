@@ -83,6 +83,8 @@ const CURRENT_KEY_VERSION = 1;
     RolesService,
     TwoFactorService,
     BackupCodesService,
+    InvitationsRepository,
+    CLOCK,
     InvitationsService,
   ],
 })

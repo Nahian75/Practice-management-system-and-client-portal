@@ -103,12 +103,18 @@ accounts should not be the only ones checking what changed.
 | Grant a role | `staff.roles.manage` | `staff.role_granted` |
 | Revoke a role | `staff.roles.manage` | `staff.role_revoked` |
 | Disable an account | `staff.disable` | `staff.disabled` (with how many sessions were ended) |
+| Re-enable an account | `staff.disable` | `staff.enabled`, then `account.invited` |
 | Any of the above refused by a safeguard | — | `staff.change_refused` (with the reason) |
 
 - Invitations carry no roles. Roles are granted separately, which can be done
   while the person is still invited.
 - Disabling keeps the account's roles, so the record shows what the person
-  could do while it was in use. A disabled account cannot be re-enabled yet.
+  could do while it was in use.
+- Re-enabling does not restore the old password. The account goes back to
+  `invited`, its password is removed and a new invitation is emailed; the
+  person chooses a new password and confirms with their existing authenticator
+  app. Earlier sessions stay ended. The kept roles apply again once the
+  invitation is accepted.
 - Only staff accounts are found by these endpoints. A client account's id
   gives 404.
 

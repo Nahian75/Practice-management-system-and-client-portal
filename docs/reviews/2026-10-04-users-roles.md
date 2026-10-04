@@ -75,8 +75,8 @@ PostgreSQL and Mailpit with synthetic accounts.
 | Location | `StaffService.disable`; `InvitationsService.invite` refuses disabled accounts |
 | Problem | There is no re-enable action, and a disabled address cannot be invited again. |
 | Impact | Disabling someone by mistake can only be undone directly in the database, which is the kind of manual change the rules discourage. |
-| Fix | **Open:** add `POST /staff/:accountId/enable` (`staff.disable`), audited, requiring a fresh password reset. Added to the F6 list of missing self-service functions. |
-| Test | When built: only staff, not your own account, audited, old sessions stay ended. |
+| Fix | **Fixed after the review:** `POST /staff/:accountId/enable` (`staff.disable`). The account returns to `invited` with its password removed, and a new invitation is emailed, so the old password never works again. Any invitation left open from before the account was disabled is closed in the same transaction. |
+| Test | `staff.controller.spec.ts`: "POST /staff/:accountId/enable" (only staff, not your own account, audited, old sessions stay ended, old invitation closed even when the new email fails). |
 
 ### U5 — A request already authorised can finish after its sender loses the role
 

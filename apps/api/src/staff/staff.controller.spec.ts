@@ -2,16 +2,21 @@ import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Kysely } from 'kysely';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
+import { FakeClock } from '../../test/fake-clock.js';
 import { waitForEmails } from '../../test/mailpit.js';
+import { authenticatorCode, enrolTwoFactor } from '../../test/two-factor.js';
+import { InvitationsService } from '../auth/invitations/invitations.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
+import { TwoFactorService } from '../auth/two-factor/two-factor.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
 import { StaffModule } from './staff.module.js';
 
 describe('Staff management', () => {
+  const clock = new FakeClock();
   let app: NestExpressApplication;
   let db: Kysely<Database>;
   let sessions: SessionsService;
@@ -62,7 +67,7 @@ describe('Staff management', () => {
     (await db.selectFrom('accounts').select('status').where('id', '=', accountId).executeTakeFirstOrThrow()).status;
 
   beforeAll(async () => {
-    app = await createTestApp(StaffModule);
+    app = await createTestApp(StaffModule, { clock });
     db = app.get(DATABASE);
     sessions = app.get(SessionsService);
   });
@@ -324,6 +329,7 @@ describe('Staff management', () => {
     await from(as(adminToken).delete(`/staff/${staff.id}/roles/partner`));
     await from(as(adminToken).put(`/staff/${admin.id}/roles/compliance`));
     await from(as(adminToken).post(`/staff/${staff.id}/disable`));
+    await from(as(adminToken).post(`/staff/${staff.id}/enable`));
 
     const events = await db
       .selectFrom('audit_events')
@@ -332,7 +338,15 @@ describe('Staff management', () => {
       .orderBy('id')
       .execute();
     expect(events).toEqual(
-      ['account.invited', 'staff.role_granted', 'staff.role_revoked', 'staff.change_refused', 'staff.disabled'].map(
+      [
+        'account.invited',
+        'staff.role_granted',
+        'staff.role_revoked',
+        'staff.change_refused',
+        'staff.disabled',
+        'staff.enabled',
+        'account.invited',
+      ].map(
         (action) => ({ action, ip_address: '198.18.7.7', user_agent: 'staff-admin-test' }),
       ),
     );
@@ -410,6 +424,139 @@ describe('Staff management', () => {
 
       expect((await as(await signedIn(await staffWith(role))).post(`/staff/${staff.id}/disable`)).status).toBe(403);
       expect(await statusOf(staff.id)).toBe('active');
+    });
+  });
+
+  describe('POST /staff/:accountId/enable', () => {
+    async function disabledStaff(...roles: StaffRole[]): Promise<TestAccount> {
+      const staff = await staffWith(...roles);
+      await as(adminToken).post(`/staff/${staff.id}/disable`);
+      return staff;
+    }
+
+    const passwordOf = (accountId: string) =>
+      db
+        .selectFrom('accounts')
+        .select(['password_hash', 'password_changed_at'])
+        .where('id', '=', accountId)
+        .executeTakeFirstOrThrow();
+
+    const tokenIn = (text: string | undefined) => /#token=([A-Za-z0-9_-]{43})/.exec(text ?? '')?.[1];
+    const inspect = (token: string | undefined) =>
+      request(app.getHttpServer()).post('/auth/invitations/inspect').send({ token });
+
+    it('reopens the account as invited, removes its password and emails a new invitation', async () => {
+      const staff = await disabledStaff();
+
+      const response = await as(adminToken).post(`/staff/${staff.id}/enable`);
+
+      expect(response.status).toBe(200);
+      expect(Object.keys(response.body)).toEqual(['expiresAt']);
+      expect(await statusOf(staff.id)).toBe('invited');
+      expect(await passwordOf(staff.id)).toEqual({ password_hash: null, password_changed_at: null });
+      const [invitation] = await waitForEmails(staff.email, 1);
+      expect((await inspect(tokenIn(invitation?.text))).status).toBe(200);
+      expect(
+        await db.selectFrom('audit_events').select(['action', 'actor_id']).where('resource_id', '=', staff.id).orderBy('id').execute(),
+      ).toEqual([
+        { action: 'staff.disabled', actor_id: admin.id },
+        { action: 'staff.enabled', actor_id: admin.id },
+        { action: 'account.invited', actor_id: admin.id },
+      ]);
+    });
+
+    it('lets the person back in with a new password and their existing authenticator app', async () => {
+      const staff = await staffWith('partner');
+      const secret = await enrolTwoFactor(app.get(TwoFactorService), staff, clock);
+      await as(adminToken).post(`/staff/${staff.id}/disable`);
+
+      await as(adminToken).post(`/staff/${staff.id}/enable`);
+
+      const [invitation] = await waitForEmails(staff.email, 1);
+      const token = tokenIn(invitation?.text);
+      const server = request(app.getHttpServer());
+      const passwordStep = await server.post('/auth/invitations/password').send({ token, password: 'tidy-otter-quartz-lantern' });
+      expect(passwordStep.body).toEqual({ twoFactor: null });
+      const complete = await server.post('/auth/invitations/complete').send({ token, code: authenticatorCode(secret, clock) });
+      expect(complete.status).toBe(200);
+      expect(await statusOf(staff.id)).toBe('active');
+    });
+
+    it('keeps the earlier sessions ended', async () => {
+      const staff = await staffWith('partner');
+      const token = await signedIn(staff);
+      await as(adminToken).post(`/staff/${staff.id}/disable`);
+
+      await as(adminToken).post(`/staff/${staff.id}/enable`);
+
+      expect((await as(token).get('/staff')).status).toBe(401);
+    });
+
+    it('does not bring back an invitation sent before the account was disabled', async () => {
+      const email = `reenabled.invitee-${randomUUID()}@example.com`;
+      const invited = await as(adminToken).post('/staff/invitations', { email, displayName: 'Invitee' });
+      const [first] = await waitForEmails(email, 1);
+      await as(adminToken).post(`/staff/${invited.body.accountId}/disable`);
+
+      await as(adminToken).post(`/staff/${invited.body.accountId}/enable`);
+
+      const [, second] = await waitForEmails(email, 2);
+      expect((await inspect(tokenIn(first?.text))).status).toBe(404);
+      expect((await inspect(tokenIn(second?.text))).status).toBe(200);
+    });
+
+    it('closes the earlier invitation even when the new one cannot be sent', async () => {
+      const email = `unsent.invitee-${randomUUID()}@example.com`;
+      const invited = await as(adminToken).post('/staff/invitations', { email, displayName: 'Invitee' });
+      const [first] = await waitForEmails(email, 1);
+      await as(adminToken).post(`/staff/${invited.body.accountId}/disable`);
+      vi.spyOn(app.get(InvitationsService), 'invite').mockRejectedValueOnce(new Error('mail server down'));
+
+      expect((await as(adminToken).post(`/staff/${invited.body.accountId}/enable`)).status).toBe(500);
+
+      expect(await statusOf(invited.body.accountId)).toBe('invited');
+      expect((await inspect(tokenIn(first?.text))).status).toBe(404);
+    });
+
+    it('keeps the roles, which apply again once the invitation is accepted', async () => {
+      const staff = await disabledStaff('partner');
+
+      await as(adminToken).post(`/staff/${staff.id}/enable`);
+
+      expect(await rolesOf(staff.id)).toEqual(['partner']);
+    });
+
+    it('refuses an account that is not disabled, and leaves its password alone', async () => {
+      const staff = await staffWith();
+      const before = await passwordOf(staff.id);
+
+      const response = await as(adminToken).post(`/staff/${staff.id}/enable`);
+
+      expect(response.status).toBe(409);
+      expect(await statusOf(staff.id)).toBe('active');
+      expect(await passwordOf(staff.id)).toEqual(before);
+      expect(await eventsBy(admin.id)).toEqual([]);
+    });
+
+    it('refuses to let anyone enable themselves', async () => {
+      expect((await as(adminToken).post(`/staff/${admin.id}/enable`)).status).toBe(403);
+      expect(await eventsBy(admin.id)).toEqual([
+        { action: 'staff.change_refused', resource_id: admin.id, metadata: { change: 'enable', reason: 'own_account' } },
+      ]);
+    });
+
+    it('does not find a client account', async () => {
+      const client = await createTestAccount(db, 'client', { status: 'disabled' });
+
+      expect((await as(adminToken).post(`/staff/${client.id}/enable`)).status).toBe(404);
+      expect(await statusOf(client.id)).toBe('disabled');
+    });
+
+    it.each(['partner', 'compliance'] as const)('is closed to a %s', async (role) => {
+      const staff = await disabledStaff();
+
+      expect((await as(await signedIn(await staffWith(role))).post(`/staff/${staff.id}/enable`)).status).toBe(403);
+      expect(await statusOf(staff.id)).toBe('disabled');
     });
   });
 });

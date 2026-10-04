@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
+import { InvitationsRepository } from '../auth/invitations/invitations.repository.js';
 import { AccountNotInvitableError, InvitationsService } from '../auth/invitations/invitations.service.js';
 import { RolesRepository } from '../auth/permissions/roles.repository.js';
 import {
@@ -10,6 +11,7 @@ import {
   type RoleChangeActor,
 } from '../auth/permissions/roles.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
+import { CLOCK, type Clock } from '../common/time/clock.js';
 import type { StaffRole } from '../database/schema.js';
 import { StaffRepository, type StaffMember } from './staff.repository.js';
 
@@ -25,6 +27,9 @@ export type InviteResult =
 export type GrantResult = 'granted' | 'not_found' | 'own_account' | 'disabled';
 export type RevokeRoleResult = RevokeResult | 'not_found' | 'own_account';
 export type DisableResult = 'disabled' | 'already_disabled' | 'not_found' | 'own_account' | LastHolderRefusal;
+export type EnableResult =
+  | { outcome: 'enabled'; expiresAt: Date }
+  | { outcome: 'not_found' | 'own_account' | 'not_disabled' };
 
 /**
  * Managing staff accounts. The rules that keep the firm from locking itself
@@ -38,8 +43,10 @@ export class StaffService {
     private readonly roles: RolesService,
     private readonly rolesRepository: RolesRepository,
     private readonly invitations: InvitationsService,
+    private readonly invitationsRepository: InvitationsRepository,
     private readonly sessions: SessionsService,
     private readonly audit: AuditService,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   list(): Promise<StaffMember[]> {
@@ -136,11 +143,61 @@ export class StaffService {
     return result;
   }
 
+  /**
+   * Re-enables a disabled staff account. The old password is removed and a new
+   * invitation is emailed, so getting back in takes the email inbox, a new
+   * password and the authenticator app. Earlier sessions stay ended, and the
+   * kept roles apply again once the invitation is accepted.
+   */
+  async enable(accountId: string, by: StaffActor): Promise<EnableResult> {
+    const account = await this.staff.findStaff(accountId);
+    if (!account) {
+      return { outcome: 'not_found' };
+    }
+    if (account.id === by.accountId) {
+      await this.recordRefusal(by, account.id, { change: 'enable', reason: 'own_account' });
+      return { outcome: 'own_account' };
+    }
+
+    // An invitation left open when the account was disabled would work again
+    // once the account is invited, so it is closed in the same transaction.
+    const reopened = await this.rolesRepository.transaction(async (trx) => {
+      if (!(await this.staff.reopen(account.id, trx))) {
+        return false;
+      }
+      await this.invitationsRepository.closeOpenForAccount(account.id, this.clock.now(), trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'staff.enabled',
+          outcome: 'success',
+          resource: { type: 'account', id: account.id },
+          ...by.context,
+        },
+        trx,
+      );
+      return true;
+    });
+    if (!reopened) {
+      return { outcome: 'not_disabled' };
+    }
+
+    const { expiresAt } = await this.invitations.invite(
+      { kind: 'staff', email: account.email, displayName: account.display_name },
+      by,
+    );
+    return { outcome: 'enabled', expiresAt };
+  }
+
   /** Refusals are recorded too: an attempt to change one's own roles is worth noticing. */
   private async recordRefusal(
     by: StaffActor,
     accountId: string,
-    metadata: { change: 'grant_role' | 'revoke_role' | 'disable'; role?: StaffRole; reason: 'own_account' | LastHolderRefusal },
+    metadata: {
+      change: 'grant_role' | 'revoke_role' | 'disable' | 'enable';
+      role?: StaffRole;
+      reason: 'own_account' | LastHolderRefusal;
+    },
   ): Promise<void> {
     await this.audit.record({
       actor: by.actor,

@@ -51,10 +51,26 @@ export class StaffRepository {
   findStaff(accountId: string) {
     return this.db
       .selectFrom('accounts')
-      .select(['id', 'status'])
+      .select(['id', 'email', 'display_name', 'status'])
       .where('id', '=', accountId)
       .where('kind', '=', 'staff')
       .executeTakeFirst();
+  }
+
+  /**
+   * Returns a disabled account to `invited` and removes its password, so the
+   * person can only get back in by accepting a new invitation.
+   * Returns false when the account was not disabled.
+   */
+  async reopen(accountId: string, executor: Kysely<Database> = this.db): Promise<boolean> {
+    const result = await executor
+      .updateTable('accounts')
+      .set({ status: 'invited', password_hash: null, password_changed_at: null })
+      .where('id', '=', accountId)
+      .where('kind', '=', 'staff')
+      .where('status', '=', 'disabled')
+      .executeTakeFirst();
+    return result.numUpdatedRows === 1n;
   }
 
   /** Returns false when the account was already disabled. */

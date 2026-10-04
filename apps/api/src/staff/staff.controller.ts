@@ -46,6 +46,9 @@ const invitedSchema = z.object({
   accountId: z.uuid(),
   expiresAt: z.iso.datetime(),
 });
+const enabledSchema = z.object({
+  expiresAt: z.iso.datetime(),
+});
 
 export const STAFF_NOT_FOUND_MESSAGE = 'No staff account with this id';
 export const OWN_ACCOUNT_MESSAGE = 'You cannot change your own account';
@@ -152,6 +155,28 @@ export class StaffController {
       case 'disabled':
       case 'already_disabled':
         return;
+    }
+  }
+
+  @Post(':accountId/enable')
+  @RequirePermission('staff.disable')
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(enabledSchema)
+  async enable(
+    @Param('accountId', { schema: accountId }) id: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const result = await this.staff.enable(id, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException(STAFF_NOT_FOUND_MESSAGE);
+      case 'own_account':
+        throw new ForbiddenException(OWN_ACCOUNT_MESSAGE);
+      case 'not_disabled':
+        throw new ConflictException('This account is not disabled');
+      case 'enabled':
+        return { expiresAt: result.expiresAt.toISOString() };
     }
   }
 }
