@@ -1,8 +1,9 @@
 # Clients
 
-**Current state (2026-10-04):** Step 7a built: tables for clients and their
-details, creating a client, and opening one you can see. Search, editing and
-contacts are designed below and not built yet.
+**Current state (2026-10-04):** Steps 7a and 7b built: creating a client,
+opening and listing the clients you can see, searching every client by name or
+reference, and editing details. Takeover and contacts are designed below and
+not built yet.
 
 ## Decisions
 
@@ -13,6 +14,7 @@ contacts are designed below and not built yet.
 | Who sees a client's details | The person who created it, until a matter exists; then that matter's team | Project owner |
 | Finding existing clients | Anyone who can create clients can search every client by name, seeing only reference, type and name | Project owner |
 | Portal logins | Per person: each contact, or an individual client themself, may get their own login | Project owner |
+| Client whose responsible person is disabled | A partner can take it over, giving a reason ([below](#taking-over-a-client)) | Project owner |
 | Deleting clients | Never. Clients are archived; retention is handled with Compliance | Rule: records are kept |
 
 ## What a client is
@@ -37,8 +39,8 @@ and is never reused.
 | Table | Holds | `pms_app` may update |
 |---|---|---|
 | `clients` | id, reference, kind (`individual` / `organisation`), status (`active` / `archived`), created by, created at | `status` only |
-| `client_individuals` | One row per individual client: name, date of birth, email, phone, address | Every detail column; not `client_id` |
-| `client_organisations` | One row per organisation client: legal name, type, registration number, email, phone, address | Every detail column; not `client_id` |
+| `client_individuals` | One row per individual client: name, date of birth, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
+| `client_organisations` | One row per organisation client: legal name, type, registration number, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
 | `client_contacts` | Contacts of organisation clients | Every detail column and `active`; not `client_id` |
 
 None of them can be deleted by the app. `kind` cannot change: an individual
@@ -66,6 +68,7 @@ New permissions, added to the table in [authorization.md](authorization.md):
 | `clients.view` — open a client you can see | | ✓ | ✓ | | |
 | `clients.search` — find any client by name (reference, type, name only) | | ✓ | ✓ | | |
 | `clients.edit` — change details and contacts of a client you can see | | ✓ | ✓ | | |
+| `clients.take_over` — become responsible for a client whose responsible person is disabled | | ✓ | | | |
 
 A permission is not enough to see a client's details: layer 3 also applies.
 The reverse holds too: someone whose fee earner role is revoked loses access
@@ -79,7 +82,25 @@ to the clients they created, because `clients.view` is checked first.
 - A client you cannot see answers **404**, not 403, so its existence is not
   confirmed.
 - Search returns at most 20 results, needs at least 2 characters, and never
-  returns contact details, addresses or dates of birth.
+  returns contact details, addresses or dates of birth. It matches an exact
+  reference (listed first) or any part of the name, ignoring case; `%` and `_`
+  are matched literally. It reads every row for now; an index comes with
+  conflict checks.
+- The list shows 50 clients at a time, newest first. `next` in the answer is
+  passed back as `?before=` for the following page.
+
+### Editing
+
+`PATCH /clients/:id` changes only the fields it is given; `null` clears an
+optional field, and `address` is replaced as a whole. The body repeats the
+client's `kind`, so organisation fields can never be sent for an individual.
+`kind`, `reference`, creator and status cannot be changed.
+
+The client's details row is locked for the length of the change. Two edits
+arriving together therefore run one after the other, and the second sees the
+first's result: the audit log never records a change twice, or a change that
+did not happen. A test holds the row from another connection to make that
+race happen on every run. Sending the same values again records nothing.
 
 ## API
 
@@ -122,17 +143,31 @@ team (compliance, with a reason) are audited when Matters is built.
 - **Archiving:** needs to know whether a client has open matters, so it is
   built with Matters.
 
-## Open questions
+## Taking over a client
 
-- If the person who created a client is disabled before a matter is opened,
-  nobody can see the client's details. Options: let a partner take it over
-  (audited), or accept that it waits for a matter. Decide before 7b.
+Decided by the project owner: if the person responsible for a client is
+disabled before a matter is opened, **a partner can take the client over**,
+giving a reason.
+
+- `clients` gains `responsible_id`, which starts as the creator. Visibility
+  follows the responsible person; `created_by` stays as the historical record.
+- `POST /clients/:id/take-over` with `{"reason"}` (10 to 500 characters),
+  permission `clients.take_over` (partners only).
+- Allowed **only while the responsible person's account is disabled**: 409
+  otherwise. Without that limit any partner could take any client, which would
+  undo the visibility rule. The partner finds the client through search, which
+  is why this endpoint answers for clients the caller cannot see.
+- Each takeover is kept in `client_responsibility_changes` (client, from, to,
+  reason, when). The reason lives there, not in the audit log, because free
+  text can hold personal data; the `client.taken_over` audit event points to
+  the row.
 
 ## Build order
 
 Each step ships with positive and negative tests and is reviewed before the next.
 
 - **7a.** Migration, permissions, `POST /clients`, `GET /clients/:id` with the visibility rule, audit. Done.
-- **7b.** `GET /clients`, search, `PATCH /clients/:id`.
-- **7c.** Contacts.
+- **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
+- **7c.** Taking over a client.
+- **7d.** Contacts.
 - Security review of the module.

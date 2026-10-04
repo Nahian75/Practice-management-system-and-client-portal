@@ -1,17 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ExpressionBuilder, Kysely } from 'kysely';
+import { sql, type ExpressionBuilder, type Kysely, type Updateable } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { Database } from '../database/schema.js';
-import type { Address, Client, NewClient } from './client.js';
+import type { ClientIndividualsTable, ClientOrganisationsTable, Database } from '../database/schema.js';
+import type { Address, Client, ClientPatch, ClientSummary, NewClient } from './client.js';
 
 /**
  * The visibility rule from docs/clients.md, in one place. Every query that
- * returns a client's details filters with it, so a forgotten check cannot
- * return someone else's client. Matters widens it to the matter's team.
+ * returns or changes a client's details filters with it, so a forgotten check
+ * cannot reach someone else's client. Matters widens it to the matter's team.
  */
 export function visibleTo(viewerId: string) {
   return (eb: ExpressionBuilder<Database, 'clients'>) => eb('clients.created_by', '=', viewerId);
 }
+
+/** The name a client is known by: the legal name, or given names and family name. */
+const clientName = sql<string>`coalesce(o.legal_name, i.given_names || ' ' || i.family_name)`;
 
 interface ContactColumns {
   email: string | null;
@@ -64,8 +67,8 @@ export class ClientsRepository {
   }
 
   /** The client, if `viewerId` may see it. */
-  async findVisible(clientId: string, viewerId: string): Promise<Client | undefined> {
-    const row = await this.db
+  async findVisible(clientId: string, viewerId: string, executor: Kysely<Database> = this.db): Promise<Client | undefined> {
+    const row = await executor
       .selectFrom('clients')
       .leftJoin('client_individuals as i', 'i.client_id', 'clients.id')
       .leftJoin('client_organisations as o', 'o.client_id', 'clients.id')
@@ -127,6 +130,95 @@ export class ClientsRepository {
     };
   }
 
+  /**
+   * Clients `viewerId` may see, newest first, `limit` at a time. `before` is
+   * the reference of the last client on the previous page.
+   */
+  listVisible(viewerId: string, page: { before?: string; limit: number }): Promise<ClientSummary[]> {
+    let query = this.db
+      .selectFrom('clients')
+      .leftJoin('client_individuals as i', 'i.client_id', 'clients.id')
+      .leftJoin('client_organisations as o', 'o.client_id', 'clients.id')
+      .select(['clients.id', 'clients.reference', 'clients.kind', clientName.as('name')])
+      .where(visibleTo(viewerId));
+    if (page.before !== undefined) {
+      const before = page.before;
+      query = query.where('clients.number', '<', (eb) =>
+        eb.selectFrom('clients').select('number').where('reference', '=', before),
+      );
+    }
+    return query.orderBy('clients.number', 'desc').limit(page.limit).execute();
+  }
+
+  /**
+   * Every client whose reference is `text` or whose name contains it. Not
+   * limited by visibility: it returns summaries only, so people can avoid
+   * creating a client twice. An exact reference comes first.
+   */
+  search(text: string, limit: number): Promise<ClientSummary[]> {
+    const pattern = `%${text.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+    return this.db
+      .selectFrom('clients')
+      .leftJoin('client_individuals as i', 'i.client_id', 'clients.id')
+      .leftJoin('client_organisations as o', 'o.client_id', 'clients.id')
+      .select(['clients.id', 'clients.reference', 'clients.kind', clientName.as('name')])
+      .where((eb) => eb.or([eb('clients.reference', '=', text.toUpperCase()), eb(clientName, 'ilike', pattern)]))
+      .orderBy(sql`clients.reference = ${text.toUpperCase()}`, 'desc')
+      .orderBy(clientName)
+      .orderBy('clients.number')
+      .limit(limit)
+      .execute();
+  }
+
+  /**
+   * Locks the client's details row until the transaction ends, if `viewerId`
+   * may see the client. Returns false when it may not, or does not exist.
+   */
+  async lockVisible(clientId: string, viewerId: string, trx: Kysely<Database>): Promise<boolean> {
+    const visible = trx.selectFrom('clients').select('clients.id').where('clients.id', '=', clientId).where(visibleTo(viewerId));
+    const individual = await trx
+      .selectFrom('client_individuals')
+      .select('client_id')
+      .where('client_id', 'in', visible)
+      .forUpdate()
+      .executeTakeFirst();
+    const organisation = await trx
+      .selectFrom('client_organisations')
+      .select('client_id')
+      .where('client_id', 'in', visible)
+      .forUpdate()
+      .executeTakeFirst();
+    return Boolean(individual ?? organisation);
+  }
+
+  /** Writes the fields present in `patch`. The caller has checked the kind and locked the row. */
+  async updateDetails(clientId: string, patch: ClientPatch, trx: Kysely<Database>): Promise<void> {
+    const contact: Updateable<ContactColumns> = {
+      ...(patch.email !== undefined && { email: patch.email }),
+      ...(patch.phone !== undefined && { phone: patch.phone }),
+      ...(patch.address !== undefined && addressColumns(patch.address)),
+    };
+
+    if (patch.kind === 'individual') {
+      const columns: Updateable<ClientIndividualsTable> = {
+        ...contact,
+        ...(patch.title !== undefined && { title: patch.title }),
+        ...(patch.givenNames !== undefined && { given_names: patch.givenNames }),
+        ...(patch.familyName !== undefined && { family_name: patch.familyName }),
+        ...(patch.dateOfBirth !== undefined && { date_of_birth: patch.dateOfBirth }),
+      };
+      await trx.updateTable('client_individuals').set(columns).where('client_id', '=', clientId).execute();
+    } else {
+      const columns: Updateable<ClientOrganisationsTable> = {
+        ...contact,
+        ...(patch.legalName !== undefined && { legal_name: patch.legalName }),
+        ...(patch.organisationType !== undefined && { organisation_type: patch.organisationType }),
+        ...(patch.registrationNumber !== undefined && { registration_number: patch.registrationNumber }),
+      };
+      await trx.updateTable('client_organisations').set(columns).where('client_id', '=', clientId).execute();
+    }
+  }
+
   /** Runs `work` in a transaction, for changes that must commit together. */
   transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {
     return this.db.transaction().execute(work);
@@ -134,14 +226,16 @@ export class ClientsRepository {
 }
 
 function contactColumns(client: NewClient): ContactColumns {
+  return { email: client.email, phone: client.phone, ...addressColumns(client.address) };
+}
+
+function addressColumns(address: Address | null): Omit<ContactColumns, 'email' | 'phone'> {
   return {
-    email: client.email,
-    phone: client.phone,
-    address_line1: client.address?.line1 ?? null,
-    address_line2: client.address?.line2 ?? null,
-    town: client.address?.town ?? null,
-    postcode: client.address?.postcode ?? null,
-    country: client.address?.country ?? null,
+    address_line1: address?.line1 ?? null,
+    address_line2: address?.line2 ?? null,
+    town: address?.town ?? null,
+    postcode: address?.postcode ?? null,
+    country: address?.country ?? null,
   };
 }
 

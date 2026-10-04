@@ -137,12 +137,21 @@ describe('clients tables', () => {
     it.each([
       ['turn an individual into an organisation', (id: string) => sql`update clients set kind = 'organisation' where id = ${id}`],
       ['change the creator', (id: string) => sql`update clients set created_by = created_by where id = ${id}`],
-      ['archive a client (not yet built)', (id: string) => sql`update clients set status = 'archived' where id = ${id}`],
-      ['change details (not yet built)', (id: string) => sql`update client_individuals set family_name = 'X' where client_id = ${id}`],
+      ['archive a client (comes with Matters)', (id: string) => sql`update clients set status = 'archived' where id = ${id}`],
+      ['move details to another client', (id: string) => sql`update client_individuals set client_id = uuidv7() where client_id = ${id}`],
       ['delete a client', (id: string) => sql`delete from clients where id = ${id}`],
       ['delete details', (id: string) => sql`delete from client_individuals where client_id = ${id}`],
     ])('may not %s', async (_case, statement) => {
       await expect(statement(clientId).execute(db)).rejects.toThrow(/permission denied/);
+    });
+
+    it('may change details, within the same checks as on creation', async () => {
+      await expect(
+        db.updateTable('client_individuals').set({ family_name: 'Smith' }).where('client_id', '=', clientId).execute(),
+      ).resolves.toBeDefined();
+      await expect(
+        db.updateTable('client_individuals').set({ email: 'Not An Email' }).where('client_id', '=', clientId).execute(),
+      ).rejects.toThrow(/violates check constraint/);
     });
   });
 });

@@ -143,29 +143,29 @@ export interface ClientsTable {
 }
 
 interface ClientContactColumns {
-  email: InsertOnly<string | null>;
-  phone: InsertOnly<string | null>;
-  address_line1: InsertOnly<string | null>;
-  address_line2: InsertOnly<string | null>;
-  town: InsertOnly<string | null>;
-  postcode: InsertOnly<string | null>;
-  country: InsertOnly<string | null>;
+  email: Writable<string | null>;
+  phone: Writable<string | null>;
+  address_line1: Writable<string | null>;
+  address_line2: Writable<string | null>;
+  town: Writable<string | null>;
+  postcode: Writable<string | null>;
+  country: Writable<string | null>;
 }
 
 export interface ClientIndividualsTable extends ClientContactColumns {
   client_id: InsertOnly<string>;
-  title: InsertOnly<string | null>;
-  given_names: InsertOnly<string>;
-  family_name: InsertOnly<string>;
+  title: Writable<string | null>;
+  given_names: Writable<string>;
+  family_name: Writable<string>;
   // A date column arrives as a string (YYYY-MM-DD), so no time zone can shift it.
-  date_of_birth: InsertOnly<string | null>;
+  date_of_birth: Writable<string | null>;
 }
 
 export interface ClientOrganisationsTable extends ClientContactColumns {
   client_id: InsertOnly<string>;
-  legal_name: InsertOnly<string>;
-  organisation_type: InsertOnly<OrganisationType>;
-  registration_number: InsertOnly<string | null>;
+  legal_name: Writable<string>;
+  organisation_type: Writable<OrganisationType>;
+  registration_number: Writable<string | null>;
 }
 
 export interface Database {

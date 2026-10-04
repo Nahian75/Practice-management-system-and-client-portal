@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
@@ -6,9 +6,11 @@ import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/ses
 import { requestContext } from '../common/http/request-context.js';
 import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
 import { COUNTRY_CODES } from '../common/validation/country-codes.js';
+import type { Client } from './client.js';
 import { ClientsService, type ClientActor } from './clients.service.js';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
+/** For creation: a field left out is stored as null. */
 const optional = <T extends z.ZodType>(schema: T) => schema.nullish().transform((value) => value ?? null);
 
 const email = z.string().trim().toLowerCase().pipe(z.email().max(254));
@@ -22,6 +24,9 @@ const country = z
 const dateOfBirth = z.iso
   .date()
   .refine((date) => date >= '1900-01-01' && date <= new Date().toISOString().slice(0, 10), 'Not a plausible date of birth');
+const organisationType = z.enum(['company', 'llp', 'partnership', 'charity', 'trust', 'other']);
+const registrationNumber = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,30}$/);
+const reference = z.string().trim().toUpperCase().regex(/^C-\d{6,}$/);
 
 const addressSchema = z.strictObject({
   line1: text(200),
@@ -31,12 +36,6 @@ const addressSchema = z.strictObject({
   country,
 });
 
-const contactFields = {
-  email: optional(email),
-  phone: optional(phone),
-  address: optional(addressSchema),
-};
-
 const newClientSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('individual'),
@@ -44,21 +43,65 @@ const newClientSchema = z.discriminatedUnion('kind', [
     givenNames: text(100),
     familyName: text(100),
     dateOfBirth: optional(dateOfBirth),
-    ...contactFields,
+    email: optional(email),
+    phone: optional(phone),
+    address: optional(addressSchema),
   }),
   z.strictObject({
     kind: z.literal('organisation'),
     legalName: text(200),
-    organisationType: z.enum(['company', 'llp', 'partnership', 'charity', 'trust', 'other']),
-    registrationNumber: optional(z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,30}$/)),
-    ...contactFields,
+    organisationType,
+    registrationNumber: optional(registrationNumber),
+    email: optional(email),
+    phone: optional(phone),
+    address: optional(addressSchema),
   }),
 ]);
+
+/** For changes: a field left out stays as it is, and null clears an optional field. */
+const atLeastOneChange = (patch: object) => Object.keys(patch).length > 1;
+const clientPatchSchema = z.discriminatedUnion('kind', [
+  z
+    .strictObject({
+      kind: z.literal('individual'),
+      title: text(20).nullable().optional(),
+      givenNames: text(100).optional(),
+      familyName: text(100).optional(),
+      dateOfBirth: dateOfBirth.nullable().optional(),
+      email: email.nullable().optional(),
+      phone: phone.nullable().optional(),
+      address: addressSchema.nullable().optional(),
+    })
+    .refine(atLeastOneChange, 'Nothing to change'),
+  z
+    .strictObject({
+      kind: z.literal('organisation'),
+      legalName: text(200).optional(),
+      organisationType: organisationType.optional(),
+      registrationNumber: registrationNumber.nullable().optional(),
+      email: email.nullable().optional(),
+      phone: phone.nullable().optional(),
+      address: addressSchema.nullable().optional(),
+    })
+    .refine(atLeastOneChange, 'Nothing to change'),
+]);
+
+const listQuerySchema = z.strictObject({ before: reference.optional() });
+const searchQuerySchema = z.strictObject({ q: z.string().trim().min(2).max(100) });
 
 const createdSchema = z.object({
   id: z.uuid(),
   reference: z.string(),
 });
+
+const summarySchema = z.object({
+  id: z.uuid(),
+  reference: z.string(),
+  kind: z.enum(['individual', 'organisation']),
+  name: z.string(),
+});
+const listSchema = z.object({ clients: z.array(summarySchema), next: z.string().nullable() });
+const searchSchema = z.object({ clients: z.array(summarySchema) });
 
 const clientRecordFields = {
   id: z.uuid(),
@@ -102,6 +145,8 @@ function actorFor(session: ResolvedSession, request: Request): ClientActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
 
+const serialise = (client: Client) => ({ ...client, createdAt: client.createdAt.toISOString() });
+
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly clients: ClientsService) {}
@@ -117,6 +162,21 @@ export class ClientsController {
     return this.clients.create(body, actorFor(session, request));
   }
 
+  @Get()
+  @RequirePermission('clients.view')
+  @ResponseSchema(listSchema)
+  list(@Query({ schema: listQuerySchema }) query: z.infer<typeof listQuerySchema>, @CurrentSession() session: ResolvedSession) {
+    return this.clients.list(session.account.id, query.before);
+  }
+
+  /** Searches every client, but returns only what is needed to recognise one. */
+  @Get('search')
+  @RequirePermission('clients.search')
+  @ResponseSchema(searchSchema)
+  async search(@Query({ schema: searchQuerySchema }) query: z.infer<typeof searchQuerySchema>) {
+    return { clients: await this.clients.search(query.q) };
+  }
+
   /** A client the caller may not see answers 404, like one that does not exist. */
   @Get(':clientId')
   @RequirePermission('clients.view')
@@ -126,6 +186,26 @@ export class ClientsController {
     if (!client) {
       throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
     }
-    return { ...client, createdAt: client.createdAt.toISOString() };
+    return serialise(client);
+  }
+
+  @Patch(':clientId')
+  @RequirePermission('clients.edit')
+  @ResponseSchema(clientSchema)
+  async update(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: clientPatchSchema }) body: z.infer<typeof clientPatchSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const result = await this.clients.update(clientId, body, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+      case 'kind_mismatch':
+        throw new BadRequestException(`This client is an ${result.kind}`);
+      case 'updated':
+        return serialise(result.client);
+    }
   }
 }

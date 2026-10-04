@@ -54,7 +54,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `password_resets` | `0008_password_resets.sql` | `SELECT`, `INSERT`; `UPDATE` of `closed_at`, `close_reason` only. No `DELETE`. One open reset per account. A trigger keeps closed resets closed, for every role | [authentication.md](authentication.md#invitations-and-password-reset) |
 | `account_roles` | `0009_account_roles.sql` | `SELECT`, `INSERT`; `UPDATE` of `revoked_at`, `revoked_by` only. No `DELETE`. One active row per account and role. Triggers: only staff accounts hold roles; a revoked row stays revoked. Checks: nobody grants or revokes their own role | [authorization.md](authorization.md#layer-2-roles-and-permissions-designed) |
 | `clients` | `0010_clients.sql` | `SELECT`; `INSERT` of `kind` and `created_by` only, so the number and reference come from the database. No `UPDATE` or `DELETE`. Trigger: created by a staff account. Checked at commit: every client has its details row | [clients.md](clients.md) |
-| `client_individuals`, `client_organisations` | `0010_clients.sql` | `SELECT`, `INSERT`. No `UPDATE` (comes with editing) or `DELETE`. One row per client (primary key); a trigger keeps it to the client's kind | [clients.md](clients.md) |
+| `client_individuals`, `client_organisations` | `0010_clients.sql`, `0011_client_editing.sql` | `SELECT`, `INSERT`; `UPDATE` of every detail column, not `client_id`. No `DELETE`. One row per client (primary key); a trigger keeps it to the client's kind | [clients.md](clients.md) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.
