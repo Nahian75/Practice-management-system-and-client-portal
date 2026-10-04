@@ -38,7 +38,7 @@ authorization decisions.
 | Audit | Built; used by Auth and Users / Roles |
 | Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
 | Users / Roles | Built: roles, permissions, permission guard, staff-management endpoints (`apps/api/src/auth/permissions/`, `apps/api/src/staff/`) |
-| Clients | Not started |
+| Clients | Designed ([clients.md](clients.md)); not built |
 | Matters | Not started |
 | Documents | Not started |
 | Client portal | Not started |
