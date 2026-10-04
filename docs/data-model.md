@@ -57,6 +57,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `client_contacts` | `0013_client_contacts.sql` | `SELECT`; `INSERT` without `active` (new contacts are active); `UPDATE` of details and `active`, not `client_id`. No `DELETE`: a contact who leaves is marked inactive. Trigger: organisation clients only | [clients.md](clients.md) |
 | `client_responsibility_changes` | `0012_client_takeover.sql` | `SELECT`; `INSERT` of client, from, to and reason only. A `SECURITY DEFINER` trigger checks the takeover rules and applies the change to `clients.responsible_id`. No row can be changed or deleted, for every role | [clients.md](clients.md#taking-over-a-client) |
 | `client_individuals`, `client_organisations` | `0010_clients.sql`, `0011_client_editing.sql` | `SELECT`, `INSERT`; `UPDATE` of every detail column, not `client_id`. No `DELETE`. One row per client (primary key); a trigger keeps it to the client's kind | [clients.md](clients.md) |
+| (client text) | `0015_client_text_safe.sql` | `app.is_safe_text()` checks every client text column and the takeover reason: no control characters, line separators or direction overrides. `pms_app` is granted `EXECUTE` on it, since new functions carry no rights by default | [review C4](reviews/2026-10-04-clients.md) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

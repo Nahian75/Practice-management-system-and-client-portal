@@ -123,6 +123,47 @@ describe('clients tables', () => {
     );
   });
 
+  // Review C4: the database refuses these too, whatever path the text came by.
+  describe('unsafe characters', () => {
+    const UNSAFE: [string, number][] = [
+      ['a tab', 0x09],
+      ['a line break', 0x0a],
+      ['a delete character', 0x7f],
+      ['a line separator', 0x2028],
+      ['a right-to-left override', 0x202e],
+      ['a right-to-left isolate', 0x2067],
+    ];
+
+    it.each(UNSAFE)('refuses %s in an individual, an organisation, a contact and a takeover reason', async (_case, codePoint) => {
+      const bad = `Doe${String.fromCodePoint(codePoint)}x`;
+      const organisationId = (await createClient('organisation', { organisation: organisation() })).id;
+      const disabled = await createTestAccount(db, 'staff', { status: 'disabled' });
+      const takerOver = await createTestAccount(db, 'staff');
+      const theirClient = (await createClient('individual', { individual: individual() }, disabled.id)).id;
+
+      await expect(createClient('individual', { individual: individual({ family_name: bad }) })).rejects.toThrow(/text_safe/);
+      await expect(createClient('organisation', { organisation: organisation({ legal_name: bad }) })).rejects.toThrow(/text_safe/);
+      await expect(
+        db.insertInto('client_contacts').values({ client_id: organisationId, given_names: 'Sam', family_name: bad }).execute(),
+      ).rejects.toThrow(/text_safe/);
+      await expect(
+        db
+          .insertInto('client_responsibility_changes')
+          .values({ client_id: theirClient, from_account_id: disabled.id, to_account_id: takerOver.id, reason: `Left the firm ${bad}` })
+          .execute(),
+      ).rejects.toThrow(/reason_safe/);
+    });
+
+    it.each([
+      ['accents', 'Zoë Brontë'],
+      ['Arabic', 'محمد'],
+      ['Chinese', '李小龙'],
+      ['an apostrophe and a hyphen', "O'Brien-Smith"],
+    ])('accepts a name with %s', async (_case, name) => {
+      await expect(createClient('individual', { individual: individual({ family_name: name }) })).resolves.toBeDefined();
+    });
+  });
+
   it('stores a date of birth as the same calendar day', async () => {
     const client = await createClient('individual', { individual: individual({ date_of_birth: '1980-02-29' }) });
 

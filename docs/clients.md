@@ -3,8 +3,8 @@
 **Current state (2026-10-04):** Built: creating a client, opening and listing
 the clients you can see, searching every client by name or reference, editing
 details, a partner taking over a client whose responsible person can no longer see it,
-and contacts of organisation clients. Security review done: C1, C2, C3 and C8
-fixed; C4 (database check for control characters) open.
+and contacts of organisation clients. Security review done: C1–C4, C8 and
+C10 fixed; C5 comes with Matters, C6 before production.
 
 ## Decisions
 
@@ -217,4 +217,4 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
 - **7d.** Contacts. Done.
-- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1, C2, C3 and C8 fixed.
+- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1–C4, C8 and C10 fixed; C5 comes with Matters and C6 before production.

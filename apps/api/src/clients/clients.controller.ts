@@ -25,12 +25,13 @@ import { COUNTRY_CODES } from '../common/validation/country-codes.js';
 import type { Client } from './client.js';
 import { ClientsService, SEARCH_WINDOW_SECONDS, type ClientActor } from './clients.service.js';
 
-// Control characters (null bytes, line breaks, tabs) and direction overrides are
-// refused: a null byte cannot be stored, a line break can split a letter or an
-// email header later, and an override makes a name display as something other
-// than what is stored. Free text must also contain a letter or a digit, so it
-// cannot be made only of invisible characters.
-const UNSAFE_CHARACTERS = /[\p{Cc}‪-‮⁦-⁩]/u;
+// Control characters (null bytes, line breaks, tabs), line separators and
+// direction overrides are refused: a null byte cannot be stored, a line break
+// can split a letter or an email header later, and an override makes a name
+// display as something other than what is stored. Free text must also contain
+// a letter or a digit, so it cannot be made only of invisible characters.
+// The database's app.is_safe_text (migration 0015) refuses the same list.
+const UNSAFE_CHARACTERS = /[\p{Cc}\u2028\u2029\u202A-\u202E\u2066-\u2069]/u;
 const VISIBLE_CHARACTER = /[\p{L}\p{N}]/u;
 
 const text = (max: number, min = 1) =>
