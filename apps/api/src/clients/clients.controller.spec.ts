@@ -346,7 +346,7 @@ describe('Clients', () => {
 
         expect(refused.status).toBe(429);
         expect(refused.headers['retry-after']).toBe('3600');
-        expect(refused.body.message).toBe('Too many client searches in the last hour. Try again later');
+        expect(refused.body.message).toBe('Too many client searches or conflict checks in the last hour. Try again later');
         const events = await searchEvents(feeEarner.id);
         expect(events.filter((event) => event.action === 'client.searched')).toHaveLength(60);
         expect(events.filter((event) => event.action === 'client.search_limited')).toEqual([

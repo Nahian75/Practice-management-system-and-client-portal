@@ -1,8 +1,9 @@
 # Matters
 
-**Current state (2026-10-04):** Step 8a built: matters and teams, opening a
-matter (without a conflict check yet), seeing your matters, and client
-visibility through matter teams. The rest is designed below and not built yet.
+**Current state (2026-10-04):** Steps 8a and 8b built: matters and teams,
+conflict checks required for opening, other parties, seeing your matters, and
+client visibility through matter teams. Clearing a possible conflict is next;
+until then a matter that needs clearance stays `awaiting_clearance`.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -102,28 +103,54 @@ be added to it.
 
 ## Conflict checks
 
-A check compares each name given against:
+Built in 8b (migration `0017`). A check compares each name given, plus the
+client's own name (is the new client someone's opponent?), against:
 
 - every client's name (individuals' full names, organisations' legal names),
 - every contact of an organisation client,
 - every other party on every matter.
 
-Matching ignores case, accents and punctuation, and uses trigram similarity
-(`pg_trgm`, review item C5 of Clients), so "Jon Smyth" finds "John Smith".
-The threshold is set by test against realistic spellings.
+A client's own record and contacts are not reported against that client.
 
-`pg_trgm` is a PostgreSQL extension. The migration role `pms_owner` may not
-install extensions (it has no `CREATE` right on the database, by design), so
-the superuser installs it once: a line in `infra/postgres/init/` for new
-databases, and a documented one-off command for existing ones. Migrations then
-only check that it is there.
+**How names are compared** (`app.normalise_name`, `app.name_likeness`):
+
+- Accents, case and apostrophes are ignored, other punctuation counts as a
+  space, and legal-form words (Ltd, Limited, plc, LLP, Inc, Co, Company, the,
+  and) are left out. "Zoë O'Neil" equals "ZOE ONEIL"; "Smith & Sons Ltd"
+  equals "Smith and Sons Limited".
+- Likeness is the whole-name trigram similarity, or one name inside the other
+  when it is nearly all there (0.8 or more). 0.3 or more is a possible match.
+- Measured: "Jon Smyth" / "John Smith" 0.31, "Kathryn" / "Catherine Jones"
+  0.30, "Muhammad" / "Mohammed Khan" 0.40, "Acme" / "Acme Trading Ltd" 1.00.
+  "Jane Smith" / "John Smith" also matches (0.47): a partner clearing a false
+  alarm costs less than a missed conflict. A first version also counted any
+  shared word, and "X Holdings Ltd" matched hundreds of companies; the 0.8
+  rule and leaving out legal-form words brought that to none.
+- Every name is compared in full each time, without an index. That is fast
+  enough at a firm's scale; an index can be added if it is not.
+
+**The database does the check itself.** The app gives the client and the
+names; a trigger adds the client's name, finds the matches, and stores the 50
+strongest with the total count. The app cannot write the matches, so no bug
+can record a check as clear. A matter opened on a check with any match starts
+as `awaiting_clearance`, decided by the database from the stored count.
+
+**Opening on a check:** the check must be for the same client, by the person
+opening the matter, under 24 hours old, and not used before, enforced by the
+database as well as the API. Every other party on the matter must have been
+among the names checked, compared the same way.
 
 A possible match shows the name, the reference of the client or matter, and
 how it relates (client, contact, opponent, ...). Nothing else: no addresses,
-no matter details. That is what a conflict check needs, and the same principle
-as client search. Checks count towards the same hourly search limit as client
-search (review C2), and each is stored with its names and match count; the
-names stay out of the audit log.
+no matter details. Checks count towards the same hourly allowance as client
+search (review C2, 60 an hour together). Each is stored with its names; the
+audit log records only the counts.
+
+`pg_trgm` and `unaccent` are PostgreSQL extensions. The migration role may
+not install extensions (by design), so the superuser installs them once into
+their own `extensions` schema: `infra/postgres/init/02-extensions.sh`, see
+[deployment.md](deployment.md). Migration `0017` stops with a clear message
+if that step was missed.
 
 ## Who can do what
 
@@ -153,6 +180,7 @@ unchanged.
 | GET | `/matters/:id` | `matters.view` + team | Details, team, other parties |
 | PATCH | `/matters/:id` | `matters.edit` + team | Title, type |
 | POST/PATCH | `/matters/:id/parties` | `matters.edit` + team | Add or change other parties |
+| GET | `/matters/:id/conflict-check` | `matters.view` + team | The check the matter was opened on: names, the 50 strongest matches, the total count |
 | POST | `/matters/:id/conflict-clearance` | `matters.supervise` + supervising partner | `{reason}` |
 | PUT/DELETE | `/matters/:id/team/:accountId` | `matters.supervise` + supervising partner | Add or remove a fee earner; hand supervision to another partner |
 | POST | `/matters/:id/close` | `matters.supervise` + supervising partner | `{reason}` |
@@ -183,10 +211,10 @@ Each step ships with positive and negative tests and is reviewed before the next
   `GET /matters`, `GET /matters/:id`, `GET /clients/:id/matters`, team-based
   visibility, and client visibility widened. Matters open without a conflict
   check in this step; nothing reaches production before 8b. Done.
-- **8b.** Other parties and conflict checks, now required for opening:
-  `pg_trgm`, matching, possible matches, `awaiting_clearance`, clearance by the
-  supervising partner, email to compliance.
-- **8c.** Team changes and handing over supervision.
-- **8d.** Editing, closing.
-- **8e.** Compliance access with a reason.
+- **8b.** Other parties and conflict checks, now required for opening: matching,
+  possible matches, `awaiting_clearance`. Done.
+- **8c.** Clearance by the supervising partner, email to compliance.
+- **8d.** Team changes and handing over supervision.
+- **8e.** Editing, closing.
+- **8f.** Compliance access with a reason.
 - Security review of the module.

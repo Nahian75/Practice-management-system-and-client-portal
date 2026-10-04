@@ -315,14 +315,6 @@ export class ClientsRepository {
   }
 
   /**
-   * Serialises one person's searches until the transaction ends, so requests
-   * sent in parallel cannot all pass the hourly limit before any is recorded.
-   */
-  async lockSearchesBy(accountId: string, trx: Kysely<Database>): Promise<void> {
-    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.client_search:${accountId}`}, 0))`.execute(trx);
-  }
-
-  /**
    * Serialises takeovers of one client until the transaction ends, so two
    * partners taking it over at once are answered one after the other.
    */

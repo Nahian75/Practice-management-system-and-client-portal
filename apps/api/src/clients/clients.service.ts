@@ -17,11 +17,10 @@ import type {
   NewClient,
 } from './client.js';
 import { ClientsRepository } from './clients.repository.js';
+import { SearchQuota } from './search-quota.js';
 
 export const CLIENTS_PAGE_SIZE = 50;
 export const SEARCH_RESULTS_LIMIT = 20;
-export const SEARCHES_PER_HOUR = 60;
-export const SEARCH_WINDOW_SECONDS = 60 * 60;
 
 export type SearchResult = { outcome: 'found'; clients: ClientSummary[] } | { outcome: 'limited' };
 
@@ -44,6 +43,7 @@ export class ClientsService {
     private readonly audit: AuditService,
     private readonly roles: RolesRepository,
     private readonly notices: SecurityNoticesService,
+    private readonly quota: SearchQuota,
   ) {}
 
   /** The audit record names the kind only: client details are personal data and stay out of the log. */
@@ -76,28 +76,13 @@ export class ClientsService {
   }
 
   /**
-   * Searches every client, at most SEARCHES_PER_HOUR times per person
-   * (review C2). Each search is recorded with its number of results, not the
-   * text searched for, and that record is also what the limit counts. Going
-   * over the limit is recorded once an hour, so hammering it cannot flood the log.
+   * Searches every client, within the hourly allowance shared with conflict
+   * checks (review C2). Each search is recorded with its number of results,
+   * not the text searched for, and that record is what the allowance counts.
    */
   search(text: string, by: ClientActor): Promise<SearchResult> {
     return this.clients.transaction(async (trx): Promise<SearchResult> => {
-      await this.clients.lockSearchesBy(by.accountId, trx);
-      const window = { actorId: by.accountId, seconds: SEARCH_WINDOW_SECONDS };
-      if ((await this.audit.countRecent({ ...window, action: 'client.searched' }, trx)) >= SEARCHES_PER_HOUR) {
-        if ((await this.audit.countRecent({ ...window, action: 'client.search_limited' }, trx)) === 0) {
-          await this.audit.record(
-            {
-              actor: by.actor,
-              action: 'client.search_limited',
-              outcome: 'denied',
-              metadata: { limit: SEARCHES_PER_HOUR },
-              ...by.context,
-            },
-            trx,
-          );
-        }
+      if (!(await this.quota.allows(by, trx))) {
         return { outcome: 'limited' };
       }
 

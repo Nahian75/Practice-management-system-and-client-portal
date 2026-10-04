@@ -217,6 +217,8 @@ export interface MattersTable {
   status: DatabaseSet<MatterStatus>;
   opened_by: InsertOnly<string>;
   opened_at: DatabaseSet<Date>;
+  /** Required for every matter opened from migration 0017 on. */
+  conflict_check_id: InsertOnly<string | null>;
 }
 
 export interface MatterTeamTable {
@@ -230,6 +232,41 @@ export interface MatterTeamTable {
   removed_at: DatabaseSet<Date | null>;
 }
 
+export type PartyRole = 'opponent' | 'opponent_solicitor' | 'other';
+
+export interface MatterPartiesTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  role: InsertOnly<PartyRole>;
+  kind: InsertOnly<ClientKind>;
+  name: InsertOnly<string>;
+  added_by: InsertOnly<string>;
+  added_at: DatabaseSet<Date>;
+}
+
+/** One possible match, as the database's find_possible_conflicts records it. */
+export interface ConflictMatchRow {
+  checkedName: string;
+  matchedName: string;
+  relation: 'client' | 'contact' | 'opponent' | 'opponent_solicitor' | 'other_party';
+  clientId: string;
+  matterId: string | null;
+  score: number;
+}
+
+export interface ConflictChecksTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  requested_by: InsertOnly<string>;
+  /** As given, with the client's own name added by the database. */
+  names: InsertOnly<string[]>;
+  /** Found by the database when the check is recorded; the app cannot write it. */
+  matches: DatabaseSet<ConflictMatchRow[]>;
+  /** How many possible matches were found; `matches` holds the 50 strongest. */
+  match_count: DatabaseSet<number>;
+  created_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -239,8 +276,10 @@ export interface Database {
   client_individuals: ClientIndividualsTable;
   client_organisations: ClientOrganisationsTable;
   client_responsibility_changes: ClientResponsibilityChangesTable;
+  conflict_checks: ConflictChecksTable;
   clients: ClientsTable;
   invitations: InvitationsTable;
+  matter_parties: MatterPartiesTable;
   matter_team: MatterTeamTable;
   matters: MattersTable;
   password_resets: PasswordResetsTable;

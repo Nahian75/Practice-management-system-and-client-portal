@@ -18,6 +18,18 @@ npm run build -w @practice/api && npm run invite:local -w @practice/api -- --kin
 npm run start:local -w @practice/api
 ```
 
+**Extensions, once per database.** `pg_trgm` and `unaccent` need the
+superuser, which the migration role deliberately is not. New data volumes get
+them from `infra/postgres/init/02-extensions.sh`. For a database created
+before that file existed, run it once:
+
+```sh
+docker compose exec -T postgres sh /docker-entrypoint-initdb.d/02-extensions.sh
+# In Git Bash on Windows, prefix with MSYS_NO_PATHCONV=1 so the path is not rewritten.
+```
+
+Migration `0017` stops with a clear message if they are missing.
+
 Behind a load balancer, set `TRUSTED_PROXIES` to its address range. Leave it
 empty when the app is reached directly.
 

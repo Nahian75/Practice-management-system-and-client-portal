@@ -1,10 +1,24 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Query, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
 import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from '../clients/search-quota.js';
 import { text } from '../common/validation/safe-text.js';
 import { MattersService, type MatterActor } from './matters.service.js';
 
@@ -21,6 +35,15 @@ const MATTER_TYPES = [
   'other',
 ] as const;
 const MATTER_STATUSES = ['awaiting_clearance', 'open', 'closed'] as const;
+const PARTY_ROLES = ['opponent', 'opponent_solicitor', 'other'] as const;
+const KINDS = ['individual', 'organisation'] as const;
+const RELATIONS = ['client', 'contact', 'opponent', 'opponent_solicitor', 'other_party'] as const;
+
+const conflictCheckRequestSchema = z.strictObject({
+  clientId: z.uuid(),
+  names: z.array(text(200)).min(1).max(20),
+});
+const partySchema = z.strictObject({ role: z.enum(PARTY_ROLES), kind: z.enum(KINDS), name: text(200) });
 
 const newMatterSchema = z.strictObject({
   clientId: z.uuid(),
@@ -32,6 +55,8 @@ const newMatterSchema = z.strictObject({
     .max(20)
     .refine((ids) => new Set(ids).size === ids.length, 'Each fee earner once')
     .default([]),
+  conflictCheckId: z.uuid(),
+  parties: z.array(partySchema).max(20).default([]),
 });
 const listQuerySchema = z.strictObject({ before: z.uuid().optional() });
 
@@ -45,8 +70,24 @@ const summarySchema = z.object({
 });
 const matterSchema = summarySchema.extend({
   openedAt: z.iso.datetime(),
+  parties: z.array(z.object({ id: z.uuid(), role: z.enum(PARTY_ROLES), kind: z.enum(KINDS), name: z.string() })),
   team: z.array(
     z.object({ accountId: z.uuid(), displayName: z.string(), role: z.enum(['supervising_partner', 'fee_earner']) }),
+  ),
+});
+const conflictCheckSchema = z.object({
+  id: z.uuid(),
+  names: z.array(z.string()),
+  matchCount: z.number().int(),
+  createdAt: z.iso.datetime(),
+  matches: z.array(
+    z.object({
+      checkedName: z.string(),
+      matchedName: z.string(),
+      relation: z.enum(RELATIONS),
+      clientReference: z.string(),
+      matterReference: z.string().nullable(),
+    }),
   ),
 });
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
@@ -80,8 +121,36 @@ export class MattersController {
         throw new BadRequestException('The supervising partner must be an active partner');
       case 'invalid_team_member':
         throw new BadRequestException('Every team member must be active staff who can work on matters');
+      case 'invalid_conflict_check':
+        throw new BadRequestException(
+          'The conflict check must be your own, for this client, from the last 24 hours, and not used for another matter',
+        );
+      case 'party_not_checked':
+        throw new BadRequestException('Every other party must have been in the conflict check');
       case 'opened':
         return { id: result.id, reference: result.reference, status: result.status };
+    }
+  }
+
+  /** Checks the names against every client, contact and other party, within the hourly search allowance. */
+  @Post('conflict-checks')
+  @RequirePermission('matters.open')
+  @ResponseSchema(conflictCheckSchema)
+  async runConflictCheck(
+    @Body({ schema: conflictCheckRequestSchema }) body: z.infer<typeof conflictCheckRequestSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.matters.runConflictCheck(body.clientId, body.names, actorFor(session, request));
+    switch (result.outcome) {
+      case 'client_not_found':
+        throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+      case 'limited':
+        response.setHeader('Retry-After', String(SEARCH_WINDOW_SECONDS));
+        throw new HttpException(SEARCH_LIMIT_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+      case 'checked':
+        return { ...result.check, createdAt: result.check.createdAt.toISOString() };
     }
   }
 
@@ -102,6 +171,18 @@ export class MattersController {
       throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
     }
     return { ...matter, openedAt: matter.openedAt.toISOString() };
+  }
+
+  /** The conflict check the matter was opened on, with its possible matches, for its team. */
+  @Get('matters/:matterId/conflict-check')
+  @RequirePermission('matters.view')
+  @ResponseSchema(conflictCheckSchema)
+  async conflictCheck(@Param('matterId', { schema: z.uuid() }) matterId: string, @CurrentSession() session: ResolvedSession) {
+    const check = await this.matters.conflictCheckOf(matterId, session.account.id);
+    if (!check) {
+      throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+    }
+    return { ...check, createdAt: check.createdAt.toISOString() };
   }
 
   @Get('clients/:clientId/matters')

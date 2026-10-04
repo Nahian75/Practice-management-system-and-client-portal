@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
@@ -20,6 +21,9 @@ describe('matters tables', () => {
     return account;
   }
 
+  /** A name no other test uses, so a conflict check for it finds nothing unless a test adds a match. */
+  const uniqueName = () => randomUUID().replaceAll('-', '').slice(0, 16);
+
   const createClient = (createdBy: string, executor: Kysely<Database> = db) =>
     executor.transaction().execute(async (trx) => {
       const created = await trx
@@ -27,24 +31,38 @@ describe('matters tables', () => {
         .values({ kind: 'individual', created_by: createdBy })
         .returning(['id', 'reference'])
         .executeTakeFirstOrThrow();
-      await trx.insertInto('client_individuals').values({ client_id: created.id, given_names: 'Jane', family_name: 'Doe' }).execute();
+      await trx
+        .insertInto('client_individuals')
+        .values({ client_id: created.id, given_names: uniqueName(), family_name: uniqueName() })
+        .execute();
       return created;
     });
 
-  /** Opens a matter with the given team in one transaction, as the app does. */
+  const runCheck = (trx: Kysely<Database>, clientId: string, requestedBy: string, names: string[] = []) =>
+    trx
+      .insertInto('conflict_checks')
+      .values({ client_id: clientId, requested_by: requestedBy, names })
+      .returning(['id', 'names', 'matches'])
+      .executeTakeFirstOrThrow();
+
+  /** Runs a conflict check and opens a matter on it, with the given team, in one transaction, as the app does. */
   const openMatter = (
     team: [string, MatterTeamRole][] = [[partner.id, 'supervising_partner']],
-    overrides: { clientId?: string; title?: string; openedBy?: string } = {},
+    overrides: { clientId?: string; title?: string; openedBy?: string; checkNames?: string[] } = {},
     executor: Kysely<Database> = db,
   ) =>
     executor.transaction().execute(async (trx) => {
+      const clientId = overrides.clientId ?? client.id;
+      const openedBy = overrides.openedBy ?? feeEarner.id;
+      const check = await runCheck(trx, clientId, openedBy, overrides.checkNames);
       const matter = await trx
         .insertInto('matters')
         .values({
-          client_id: overrides.clientId ?? client.id,
+          client_id: clientId,
           title: overrides.title ?? 'Purchase of 12 High Street',
           matter_type: 'residential_property',
-          opened_by: overrides.openedBy ?? feeEarner.id,
+          opened_by: openedBy,
+          conflict_check_id: check.id,
         })
         .returning(['id', 'number', 'reference', 'status'])
         .executeTakeFirstOrThrow();
@@ -114,6 +132,119 @@ describe('matters tables', () => {
         sql`insert into matters (client_id, title, matter_type, opened_by, number, reference, status)
             values (${client.id}, 'T', 'other', ${feeEarner.id}, 99, 'X', 'open')`.execute(db),
       ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  describe('conflict checks', () => {
+    const check = (names: string[], clientId = client.id, requestedBy = feeEarner.id) =>
+      db.transaction().execute((trx) => runCheck(trx, clientId, requestedBy, names));
+
+    async function clientNamed(givenNames: string, familyName: string) {
+      return db.transaction().execute(async (trx) => {
+        const created = await trx
+          .insertInto('clients')
+          .values({ kind: 'individual', created_by: feeEarner.id })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await trx.insertInto('client_individuals').values({ client_id: created.id, given_names: givenNames, family_name: familyName }).execute();
+        return created.id;
+      });
+    }
+
+    it("adds the client's own name, and does not report the client against itself", async () => {
+      const result = await check([]);
+
+      expect(result.names).toHaveLength(1);
+      expect(result.matches).toEqual([]);
+    });
+
+    it('finds a client whose name is spelt differently', async () => {
+      const token = uniqueName();
+      const existing = await clientNamed(`John ${token}`, 'Smith');
+
+      const result = await check([`Jon ${token} Smyth`]);
+
+      expect(result.matches).toContainEqual(
+        expect.objectContaining({ relation: 'client', clientId: existing, matterId: null, checkedName: `Jon ${token} Smyth` }),
+      );
+    });
+
+    it('finds the opponent on another matter, ignoring accents and punctuation', async () => {
+      const opponent = `Zoë O'Brien-${uniqueName()}`;
+      const matterId = (await openMatter(undefined, { checkNames: [opponent] })).id;
+      await db.transaction().execute(async (trx) => {
+        await trx
+          .insertInto('matter_parties')
+          .values({ matter_id: matterId, role: 'opponent', kind: 'individual', name: opponent, added_by: feeEarner.id })
+          .execute();
+      });
+      const otherClient = await createClient(feeEarner.id);
+
+      const result = await check([opponent.normalize('NFD').replace(/[^A-Za-z0-9 ]/g, ' ')], otherClient.id);
+
+      expect(result.matches).toContainEqual(expect.objectContaining({ relation: 'opponent', clientId: client.id, matterId }));
+    });
+
+    it('opens the matter as awaiting clearance when the check found a possible match', async () => {
+      const token = uniqueName();
+      await clientNamed(token, 'Existing');
+
+      expect((await openMatter(undefined, { checkNames: [`${token} Existing`] })).status).toBe('awaiting_clearance');
+    });
+
+    it.each([
+      ['write the matches itself', () =>
+        sql`insert into conflict_checks (client_id, requested_by, names, matches) values (${client.id}, ${feeEarner.id}, '{}', '[]')`],
+      ['change a check', () => sql`update conflict_checks set matches = '[]' where client_id = ${client.id}`],
+      ['delete a check', () => sql`delete from conflict_checks where client_id = ${client.id}`],
+    ])('does not let the app %s', async (_case, statement) => {
+      await check([]);
+
+      await expect(statement().execute(db)).rejects.toThrow(/permission denied/);
+    });
+
+    it.each<[string, () => Promise<{ clientId: string; openedBy: string }>]>([
+      ['for another client', async () => ({ clientId: (await createClient(feeEarner.id)).id, openedBy: feeEarner.id })],
+      ['by someone else', async () => ({ clientId: client.id, openedBy: (await staffWith('fee_earner')).id })],
+    ])('refuses a matter opened on a check made %s', async (_case, opening) => {
+      const { id: checkId } = await check([]);
+      const { clientId, openedBy } = await opening();
+
+      await expect(
+        db
+          .insertInto('matters')
+          .values({ client_id: clientId, title: 'T', matter_type: 'other', opened_by: openedBy, conflict_check_id: checkId })
+          .execute(),
+      ).rejects.toThrow(/needs a conflict check/);
+    });
+
+    it('refuses a second matter on the same check', async () => {
+      const first = await openMatter();
+      const { conflict_check_id: checkId } = await db
+        .selectFrom('matters')
+        .select('conflict_check_id')
+        .where('id', '=', first.id)
+        .executeTakeFirstOrThrow();
+
+      await expect(
+        db
+          .insertInto('matters')
+          .values({ client_id: client.id, title: 'T', matter_type: 'other', opened_by: feeEarner.id, conflict_check_id: checkId })
+          .execute(),
+      ).rejects.toThrow(/matters_conflict_check_key/);
+    });
+
+    it('refuses a party who was not in the check, and accepts one who was, however written', async () => {
+      const checked = `Mary-Ann O'Neil ${uniqueName()}`;
+      const matterId = (await openMatter(undefined, { checkNames: [checked] })).id;
+      const addParty = (name: string) =>
+        db
+          .insertInto('matter_parties')
+          .values({ matter_id: matterId, role: 'opponent', kind: 'individual', name, added_by: feeEarner.id })
+          .execute();
+
+      await expect(addParty(`Someone ${uniqueName()}`)).rejects.toThrow(/was not in the matter's conflict check/);
+      await expect(addParty(checked.toUpperCase().replace("'", ''))).resolves.toBeDefined();
     });
   });
 

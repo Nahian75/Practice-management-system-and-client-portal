@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ExpressionBuilder, Kysely } from 'kysely';
+import { sql, type ExpressionBuilder, type Kysely } from 'kysely';
 import { clientName, visibleTo as clientVisibleTo } from '../clients/clients.repository.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, MatterTeamRole, MatterType } from '../database/schema.js';
-import type { Matter, MatterSummary, TeamMember } from './matter.js';
+import type { Matter, MatterSummary, NewParty, Party, TeamMember } from './matter.js';
 
 /**
  * The visibility rule for matters (docs/matters.md), in one place: an active
@@ -61,14 +61,20 @@ export class MattersRepository {
     }));
   }
 
-  /** Inserts the matter. The database sets its number, reference and status. */
+  /** Inserts the matter. The database checks the conflict check and sets the number, reference and status. */
   insert(
-    matter: { clientId: string; title: string; matterType: MatterType; openedBy: string },
+    matter: { clientId: string; title: string; matterType: MatterType; openedBy: string; conflictCheckId: string },
     trx: Kysely<Database>,
   ) {
     return trx
       .insertInto('matters')
-      .values({ client_id: matter.clientId, title: matter.title, matter_type: matter.matterType, opened_by: matter.openedBy })
+      .values({
+        client_id: matter.clientId,
+        title: matter.title,
+        matter_type: matter.matterType,
+        opened_by: matter.openedBy,
+        conflict_check_id: matter.conflictCheckId,
+      })
       .returning(['id', 'reference', 'status'])
       .executeTakeFirstOrThrow();
   }
@@ -103,9 +109,18 @@ export class MattersRepository {
       .orderBy('matter_team.role', 'desc')
       .orderBy('accounts.display_name')
       .execute();
+    const parties = await this.db
+      .selectFrom('matter_parties')
+      .innerJoin('matters', 'matters.id', 'matter_parties.matter_id')
+      .select(['matter_parties.id', 'matter_parties.role', 'matter_parties.kind', 'matter_parties.name'])
+      .where('matter_parties.matter_id', '=', matterId)
+      .where(visibleTo(viewerId))
+      .orderBy('matter_parties.added_at')
+      .execute();
     return {
       ...summaryFrom(row),
       openedAt: row.opened_at,
+      parties: parties.map((party): Party => ({ id: party.id, role: party.role, kind: party.kind, name: party.name })),
       team: team.map(
         (member): TeamMember => ({ accountId: member.account_id, displayName: member.display_name, role: member.role }),
       ),
@@ -123,6 +138,85 @@ export class MattersRepository {
     }
     const rows = await query.orderBy('matters.id', 'desc').limit(page.limit).execute();
     return rows.map(summaryFrom);
+  }
+
+  /** Records a conflict check. The database adds the client's own name and finds the matches. */
+  recordConflictCheck(check: { clientId: string; requestedBy: string; names: string[] }, trx: Kysely<Database>) {
+    return trx
+      .insertInto('conflict_checks')
+      .values({ client_id: check.clientId, requested_by: check.requestedBy, names: check.names })
+      .returning(['id', 'names', 'matches', 'match_count', 'created_at'])
+      .executeTakeFirstOrThrow();
+  }
+
+  /** A check that can still open a matter: for this client, by this person, under a day old, not used. */
+  async usableConflictCheck(check: { id: string; clientId: string; requestedBy: string }, trx: Kysely<Database>) {
+    const row = await trx
+      .selectFrom('conflict_checks')
+      .select(['conflict_checks.id', 'conflict_checks.names'])
+      .where('conflict_checks.id', '=', check.id)
+      .where('conflict_checks.client_id', '=', check.clientId)
+      .where('conflict_checks.requested_by', '=', check.requestedBy)
+      .where('conflict_checks.created_at', '>', sql<Date>`clock_timestamp() - interval '24 hours'`)
+      .where(({ not, exists, selectFrom }) =>
+        not(exists(selectFrom('matters').select('matters.id').whereRef('matters.conflict_check_id', '=', 'conflict_checks.id'))),
+      )
+      .executeTakeFirst();
+    return row;
+  }
+
+  /** Whether every name is among `checkedNames`, compared the way the database compares names. */
+  async allNamesChecked(names: string[], checkedNames: string[], trx: Kysely<Database>): Promise<boolean> {
+    if (names.length === 0) {
+      return true;
+    }
+    const { unchecked } = await sql<{ unchecked: string }>`
+      select count(*) as unchecked from unnest(${names}::text[]) as name
+      where app.normalise_name(name) not in (select app.normalise_name(checked) from unnest(${checkedNames}::text[]) as checked)
+    `
+      .execute(trx)
+      .then((result) => result.rows[0] ?? { unchecked: '0' });
+    return Number(unchecked) === 0;
+  }
+
+  /** Client and matter references for the ids in a check's matches. */
+  async references(clientIds: string[], matterIds: string[], executor: Kysely<Database> = this.db) {
+    const clients = clientIds.length
+      ? await executor.selectFrom('clients').select(['id', 'reference']).where('id', 'in', clientIds).execute()
+      : [];
+    const matters = matterIds.length
+      ? await executor.selectFrom('matters').select(['id', 'reference']).where('id', 'in', matterIds).execute()
+      : [];
+    return {
+      client: new Map(clients.map((row) => [row.id, row.reference])),
+      matter: new Map(matters.map((row) => [row.id, row.reference])),
+    };
+  }
+
+  /** The check a matter was opened on, if `viewerId` is on its team. */
+  visibleConflictCheck(matterId: string, viewerId: string) {
+    return this.db
+      .selectFrom('matters')
+      .innerJoin('conflict_checks', 'conflict_checks.id', 'matters.conflict_check_id')
+      .select([
+        'conflict_checks.id',
+        'conflict_checks.names',
+        'conflict_checks.matches',
+        'conflict_checks.match_count',
+        'conflict_checks.created_at',
+      ])
+      .where('matters.id', '=', matterId)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
+  }
+
+  async addParty(party: NewParty & { matterId: string; addedBy: string }, trx: Kysely<Database>): Promise<string> {
+    const { id } = await trx
+      .insertInto('matter_parties')
+      .values({ matter_id: party.matterId, role: party.role, kind: party.kind, name: party.name, added_by: party.addedBy })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
   }
 
   /** Runs `work` in a transaction, for changes that must commit together. */

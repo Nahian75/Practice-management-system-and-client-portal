@@ -29,7 +29,9 @@
 | PATCH | `/clients/:clientId` | `clients.edit` + visibility | `{"kind", ...fields to change}` → 200 with the client. 400 for unknown fields, nothing to change, or the wrong `kind`; 404 as for GET |
 | POST | `/clients/:clientId/contacts` | `clients.edit` + visibility | `{givenNames, familyName, jobTitle?, email?, phone?}` → 201 `{id}`. 404 as for GET, 409 for an individual client |
 | PATCH | `/clients/:clientId/contacts/:contactId` | `clients.edit` + visibility | Fields to change, or `active` → 200 with the contact. 404 unless the contact belongs to this client and the caller may see it |
-| POST | `/matters` | `matters.open` | `{clientId, title, matterType, supervisingPartnerId, feeEarnerIds?}` → 201 `{id, reference, status}`. The opener joins the team. 404 client not visible, 400 supervising partner or team member not allowed |
+| POST | `/matters` | `matters.open` | `{clientId, title, matterType, supervisingPartnerId, feeEarnerIds?, conflictCheckId, parties?}` → 201 `{id, reference, status}`; status is `awaiting_clearance` if the check found any possible match. The opener joins the team. 404 client not visible; 400 supervising partner or team member not allowed, check not usable (not yours, other client, over 24 hours old, already used), or a party not in the check |
+| POST | `/conflict-checks` | `matters.open` | `{clientId, names[1..20]}` → 201 `{id, names, matches, matchCount, createdAt}`. The client's own name is added; up to 50 strongest matches, each with name, relation and references only. 404 client not visible, 429 over the hourly allowance shared with client search |
+| GET | `/matters/:matterId/conflict-check` | `matters.view` + team | The check the matter was opened on |
 | GET | `/matters` | `matters.view` | `{"matters": [...], "next"}`: matters you are on the team of, 50 at a time, newest first. `?before=<next>` |
 | GET | `/matters/:matterId` | `matters.view` + team | Details, client summary and team. 404 if not on the team |
 | GET | `/clients/:clientId/matters` | `matters.view` + client visibility | The client's matters you are on the team of |

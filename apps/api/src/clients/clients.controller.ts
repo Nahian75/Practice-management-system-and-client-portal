@@ -24,7 +24,8 @@ import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-sch
 import { COUNTRY_CODES } from '../common/validation/country-codes.js';
 import { text } from '../common/validation/safe-text.js';
 import type { Client } from './client.js';
-import { ClientsService, SEARCH_WINDOW_SECONDS, type ClientActor } from './clients.service.js';
+import { ClientsService, type ClientActor } from './clients.service.js';
+import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from './search-quota.js';
 
 /** For creation: a field left out is stored as null. */
 const optional = <T extends z.ZodType>(schema: T) => schema.nullish().transform((value) => value ?? null);
@@ -189,7 +190,6 @@ const clientSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const CLIENT_NOT_FOUND_MESSAGE = 'No client with this id';
-export const SEARCH_LIMIT_MESSAGE = 'Too many client searches in the last hour. Try again later';
 
 function actorFor(session: ResolvedSession, request: Request): ClientActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };

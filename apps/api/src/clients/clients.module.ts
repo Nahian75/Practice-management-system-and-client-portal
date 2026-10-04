@@ -5,10 +5,12 @@ import { DatabaseModule } from '../database/database.module.js';
 import { ClientsController } from './clients.controller.js';
 import { ClientsRepository } from './clients.repository.js';
 import { ClientsService } from './clients.service.js';
+import { SearchQuota } from './search-quota.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule],
   controllers: [ClientsController],
-  providers: [ClientsRepository, ClientsService],
+  providers: [ClientsRepository, ClientsService, SearchQuota],
+  exports: [SearchQuota],
 })
 export class ClientsModule {}
