@@ -8,6 +8,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "check:dependency-age": "node scripts/check-dependency-age.mjs"
+    "check:dependency-age": "node scripts/check-dependency-age.mjs",
+    "check:hidden-characters": "node scripts/check-hidden-characters.mjs --all"
   }
 }

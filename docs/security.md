@@ -31,6 +31,26 @@ git config core.hooksPath .githooks
 - A false positive is handled by adding its fingerprint to `.gitleaksignore`,
   which is reviewed like any other change.
 
+## Hidden characters in source
+
+**Tool:** `scripts/check-hidden-characters.mjs`, run by the same pre-commit
+hook after gitleaks ([review C10](reviews/2026-10-04-clients.md)).
+
+**Why:** control characters, zero-width characters, line separators and
+text-direction controls cannot be seen in an editor or a diff, but the
+compiler reads them. Direction controls can make code display differently
+from what runs ("Trojan Source"). One reached a commit once, because an
+editing tool turned an escape sequence into the real character.
+
+**Behaviour:**
+- Checks the staged version of every staged text file; binary files are skipped.
+- Any such character blocks the commit, with file, line, column and code point.
+  Write it as an escape sequence instead (for example `\u202E` in code).
+- `npm run check:hidden-characters` checks every committed file.
+
+**Limits:** skipped by `git commit --no-verify`, like the secret scan; CI will
+run it too once CI exists.
+
 ## Dependencies
 
 Settings in `.npmrc`:

@@ -13,3 +13,9 @@ if ! gitleaks git --pre-commit --staged --redact --no-banner --ignore-gitleaks-a
   echo "Remove it from the file and unstage it. Never commit real credentials." >&2
   exit 1
 fi
+
+if ! node scripts/check-hidden-characters.mjs; then
+  echo "" >&2
+  echo "pre-commit: invisible characters in staged changes. Commit blocked." >&2
+  exit 1
+fi
