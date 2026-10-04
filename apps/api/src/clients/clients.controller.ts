@@ -1,10 +1,24 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-schema.decorator.js';
 import { COUNTRY_CODES } from '../common/validation/country-codes.js';
 import type { Client } from './client.js';
 import { ClientsService, type ClientActor } from './clients.service.js';
@@ -86,7 +100,9 @@ const clientPatchSchema = z.discriminatedUnion('kind', [
     .refine(atLeastOneChange, 'Nothing to change'),
 ]);
 
-const listQuerySchema = z.strictObject({ before: reference.optional() });
+const takeOverSchema = z.strictObject({ reason: z.string().trim().min(10).max(500) });
+
+const listQuerySchema =z.strictObject({ before: reference.optional() });
 const searchQuerySchema = z.strictObject({ q: z.string().trim().min(2).max(100) });
 
 const createdSchema = z.object({
@@ -206,6 +222,27 @@ export class ClientsController {
         throw new BadRequestException(`This client is an ${result.kind}`);
       case 'updated':
         return serialise(result.client);
+    }
+  }
+
+  /** Answers for clients the caller cannot see: a partner finds them through search. */
+  @Post(':clientId/take-over')
+  @RequirePermission('clients.take_over')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async takeOver(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: takeOverSchema }) body: z.infer<typeof takeOverSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    switch (await this.clients.takeOver(clientId, body.reason, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+      case 'responsible_active':
+        throw new ConflictException('The person responsible for this client is still active');
+      case 'taken_over':
+        return;
     }
   }
 }

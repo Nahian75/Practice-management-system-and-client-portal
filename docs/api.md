@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-04):** Health, authentication, staff management, and clients (create, open, list, search, edit).
+**Current state (2026-10-04):** Health, authentication, staff management, and clients (create, open, list, search, edit, take over).
 
 ## Endpoints
 
@@ -27,6 +27,7 @@
 | GET | `/clients/search?q=` | `clients.search` | `{"clients": [{id, reference, kind, name}]}`: up to 20 clients of the whole firm by reference or part of the name. `q` 2 to 100 characters |
 | GET | `/clients/:clientId` | `clients.view` + visibility | The client's details. 404 if it does not exist or the caller may not see it |
 | PATCH | `/clients/:clientId` | `clients.edit` + visibility | `{"kind", ...fields to change}` → 200 with the client. 400 for unknown fields, nothing to change, or the wrong `kind`; 404 as for GET |
+| POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person is still active |
 
 `/health` returns exactly `{"status":"ok"}`. It must never return version
 numbers, environment names, dependency status or anything else an attacker

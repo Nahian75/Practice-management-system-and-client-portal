@@ -1,9 +1,9 @@
 # Clients
 
-**Current state (2026-10-04):** Steps 7a and 7b built: creating a client,
+**Current state (2026-10-04):** Steps 7a to 7c built: creating a client,
 opening and listing the clients you can see, searching every client by name or
-reference, and editing details. Takeover and contacts are designed below and
-not built yet.
+reference, editing details, and a partner taking over a client whose
+responsible person is disabled. Contacts are designed below and not built yet.
 
 ## Decisions
 
@@ -38,7 +38,8 @@ and is never reused.
 
 | Table | Holds | `pms_app` may update |
 |---|---|---|
-| `clients` | id, reference, kind (`individual` / `organisation`), status (`active` / `archived`), created by, created at | `status` only |
+| `clients` | id, reference, kind (`individual` / `organisation`), status (`active` / `archived`), created by, created at, responsible person | Nothing. The responsible person changes only through `client_responsibility_changes` |
+| `client_responsibility_changes` | Every takeover: client, from, to, reason, when (`0012_client_takeover.sql`) | Nothing; inserts only, and no role can change or delete a row |
 | `client_individuals` | One row per individual client: name, date of birth, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
 | `client_organisations` | One row per organisation client: legal name, type, registration number, email, phone, address | Every detail column; not `client_id` (`0011_client_editing.sql`) |
 | `client_contacts` | Contacts of organisation clients | Every detail column and `active`; not `client_id` |
@@ -74,9 +75,10 @@ A permission is not enough to see a client's details: layer 3 also applies.
 The reverse holds too: someone whose fee earner role is revoked loses access
 to the clients they created, because `clients.view` is checked first.
 
-- **Visibility rule:** a client's details are visible to the person who
-  created it. When Matters is built, this becomes "the creator until a matter
-  exists, then the matter's team".
+- **Visibility rule:** a client's details are visible to the person
+  responsible for it: the creator, unless a partner has [taken it
+  over](#taking-over-a-client). When Matters is built, this becomes "the
+  responsible person until a matter exists, then the matter's team".
 - The rule is applied inside every database query through one function, so a
   forgotten check cannot return another person's client.
 - A client you cannot see answers **404**, not 403, so its existence is not
@@ -111,6 +113,7 @@ race happen on every run. Sending the same values again records nothing.
 | GET | `/clients/search?q=` | `clients.search` | Reference, kind and name only |
 | GET | `/clients/:id` | `clients.view` + layer 3 | Full details and contacts. 404 if not visible |
 | PATCH | `/clients/:id` | `clients.edit` + layer 3 | Change details. `kind` and `reference` cannot be changed |
+| POST | `/clients/:id/take-over` | `clients.take_over` | `{"reason"}` → 204. 404 no such client, 409 the responsible person is still active |
 | POST | `/clients/:id/contacts` | `clients.edit` + layer 3 | Organisations only |
 | PATCH | `/clients/:id/contacts/:contactId` | `clients.edit` + layer 3 | Change details, or mark inactive |
 
@@ -123,6 +126,8 @@ Request bodies are strict: an unknown field is a 400, so `reference`,
 |---|---|
 | `client.created` | kind |
 | `client.updated` | names of the fields that changed, never their values |
+| `client.taken_over` | id of the `client_responsibility_changes` row, previous responsible person. The reason stays in that row |
+| `client.take_over_refused` | `responsible_active`: a takeover tried while the responsible person was still active |
 | `client.contact_added`, `client.contact_updated` | contact id, names of changed fields |
 
 Values are left out on purpose: the audit log is kept longer and read more
@@ -162,12 +167,27 @@ giving a reason.
   text can hold personal data; the `client.taken_over` audit event points to
   the row.
 
+### How the database enforces it
+
+The app has no right to change `responsible_id`. Recording a row in
+`client_responsibility_changes` is what changes it: a trigger checks that the
+handover comes from the current responsible person, that their account is
+disabled, and that the new person is active staff, then applies it. The
+trigger runs as the table owner (`SECURITY DEFINER`, with a fixed
+`search_path`). So no bug in the app can move a client without a history row
+and a reason, or take one from someone still at work; a test removes the
+service's own check and the database still refuses.
+
+Takeovers of one client queue on an advisory lock, so two partners trying at
+once get 204 and 409. A test holds the lock from another connection to make
+that happen on every run.
+
 ## Build order
 
 Each step ships with positive and negative tests and is reviewed before the next.
 
 - **7a.** Migration, permissions, `POST /clients`, `GET /clients/:id` with the visibility rule, audit. Done.
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
-- **7c.** Taking over a client.
+- **7c.** Taking over a client. Done.
 - **7d.** Contacts.
 - Security review of the module.

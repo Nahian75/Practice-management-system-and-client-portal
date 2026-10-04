@@ -10,7 +10,7 @@ import type { Address, Client, ClientPatch, ClientSummary, NewClient } from './c
  * cannot reach someone else's client. Matters widens it to the matter's team.
  */
 export function visibleTo(viewerId: string) {
-  return (eb: ExpressionBuilder<Database, 'clients'>) => eb('clients.created_by', '=', viewerId);
+  return (eb: ExpressionBuilder<Database, 'clients'>) => eb('clients.responsible_id', '=', viewerId);
 }
 
 /** The name a client is known by: the legal name, or given names and family name. */
@@ -217,6 +217,42 @@ export class ClientsRepository {
       };
       await trx.updateTable('client_organisations').set(columns).where('client_id', '=', clientId).execute();
     }
+  }
+
+  /**
+   * Serialises takeovers of one client until the transaction ends, so two
+   * partners taking it over at once are answered one after the other.
+   */
+  async lockResponsibility(clientId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.client_responsibility:${clientId}`}, 0))`.execute(trx);
+  }
+
+  /** Who is responsible for the client, and whether their account is still in use. Not limited by visibility. */
+  findResponsible(clientId: string, trx: Kysely<Database>) {
+    return trx
+      .selectFrom('clients')
+      .innerJoin('accounts', 'accounts.id', 'clients.responsible_id')
+      .select(['clients.responsible_id', 'accounts.status'])
+      .where('clients.id', '=', clientId)
+      .executeTakeFirst();
+  }
+
+  /** Records a change of responsibility. The database checks the rules and applies it. */
+  async recordResponsibilityChange(
+    change: { clientId: string; fromAccountId: string; toAccountId: string; reason: string },
+    trx: Kysely<Database>,
+  ): Promise<string> {
+    const { id } = await trx
+      .insertInto('client_responsibility_changes')
+      .values({
+        client_id: change.clientId,
+        from_account_id: change.fromAccountId,
+        to_account_id: change.toAccountId,
+        reason: change.reason,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
   }
 
   /** Runs `work` in a transaction, for changes that must commit together. */

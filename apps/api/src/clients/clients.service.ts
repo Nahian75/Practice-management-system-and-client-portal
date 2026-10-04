@@ -101,7 +101,58 @@ export class ClientsService {
       return { outcome: 'updated', client: updated };
     });
   }
+
+  /**
+   * Makes the caller responsible for a client whose responsible person's
+   * account is disabled. Works for clients the caller cannot see yet: they
+   * find it through search. The reason is stored with the change, not in the
+   * audit log, which points to it instead.
+   */
+  async takeOver(clientId: string, reason: string, by: ClientActor): Promise<TakeOverResult> {
+    const result = await this.clients.transaction(async (trx): Promise<TakeOverResult> => {
+      await this.clients.lockResponsibility(clientId, trx);
+      const current = await this.clients.findResponsible(clientId, trx);
+      if (!current) {
+        return 'not_found';
+      }
+      if (current.status !== 'disabled') {
+        return 'responsible_active';
+      }
+
+      const changeId = await this.clients.recordResponsibilityChange(
+        { clientId, fromAccountId: current.responsible_id, toAccountId: by.accountId, reason },
+        trx,
+      );
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'client.taken_over',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { changeId, from: current.responsible_id },
+          ...by.context,
+        },
+        trx,
+      );
+      return 'taken_over';
+    });
+
+    // Trying to take a client from someone still at work is worth noticing.
+    if (result === 'responsible_active') {
+      await this.audit.record({
+        actor: by.actor,
+        action: 'client.take_over_refused',
+        outcome: 'denied',
+        resource: { type: 'client', id: clientId },
+        metadata: { reason: 'responsible_active' },
+        ...by.context,
+      });
+    }
+    return result;
+  }
 }
+
+export type TakeOverResult = 'taken_over' | 'not_found' | 'responsible_active';
 
 /** Names of the fields in `patch` whose value differs from `current`, in a stable order. */
 function changedFields(current: Client, patch: ClientPatch): string[] {

@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestAccount, grantTestRole, revokeTestRole, type TestAccount } from '../../test/accounts.js';
+import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -454,6 +454,132 @@ describe('Clients', () => {
       });
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe('POST /clients/:clientId/take-over', () => {
+    const REASON = { reason: 'Fee earner left the firm before the matter opened' };
+    let clientId: string;
+    let partner: TestAccount;
+    let partnerToken: string;
+
+    const changesOf = (id: string) =>
+      db
+        .selectFrom('client_responsibility_changes')
+        .select(['id', 'from_account_id', 'to_account_id', 'reason'])
+        .where('client_id', '=', id)
+        .execute();
+    const takeOverEvents = (id: string) =>
+      db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'action', 'outcome', 'metadata'])
+        .where('resource_id', '=', id)
+        .where('action', 'like', 'client.take%')
+        .orderBy('id')
+        .execute();
+
+    beforeEach(async () => {
+      clientId = (await as(token).post('/clients', INDIVIDUAL)).body.id;
+      partner = await staffWith('partner');
+      partnerToken = await signedIn(partner);
+    });
+
+    describe('when the responsible person is disabled', () => {
+      beforeEach(async () => {
+        await setAccountStatus(db, feeEarner.id, 'disabled');
+      });
+
+      it('makes the partner responsible, so they can open and list the client', async () => {
+        expect((await as(partnerToken).get(`/clients/${clientId}`)).status).toBe(404);
+
+        const response = await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+
+        expect(response.status).toBe(204);
+        expect((await as(partnerToken).get(`/clients/${clientId}`)).status).toBe(200);
+        expect((await as(partnerToken).get('/clients')).body.clients.map((c: { id: string }) => c.id)).toContain(clientId);
+      });
+
+      it('keeps the reason with the change, and only a pointer to it in the audit log', async () => {
+        await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+
+        const changes = await changesOf(clientId);
+        expect(changes).toEqual([
+          { id: expect.any(String), from_account_id: feeEarner.id, to_account_id: partner.id, reason: REASON.reason },
+        ]);
+        const events = await takeOverEvents(clientId);
+        expect(events).toEqual([
+          {
+            actor_id: partner.id,
+            action: 'client.taken_over',
+            outcome: 'success',
+            metadata: { changeId: changes[0]?.id, from: feeEarner.id },
+          },
+        ]);
+        expect(JSON.stringify(events)).not.toContain('left the firm');
+      });
+
+      /*
+       * Holding the takeover lock from another connection makes both requests
+       * queue on it every time; once it is released they run one after the
+       * other, and the second finds the first partner responsible and active.
+       */
+      it('lets only one of two partners taking it over at once succeed', async () => {
+        const otherPartner = await signedIn(await staffWith('partner'));
+        const holder = createDatabase<Database>(testAppDatabaseUrl(), 1);
+        const lockKey = sql`hashtextextended(${`app.client_responsibility:${clientId}`}, 0)`;
+        try {
+          await sql`select pg_advisory_lock(${lockKey})`.execute(holder);
+          const { rows } = await sql<{ pid: number }>`select pg_backend_pid() as pid`.execute(holder);
+          const holderPid = rows[0]?.pid;
+          const responses = Promise.all([
+            as(partnerToken).post(`/clients/${clientId}/take-over`, REASON).then((r) => r),
+            as(otherPartner).post(`/clients/${clientId}/take-over`, REASON).then((r) => r),
+          ]);
+          await expect
+            .poll(async () => {
+              const blocked = await sql<{ count: string }>`
+                select count(*) from pg_stat_activity where ${holderPid}::int = any(pg_blocking_pids(pid))`.execute(db);
+              return Number(blocked.rows[0]?.count);
+            })
+            .toBe(2);
+          await sql`select pg_advisory_unlock(${lockKey})`.execute(holder);
+
+          expect((await responses).map((response) => response.status).sort()).toEqual([204, 409]);
+          expect(await changesOf(clientId)).toHaveLength(1);
+        } finally {
+          await holder.destroy();
+        }
+      });
+
+      it.each<[string, object]>([
+        ['no reason', {}],
+        ['a short reason', { reason: '  left    ' }],
+        ['a reason over 500 characters', { reason: 'x'.repeat(501) }],
+        ['someone else to hand it to', { ...REASON, toAccountId: '00000000-0000-7000-8000-000000000000' }],
+      ])('refuses %s', async (_case, body) => {
+        expect((await as(partnerToken).post(`/clients/${clientId}/take-over`, body)).status).toBe(400);
+        expect(await changesOf(clientId)).toEqual([]);
+      });
+
+      it.each(['fee_earner', 'administrator', 'compliance'] as const)('is closed to %s', async (role) => {
+        expect((await as(await signedIn(await staffWith(role))).post(`/clients/${clientId}/take-over`, REASON)).status).toBe(403);
+        expect(await changesOf(clientId)).toEqual([]);
+      });
+    });
+
+    it('refuses while the responsible person is active, and records the attempt', async () => {
+      const response = await as(partnerToken).post(`/clients/${clientId}/take-over`, REASON);
+
+      expect(response.status).toBe(409);
+      expect(await changesOf(clientId)).toEqual([]);
+      expect((await as(partnerToken).get(`/clients/${clientId}`)).status).toBe(404);
+      expect(await takeOverEvents(clientId)).toEqual([
+        { actor_id: partner.id, action: 'client.take_over_refused', outcome: 'denied', metadata: { reason: 'responsible_active' } },
+      ]);
+    });
+
+    it('does not find a client that does not exist', async () => {
+      expect((await as(partnerToken).post('/clients/00000000-0000-7000-8000-000000000000/take-over', REASON)).status).toBe(404);
     });
   });
 });

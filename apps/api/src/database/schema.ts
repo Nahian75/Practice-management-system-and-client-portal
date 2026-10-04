@@ -140,6 +140,17 @@ export interface ClientsTable {
   status: DatabaseSet<ClientStatus>;
   created_by: InsertOnly<string>;
   created_at: DatabaseSet<Date>;
+  /** Set by the database: the creator, then changed only through client_responsibility_changes. */
+  responsible_id: DatabaseSet<string>;
+}
+
+export interface ClientResponsibilityChangesTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  from_account_id: InsertOnly<string>;
+  to_account_id: InsertOnly<string>;
+  reason: InsertOnly<string>;
+  changed_at: DatabaseSet<Date>;
 }
 
 interface ClientContactColumns {
@@ -175,6 +186,7 @@ export interface Database {
   backup_codes: BackupCodesTable;
   client_individuals: ClientIndividualsTable;
   client_organisations: ClientOrganisationsTable;
+  client_responsibility_changes: ClientResponsibilityChangesTable;
   clients: ClientsTable;
   invitations: InvitationsTable;
   password_resets: PasswordResetsTable;

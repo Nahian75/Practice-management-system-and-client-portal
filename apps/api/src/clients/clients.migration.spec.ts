@@ -1,6 +1,6 @@
 import { sql, type Insertable, type Kysely } from 'kysely';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestAccount, type TestAccount } from '../../test/accounts.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestAccount, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
 import type { ClientIndividualsTable, ClientKind, ClientOrganisationsTable, Database } from '../database/schema.js';
@@ -125,6 +125,97 @@ describe('clients tables', () => {
       .where('client_id', '=', client.id)
       .executeTakeFirstOrThrow();
     expect(row.date_of_birth).toBe('1980-02-29');
+  });
+
+  describe('responsibility', () => {
+    let creator: TestAccount;
+    let partner: TestAccount;
+    let clientId: string;
+
+    const responsibleFor = async (id: string) =>
+      (await db.selectFrom('clients').select('responsible_id').where('id', '=', id).executeTakeFirstOrThrow()).responsible_id;
+
+    const recordChange = (overrides: Record<string, unknown> = {}) =>
+      db
+        .insertInto('client_responsibility_changes')
+        .values({
+          client_id: clientId,
+          from_account_id: creator.id,
+          to_account_id: partner.id,
+          reason: 'Creator left the firm before a matter was opened',
+          ...overrides,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+
+    beforeEach(async () => {
+      creator = await createTestAccount(db, 'staff');
+      partner = await createTestAccount(db, 'staff');
+      clientId = (await createClient('individual', { individual: individual() }, creator.id)).id;
+    });
+
+    it('starts with the creator', async () => {
+      expect(await responsibleFor(clientId)).toBe(creator.id);
+    });
+
+    it('moves to the new person when a change is recorded for a disabled account', async () => {
+      await setAccountStatus(db, creator.id, 'disabled');
+
+      await recordChange();
+
+      expect(await responsibleFor(clientId)).toBe(partner.id);
+    });
+
+    it.each<[string, () => Promise<unknown>, RegExp]>([
+      ['from an account that is still active', () => recordChange(), /only from a disabled account/],
+      ['from someone who is not responsible', () => recordChange({ from_account_id: partner.id, to_account_id: creator.id }), /is not the responsibility of/],
+    ])('refuses a change %s', async (_case, attempt, error) => {
+      await expect(attempt()).rejects.toThrow(error);
+      expect(await responsibleFor(clientId)).toBe(creator.id);
+    });
+
+    it.each<[string, () => Promise<TestAccount>]>([
+      ['a client account', () => createTestAccount(db, 'client')],
+      ['a disabled staff account', () => createTestAccount(db, 'staff', { status: 'disabled' })],
+    ])('refuses a change to %s', async (_case, makeAccount) => {
+      await setAccountStatus(db, creator.id, 'disabled');
+      const recipient = await makeAccount();
+
+      await expect(recordChange({ to_account_id: recipient.id })).rejects.toThrow(/by an active staff account/);
+      expect(await responsibleFor(clientId)).toBe(creator.id);
+    });
+
+    it('refuses a short reason', async () => {
+      await setAccountStatus(db, creator.id, 'disabled');
+
+      await expect(recordChange({ reason: 'left' })).rejects.toThrow(/violates check constraint/);
+    });
+
+    // The trigger runs before the CHECK and already refuses it (a disabled account is not
+    // active staff); the CHECK stays as a second line.
+    it('refuses a change to the same person', async () => {
+      await setAccountStatus(db, creator.id, 'disabled');
+
+      await expect(recordChange({ to_account_id: creator.id })).rejects.toThrow(/active staff account|violates check constraint/);
+    });
+
+    it.each([
+      ['set the responsible person on creation', () =>
+        sql`insert into clients (kind, created_by, responsible_id) values ('individual', ${creator.id}, ${partner.id})`],
+      ['change the responsible person directly', () => sql`update clients set responsible_id = ${partner.id} where id = ${clientId}`],
+    ])('does not let the app %s', async (_case, statement) => {
+      await expect(statement().execute(db)).rejects.toThrow(/permission denied/);
+    });
+
+    it('keeps every recorded change as it was', async () => {
+      await setAccountStatus(db, creator.id, 'disabled');
+      const { id } = await recordChange();
+
+      await expect(sql`update client_responsibility_changes set reason = 'Rewritten afterwards' where id = ${id}`.execute(db)).rejects.toThrow(
+        /permission denied/,
+      );
+      await expect(sql`delete from client_responsibility_changes where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
   });
 
   describe('app role restrictions', () => {

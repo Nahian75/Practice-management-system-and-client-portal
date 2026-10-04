@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   'clients.view',
   'clients.search',
   'clients.edit',
+  'clients.take_over',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -38,7 +39,7 @@ export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'complian
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
   administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable'],
-  partner: ['staff.view', 'clients.create', 'clients.view', 'clients.search', 'clients.edit'],
+  partner: ['staff.view', 'clients.create', 'clients.view', 'clients.search', 'clients.edit', 'clients.take_over'],
   fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit'],
   accounts: [],
   compliance: ['staff.view', 'audit.view'],

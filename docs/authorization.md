@@ -62,6 +62,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `clients.view` — open a client you can see ([visibility](clients.md#who-can-do-what)) | | ✓ | ✓ | | |
 | `clients.search` — find any client by name or reference (summary only) | | ✓ | ✓ | | |
 | `clients.edit` — change the details of a client you can see | | ✓ | ✓ | | |
+| `clients.take_over` — become responsible for a client whose responsible person is disabled ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.
