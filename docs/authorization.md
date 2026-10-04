@@ -88,6 +88,11 @@ accounts should not be the only ones checking what changed.
   and every 403 caused by a missing permission. Each change is recorded in the
   same transaction as the change, with the caller's address and browser, so a
   change without its record cannot happen.
+- **Role changes are emailed.** The person is told whenever a role is granted
+  or revoked, and every active compliance holder is told when `administrator`,
+  `compliance` or `accounts` is granted, so a misused administrator account
+  cannot hand out access quietly. See the notice table in
+  [authentication.md](authentication.md#security-notice-emails).
 - **Refusals are audited too.** Trying to change your own account, or to remove
   the last administrator or compliance holder, is recorded as
   `staff.change_refused`.

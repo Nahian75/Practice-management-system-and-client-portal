@@ -18,6 +18,13 @@ export const PROTECTED_ROLES = ['administrator', 'compliance'] as const satisfie
 
 export type ProtectedRole = (typeof PROTECTED_ROLES)[number];
 
+/**
+ * Roles whose grant is emailed to every compliance holder: they reach staff
+ * management, the audit log and client money, so a grant made through a
+ * misused administrator account must not go unnoticed.
+ */
+export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'compliance', 'accounts'];
+
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
   administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable'],

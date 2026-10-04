@@ -64,6 +64,12 @@ describe('smtpTransportOptions', () => {
     expect(options.tls).toEqual({ rejectUnauthorized: true, minVersion: 'TLSv1.2' });
   });
 
+  it('sends over a small pool of shared connections', () => {
+    const options = smtpTransportOptions({ NODE_ENV: 'production', SMTP_URL: 'smtps://smtp.example.com' });
+
+    expect(options).toMatchObject({ pool: true, maxConnections: 3 });
+  });
+
   it('allows a plain local mail catcher outside production', () => {
     const options = smtpTransportOptions({ NODE_ENV: 'development', SMTP_URL: 'smtp://127.0.0.1:1025' });
 

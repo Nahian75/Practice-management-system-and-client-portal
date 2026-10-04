@@ -53,8 +53,8 @@ PostgreSQL and Mailpit with synthetic accounts.
 | Location | `PUT /staff/:accountId/roles/:role` |
 | Problem | By decision of the project owner there is no second approval for role grants. An administrator can give anyone `accounts` (client money) or `compliance` (the audit log), and two people acting together can get around the separation between administrators and the audit log. |
 | Impact | A compromised or dishonest administrator account can hand out access quietly. The change is in the audit log, but nobody is told. |
-| Fix | **Recommended before production:** email the person whose roles changed, and email every compliance holder when `administrator`, `compliance` or `accounts` is granted. The existing security-notice emails can carry it. Needs the project owner's approval. |
-| Test | When built: notice sent to the right people; no notice for other roles. |
+| Fix | **Fixed after the review**, by decision of the project owner: the person is emailed whenever a role is granted or revoked, and every active compliance holder is emailed when `administrator`, `compliance` or `accounts` (`SENSITIVE_ROLES`) is granted. Collusion between an administrator and every compliance holder remains possible; that is what the audit log and external review are for. |
+| Test | `staff.controller.spec.ts`: "role change emails". Dropping a role from `SENSITIVE_ROLES`, skipping the revoke notice, or emailing the grantee twice each fail a test. |
 
 ### U3 — No safeguard for the last compliance holder
 

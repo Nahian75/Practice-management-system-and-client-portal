@@ -28,5 +28,9 @@
   delivered mail to an address injected with `
 Bcc:`.
 - Message bodies are never logged: they carry one-time links.
+- Messages share a pool of at most 3 SMTP connections and queue for them, so a
+  burst (one notice per compliance holder) does not open a connection per
+  message. Without the pool, a burst made Mailpit stop answering and other
+  emails sent at the same moment were lost.
 - Locally, Mailpit catches everything at http://127.0.0.1:8025. No email leaves the machine.
 - Open: which provider, and its data-processing agreement and data location.

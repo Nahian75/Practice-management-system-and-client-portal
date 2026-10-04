@@ -6,13 +6,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { FakeClock } from '../../test/fake-clock.js';
-import { waitForEmails } from '../../test/mailpit.js';
+import { inbox, waitForEmails } from '../../test/mailpit.js';
 import { authenticatorCode, enrolTwoFactor } from '../../test/two-factor.js';
 import { InvitationsService } from '../auth/invitations/invitations.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { TwoFactorService } from '../auth/two-factor/two-factor.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
+import { MailOutbox } from '../mail/mail-outbox.js';
 import { StaffModule } from './staff.module.js';
 
 describe('Staff management', () => {
@@ -317,6 +318,92 @@ describe('Staff management', () => {
       expect((await as(token).delete(`/staff/${admin.id}/roles/administrator`)).status).toBe(403);
       expect(await rolesOf(staff.id)).toEqual([]);
       expect(await rolesOf(admin.id)).toEqual(['administrator']);
+    });
+  });
+
+  describe('role change emails', () => {
+    const settle = () => app.get(MailOutbox).drain();
+    const mentioning = async (address: string, text: string) =>
+      (await inbox(address)).filter((email) => email.text.includes(text));
+
+    it('tells the person when a role is granted, and by whom', async () => {
+      const staff = await staffWith();
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/partner`);
+
+      const [email] = await waitForEmails(staff.email, 1);
+      expect(email?.subject).toBe('You were given a new role');
+      expect(email?.text).toContain('given the partner role');
+      expect(email?.text).toContain('by Test staff');
+    });
+
+    it('tells the person when a role is removed', async () => {
+      const staff = await staffWith('fee_earner');
+
+      await as(adminToken).delete(`/staff/${staff.id}/roles/fee_earner`);
+
+      const [email] = await waitForEmails(staff.email, 1);
+      expect(email?.subject).toBe('A role was removed from your account');
+      expect(email?.text).toContain('The fee earner role was removed');
+    });
+
+    const sensitiveRoles = ['administrator', 'compliance', 'accounts'] as const;
+
+    it.each(sensitiveRoles)('tells every compliance holder when %s is granted', async (role) => {
+      const holders = [await staffWith('compliance'), await staffWith('compliance', 'partner')];
+      const staff = await staffWith();
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/${role}`);
+
+      for (const holder of holders) {
+        // Other tests' notices reach these holders too, so wait for the one about this grant.
+        await expect.poll(() => mentioning(holder.email, staff.email), { timeout: 15_000 }).toHaveLength(1);
+        const [email] = await mentioning(holder.email, staff.email);
+        expect(email?.subject).toBe(`The ${role} role was granted`);
+        expect(email?.text).toContain(`was given the ${role} role`);
+      }
+    });
+
+    it.each(['partner', 'fee_earner'] as const)('does not tell compliance holders about %s', async (role) => {
+      const holder = await staffWith('compliance');
+      const staff = await staffWith();
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/${role}`);
+      await settle();
+
+      expect(await mentioning(holder.email, staff.email)).toEqual([]);
+    });
+
+    it('does not tell a disabled compliance holder', async () => {
+      const holder = await staffWith('compliance');
+      await as(adminToken).post(`/staff/${holder.id}/disable`);
+      const staff = await staffWith();
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/accounts`);
+      await settle();
+
+      expect(await mentioning(holder.email, staff.email)).toEqual([]);
+    });
+
+    it('sends the new compliance holder only their own notice', async () => {
+      const staff = await staffWith();
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/compliance`);
+      await settle();
+
+      expect((await inbox(staff.email)).map((email) => email.subject)).toEqual(['You were given a new role']);
+    });
+
+    it('sends nothing when nothing changed', async () => {
+      const staff = await staffWith('partner');
+
+      await as(adminToken).put(`/staff/${staff.id}/roles/partner`);
+      await as(adminToken).delete(`/staff/${staff.id}/roles/fee_earner`);
+      await as(adminToken).put(`/staff/${admin.id}/roles/accounts`);
+      await settle();
+
+      expect(await inbox(staff.email)).toEqual([]);
+      expect(await inbox(admin.email)).toEqual([]);
     });
   });
 

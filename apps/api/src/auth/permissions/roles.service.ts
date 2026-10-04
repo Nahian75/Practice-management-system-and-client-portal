@@ -5,6 +5,7 @@ import { AuditService } from '../../audit/audit.service.js';
 import type { RequestContext } from '../../common/http/request-context.js';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
 import type { Database, StaffRole } from '../../database/schema.js';
+import { SecurityNoticesService } from '../notices/security-notices.service.js';
 import { PROTECTED_ROLES, type ProtectedRole } from './permissions.js';
 import { RolesRepository } from './roles.repository.js';
 
@@ -34,6 +35,7 @@ export class RolesService {
   constructor(
     private readonly roles: RolesRepository,
     private readonly audit: AuditService,
+    private readonly notices: SecurityNoticesService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -47,22 +49,26 @@ export class RolesService {
       throw new OwnRoleChangeError('Nobody can change their own roles');
     }
 
-    await this.roles.transaction(async (trx) => {
-      const granted = await this.roles.grant({ accountId, role, grantedBy: by.accountId, at: this.clock.now() }, trx);
-      if (granted) {
-        await this.audit.record(
-          {
-            actor: by.actor,
-            action: 'staff.role_granted',
-            outcome: 'success',
-            resource: { type: 'account', id: accountId },
-            metadata: { role },
-            ...by.context,
-          },
-          trx,
-        );
+    const granted = await this.roles.transaction(async (trx) => {
+      if (!(await this.roles.grant({ accountId, role, grantedBy: by.accountId, at: this.clock.now() }, trx))) {
+        return false;
       }
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'staff.role_granted',
+          outcome: 'success',
+          resource: { type: 'account', id: accountId },
+          metadata: { role },
+          ...by.context,
+        },
+        trx,
+      );
+      return true;
     });
+    if (granted) {
+      await this.notices.roleGranted(accountId, role, by.accountId);
+    }
   }
 
   /** Revokes a role. Refuses to remove the last active holder of a protected role. */
@@ -71,7 +77,7 @@ export class RolesService {
       throw new OwnRoleChangeError('Nobody can change their own roles');
     }
 
-    return this.roles.transaction(async (trx): Promise<RevokeResult> => {
+    const result = await this.roles.transaction(async (trx): Promise<RevokeResult> => {
       await this.roles.lockProtectedRoleChanges(trx);
       if (!(await this.roles.activeRoles(accountId, trx)).includes(role)) {
         return 'not_held';
@@ -94,6 +100,10 @@ export class RolesService {
       );
       return 'revoked';
     });
+    if (result === 'revoked') {
+      await this.notices.roleRevoked(accountId, role, by.accountId);
+    }
+    return result;
   }
 
   /**

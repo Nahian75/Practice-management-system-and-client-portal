@@ -186,6 +186,8 @@ Sent in the background, never slowing or failing the action that caused them:
 |---|---|
 | Sign-in blocked | The wrong guess that starts a 15-minute block (sent once per block) |
 | Password changed | A password reset completes |
+| Role granted / role removed | A role is granted to, or revoked from, the account |
+| Sensitive role granted | `administrator`, `compliance` or `accounts` is granted to someone else: sent to every active compliance holder |
 
 Background email (`MailOutbox`) waits for anything still sending when the app
 shuts down, but a crash can lose a message. A persistent queue replaces it

@@ -69,6 +69,19 @@ export class RolesRepository {
     return Number(count);
   }
 
+  /** Ids of the active accounts holding `role`. */
+  async activeHolders(role: StaffRole): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('account_roles')
+      .innerJoin('accounts', 'accounts.id', 'account_roles.account_id')
+      .select('accounts.id')
+      .where('account_roles.role', '=', role)
+      .where('account_roles.revoked_at', 'is', null)
+      .where('accounts.status', '=', 'active')
+      .execute();
+    return rows.map((row) => row.id);
+  }
+
   /** Runs `work` in a transaction, for changes that must commit together. */
   transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {
     return this.db.transaction().execute(work);
