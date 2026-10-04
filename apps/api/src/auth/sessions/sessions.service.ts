@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../../audit/audit.service.js';
 import type { RequestContext } from '../../common/http/request-context.js';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
-import type { AccountKind, SessionEndReason, SessionStage } from '../../database/schema.js';
+import type { Kysely } from 'kysely';
+import type { AccountKind, Database, SessionEndReason, SessionStage } from '../../database/schema.js';
 import { auditActorFor, type ResolvedSession, type SessionAccount } from './authenticated-session.js';
 import {
   LAST_SEEN_WRITE_INTERVAL_MS,
@@ -99,8 +100,8 @@ export class SessionsService {
   }
 
   /** Ends every open session for the account, for example after a password reset. Returns how many. */
-  endAllForAccount(accountId: string, reason: SessionEndReason): Promise<number> {
-    return this.repository.endAllForAccount(accountId, reason, this.clock.now());
+  endAllForAccount(accountId: string, reason: SessionEndReason, executor?: Kysely<Database>): Promise<number> {
+    return this.repository.endAllForAccount(accountId, reason, this.clock.now(), executor);
   }
 
   /** Ends a session. The caller records the reason in the audit log. */

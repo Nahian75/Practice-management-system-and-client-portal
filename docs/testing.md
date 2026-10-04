@@ -1,6 +1,6 @@
 # Testing
 
-**Current state (2026-10-03):** Unit, HTTP and database integration tests for the API.
+**Current state (2026-10-04):** Unit, HTTP and database integration tests for the API.
 
 ## Tools
 
@@ -46,6 +46,15 @@ Test apps believe `X-Forwarded-For` from loopback, and give every request a
 random address from 198.18.0.0/15 (reserved for testing) unless the test sets
 one. Many tests fail sign-ins on purpose; without this they would all share
 127.0.0.1 and trip the per-address limit for each other.
+
+## Tests that need the whole database
+
+Most test files run in parallel against the same test database, so each test
+only looks at rows it created. A few rules are about the whole database, such
+as "at least one active administrator", and a test of them must change rows
+other tests rely on. Those files are named `*.exclusive.spec.ts`. Vitest runs
+them as a separate project after every other test file has finished, one file
+at a time (`vitest.config.ts`).
 
 ## Running
 

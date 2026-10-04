@@ -1,8 +1,7 @@
 # Authorization
 
-**Current state (2026-10-04):** Layer 1 built. Layer 2 built: roles, permissions and
-`@RequirePermission`; staff-management endpoints next (6b). Layer 3 (records)
-designed in outline, built with Matters.
+**Current state (2026-10-04):** Layers 1 and 2 built, including the
+staff-management endpoints. Layer 3 (records) designed in outline, built with Matters.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -25,7 +24,7 @@ without it.
   gets 403 and is recorded as `auth.access_denied`.
 - A session still waiting for its 2FA code is treated as signed out.
 
-## Layer 2: roles and permissions (designed)
+## Layer 2: roles and permissions (built)
 
 ### Decisions
 
@@ -85,7 +84,43 @@ accounts should not be the only ones checking what changed.
   - Disabling an account ends all its sessions immediately.
   - Only staff accounts can hold roles; the database enforces it.
 - **Everything is audited:** invitations, role grants and revocations, disabling,
-  and every 403 caused by a missing permission.
+  and every 403 caused by a missing permission. Each change is recorded in the
+  same transaction as the change, with the caller's address and browser, so a
+  change without its record cannot happen.
+- **Refusals are audited too.** Trying to change your own account, or to remove
+  the last administrator, is recorded as `staff.change_refused`.
+
+### Staff management
+
+`apps/api/src/staff/`. Endpoints are listed in [api.md](api.md).
+
+| Action | Permission | Audit event |
+|---|---|---|
+| List staff and their roles | `staff.view` | — |
+| Invite a staff member | `staff.invite` | `account.invited` |
+| Grant a role | `staff.roles.manage` | `staff.role_granted` |
+| Revoke a role | `staff.roles.manage` | `staff.role_revoked` |
+| Disable an account | `staff.disable` | `staff.disabled` (with how many sessions were ended) |
+| Any of the above refused by a safeguard | — | `staff.change_refused` (with the reason) |
+
+- Invitations carry no roles. Roles are granted separately, which can be done
+  while the person is still invited.
+- Disabling keeps the account's roles, so the record shows what the person
+  could do while it was in use. A disabled account cannot be re-enabled yet.
+- Only staff accounts are found by these endpoints. A client account's id
+  gives 404.
+
+### The last administrator
+
+Removing the administrator role, and disabling an administrator, both check
+that another **active** administrator remains (invited and disabled ones do not
+count). Over the API this can only be reached by a race: since nobody can
+change their own account, whoever makes the change is another administrator.
+Two administrators removing each other at the same moment would each see the
+other still there. Both changes therefore take a PostgreSQL advisory lock
+(`pg_advisory_xact_lock`) before counting, so they run one after the other and
+the second is refused. `last-administrator.exclusive.spec.ts` makes that race
+happen on every run.
 
 ### First administrator
 

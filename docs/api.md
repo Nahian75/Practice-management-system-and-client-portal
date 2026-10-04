@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-03):** NestJS 12 skeleton in `apps/api`. One endpoint.
+**Current state (2026-10-04):** Health, authentication and staff management.
 
 ## Endpoints
 
@@ -16,6 +16,11 @@
 | POST | `/auth/password-reset/complete` | Public, needs reset token | `{"token","password"}` → 204, 404 (invalid or expired link), or 400 with the reasons the password was refused |
 | GET | `/auth/session` | Any signed-in account | The signed-in account: id, kind, display name |
 | POST | `/auth/sign-out` | Public | Ends the current session if there is one, clears the cookie. Always 204 |
+| GET | `/staff` | `staff.view` | `{"staff": [{id, email, displayName, status, roles}]}`: every staff account, including invited and disabled |
+| POST | `/staff/invitations` | `staff.invite` | `{"email","displayName"}` → 201 `{accountId, expiresAt}`. Inviting someone already invited sends a fresh link. 409 if the address already has an active, disabled or client account |
+| PUT | `/staff/:accountId/roles/:role` | `staff.roles.manage` | Grants a role. 204, also when already held. 403 on your own account, 404 not a staff account, 409 account disabled |
+| DELETE | `/staff/:accountId/roles/:role` | `staff.roles.manage` | Revokes a role. 204, also when not held. 403 on your own account, 404 not a staff account, 409 last active administrator |
+| POST | `/staff/:accountId/disable` | `staff.disable` | Disables the account and ends its sessions. 204, also when already disabled. 403 on your own account, 404 not a staff account, 409 last active administrator |
 
 `/health` returns exactly `{"status":"ok"}`. It must never return version
 numbers, environment names, dependency status or anything else an attacker
@@ -35,6 +40,7 @@ Every route declares who may call it, its input and its output. Without all thre
 | `@StaffOnly()` | Signed-in staff |
 | `@ClientOnly()` | Signed-in clients |
 | `@AnyAccount()` | Any signed-in account |
+| `@RequirePermission('staff.invite')` | Signed-in staff holding a role with that permission (see [authorization.md](authorization.md)) |
 
 A session waiting for its 2FA code counts as not signed in.
 

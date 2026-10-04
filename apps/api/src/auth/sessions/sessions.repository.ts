@@ -36,8 +36,13 @@ export class SessionsRepository {
     await this.db.updateTable('sessions').set({ last_seen_at: at }).where('id', '=', sessionId).execute();
   }
 
-  async endAllForAccount(accountId: string, reason: SessionEndReason, at: Date): Promise<number> {
-    const result = await this.db
+  async endAllForAccount(
+    accountId: string,
+    reason: SessionEndReason,
+    at: Date,
+    executor: Kysely<Database> = this.db,
+  ): Promise<number> {
+    const result = await executor
       .updateTable('sessions')
       .set({ ended_at: at, end_reason: reason })
       .where('account_id', '=', accountId)

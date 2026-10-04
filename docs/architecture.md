@@ -1,6 +1,6 @@
 # Architecture
 
-**Current state (2026-10-03):** API foundation, database connection, migrations and the audit log. No business modules yet.
+**Current state (2026-10-04):** API foundation, audit log, authentication, and users and roles. No business modules yet.
 This file describes the target shape. Sections are updated as each part is built.
 
 ## Shape
@@ -35,9 +35,9 @@ authorization decisions.
 
 | Module | Status |
 |---|---|
-| Audit | Table and `AuditService` built; no callers yet |
+| Audit | Built; used by Auth and Users / Roles |
 | Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
-| Users / Roles | Roles, permissions and permission guard built; staff-management endpoints next |
+| Users / Roles | Built: roles, permissions, permission guard, staff-management endpoints (`apps/api/src/auth/permissions/`, `apps/api/src/staff/`) |
 | Clients | Not started |
 | Matters | Not started |
 | Documents | Not started |

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { AuditActor } from '../../audit/audit-event.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { generateOpaqueToken, hashOpaqueToken } from '../../common/crypto/opaque-token.js';
+import type { RequestContext } from '../../common/http/request-context.js';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
@@ -69,7 +70,7 @@ export class InvitationsService {
    */
   async invite(
     input: { kind: AccountKind; email: string; displayName: string },
-    invitedBy: { actor: AuditActor; accountId: string | null },
+    invitedBy: { actor: AuditActor; accountId: string | null; context?: RequestContext },
   ): Promise<{ accountId: string; expiresAt: Date }> {
     const email = input.email.trim().toLowerCase();
     const existing = await this.accounts.findByEmail(email);
@@ -104,6 +105,7 @@ export class InvitationsService {
       outcome: 'success',
       resource: { type: 'account', id: accountId },
       metadata: { kind: input.kind },
+      ...invitedBy.context,
     });
 
     return { accountId, expiresAt };
