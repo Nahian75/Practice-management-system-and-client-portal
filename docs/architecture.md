@@ -35,10 +35,10 @@ authorization decisions.
 
 | Module | Status |
 |---|---|
-| Audit | Built; used by Auth and Users / Roles |
+| Audit | Built; used by Auth, Users / Roles and Clients |
 | Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
 | Users / Roles | Built: roles, permissions, permission guard, staff-management endpoints (`apps/api/src/auth/permissions/`, `apps/api/src/staff/`) |
-| Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security review next ([clients.md](clients.md)) |
+| Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security-reviewed: C1–C3 and C8 fixed; C4 open, C5 with Matters, C6 before production ([review](reviews/2026-10-04-clients.md)) |
 | Matters | Not started |
 | Documents | Not started |
 | Client portal | Not started |

@@ -315,6 +315,61 @@ describe('Clients', () => {
     it.each(['administrator', 'accounts', 'compliance'] as const)('is closed to %s', async (role) => {
       expect((await as(await signedIn(await staffWith(role))).get(`/clients/search?q=${name}`)).status).toBe(403);
     });
+
+    describe('limit and record (review C2)', () => {
+      const searchEvents = (accountId: string) =>
+        db
+          .selectFrom('audit_events')
+          .select(['action', 'outcome', 'metadata'])
+          .where('actor_id', '=', accountId)
+          .where('action', 'like', 'client.search%')
+          .orderBy('id')
+          .execute();
+      const searchAs = (sessionToken: string) => as(sessionToken).get(`/clients/search?q=${encodeURIComponent(name)}`);
+
+      it('records each search with its number of results, never the text searched for', async () => {
+        await searchAs(token);
+
+        const events = await searchEvents(feeEarner.id);
+        expect(events).toEqual([{ action: 'client.searched', outcome: 'success', metadata: { results: 1 } }]);
+        expect(JSON.stringify(events)).not.toContain(name);
+      });
+
+      it('refuses the 61st search in an hour, and records going over the limit once', async () => {
+        for (let search = 0; search < 60; search++) {
+          expect((await searchAs(token)).status).toBe(200);
+        }
+
+        const refused = await searchAs(token);
+        await searchAs(token);
+        await searchAs(token);
+
+        expect(refused.status).toBe(429);
+        expect(refused.headers['retry-after']).toBe('3600');
+        expect(refused.body.message).toBe('Too many client searches in the last hour. Try again later');
+        const events = await searchEvents(feeEarner.id);
+        expect(events.filter((event) => event.action === 'client.searched')).toHaveLength(60);
+        expect(events.filter((event) => event.action === 'client.search_limited')).toEqual([
+          { action: 'client.search_limited', outcome: 'denied', metadata: { limit: 60 } },
+        ]);
+      });
+
+      it('limits each person separately', async () => {
+        for (let search = 0; search < 60; search++) {
+          await searchAs(token);
+        }
+
+        expect((await searchAs(await signedIn(await staffWith('fee_earner')))).status).toBe(200);
+      });
+
+      // Without the per-person lock, requests in flight together would all pass the count first.
+      it('lets exactly 60 of 70 searches sent at once through', async () => {
+        const statuses = (await Promise.all(Array.from({ length: 70 }, () => searchAs(token)))).map((r) => r.status);
+
+        expect(statuses.filter((status) => status === 200)).toHaveLength(60);
+        expect(statuses.filter((status) => status === 429)).toHaveLength(10);
+      });
+    });
   });
 
   describe('PATCH /clients/:clientId', () => {

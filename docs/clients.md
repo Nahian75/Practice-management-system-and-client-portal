@@ -3,8 +3,8 @@
 **Current state (2026-10-04):** Built: creating a client, opening and listing
 the clients you can see, searching every client by name or reference, editing
 details, a partner taking over a client whose responsible person can no longer see it,
-and contacts of organisation clients. Security review done; review item C2
-(search limit) is being built.
+and contacts of organisation clients. Security review done: C1, C2, C3 and C8
+fixed; C4 (database check for control characters) open.
 
 ## Decisions
 
@@ -89,6 +89,11 @@ to the clients they created, because `clients.view` is checked first.
   reference (listed first) or any part of the name, ignoring case; `%` and `_`
   are matched literally. It reads every row for now; an index comes with
   conflict checks.
+- Each person may search 60 times an hour; the 61st search gets 429 with
+  `Retry-After`. Every search is recorded as `client.searched` with its number
+  of results, never the text, and that record is what the limit counts. A
+  per-person lock makes searches sent together queue, so a burst cannot pass
+  the count before any is recorded ([review C2](reviews/2026-10-04-clients.md)).
 - The list shows 50 clients at a time, newest first. `next` in the answer is
   passed back as `?before=` for the following page.
 
@@ -135,6 +140,8 @@ must contain a letter or a digit ([review C1](reviews/2026-10-04-clients.md)).
 | `client.updated` | names of the fields that changed, never their values |
 | `client.taken_over` | id of the `client_responsibility_changes` row, previous responsible person. The reason stays in that row |
 | `client.take_over_refused` | `responsible_has_access`: a takeover tried while the responsible person could still see the client |
+| `client.searched` | number of results; never the text searched for |
+| `client.search_limited` | the hourly limit, recorded once an hour while someone is over it |
 | `client.contact_added` | contact id |
 | `client.contact_updated` | contact id, names of the fields that changed |
 
@@ -143,7 +150,7 @@ widely than client records, so copying names and addresses into it would
 spread personal data. Each event is written in the same transaction as the
 change, with the caller's address and browser.
 
-Searches and views are not audited yet. Views by people outside the matter
+Views are not audited yet. Views by people outside the matter
 team (compliance, with a reason) are audited when Matters is built.
 
 ## Not in this module
@@ -210,4 +217,4 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
 - **7d.** Contacts. Done.
-- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1, C3 and C8 fixed; C2 decided, to be built next.
+- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1, C2, C3 and C8 fixed.

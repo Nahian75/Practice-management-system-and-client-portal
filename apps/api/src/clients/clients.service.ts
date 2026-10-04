@@ -20,6 +20,10 @@ import { ClientsRepository } from './clients.repository.js';
 
 export const CLIENTS_PAGE_SIZE = 50;
 export const SEARCH_RESULTS_LIMIT = 20;
+export const SEARCHES_PER_HOUR = 60;
+export const SEARCH_WINDOW_SECONDS = 60 * 60;
+
+export type SearchResult = { outcome: 'found'; clients: ClientSummary[] } | { outcome: 'limited' };
 
 /** The signed-in staff member acting, and the request it came from. */
 export interface ClientActor {
@@ -71,8 +75,45 @@ export class ClientsService {
     return { clients, next: clients.length === CLIENTS_PAGE_SIZE ? (clients.at(-1)?.reference ?? null) : null };
   }
 
-  search(text: string): Promise<ClientSummary[]> {
-    return this.clients.search(text, SEARCH_RESULTS_LIMIT);
+  /**
+   * Searches every client, at most SEARCHES_PER_HOUR times per person
+   * (review C2). Each search is recorded with its number of results, not the
+   * text searched for, and that record is also what the limit counts. Going
+   * over the limit is recorded once an hour, so hammering it cannot flood the log.
+   */
+  search(text: string, by: ClientActor): Promise<SearchResult> {
+    return this.clients.transaction(async (trx): Promise<SearchResult> => {
+      await this.clients.lockSearchesBy(by.accountId, trx);
+      const window = { actorId: by.accountId, seconds: SEARCH_WINDOW_SECONDS };
+      if ((await this.audit.countRecent({ ...window, action: 'client.searched' }, trx)) >= SEARCHES_PER_HOUR) {
+        if ((await this.audit.countRecent({ ...window, action: 'client.search_limited' }, trx)) === 0) {
+          await this.audit.record(
+            {
+              actor: by.actor,
+              action: 'client.search_limited',
+              outcome: 'denied',
+              metadata: { limit: SEARCHES_PER_HOUR },
+              ...by.context,
+            },
+            trx,
+          );
+        }
+        return { outcome: 'limited' };
+      }
+
+      const clients = await this.clients.search(text, SEARCH_RESULTS_LIMIT, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'client.searched',
+          outcome: 'success',
+          metadata: { results: clients.length },
+          ...by.context,
+        },
+        trx,
+      );
+      return { outcome: 'found', clients };
+    });
   }
 
   /**

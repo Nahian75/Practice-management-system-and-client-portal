@@ -17,6 +17,11 @@ export class AuditService {
   async record(event: AuditEvent, transaction?: Kysely<Database>): Promise<void> {
     await this.repository.insert(toRow(event), transaction);
   }
+
+  /** How often this actor did this in the last `seconds`. Lets a limit use the audit record as its count. */
+  countRecent(query: { actorId: string; action: string; seconds: number }, transaction?: Kysely<Database>): Promise<number> {
+    return this.repository.countRecent(query, transaction);
+  }
 }
 
 function toRow(event: AuditEvent): Insertable<AuditEventsTable> {

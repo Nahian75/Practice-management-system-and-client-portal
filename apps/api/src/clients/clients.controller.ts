@@ -5,6 +5,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   NotFoundException,
   Param,
@@ -12,8 +13,9 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
@@ -21,7 +23,7 @@ import { requestContext } from '../common/http/request-context.js';
 import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-schema.decorator.js';
 import { COUNTRY_CODES } from '../common/validation/country-codes.js';
 import type { Client } from './client.js';
-import { ClientsService, type ClientActor } from './clients.service.js';
+import { ClientsService, SEARCH_WINDOW_SECONDS, type ClientActor } from './clients.service.js';
 
 // Control characters (null bytes, line breaks, tabs) and direction overrides are
 // refused: a null byte cannot be stored, a line break can split a letter or an
@@ -202,6 +204,7 @@ const clientSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const CLIENT_NOT_FOUND_MESSAGE = 'No client with this id';
+export const SEARCH_LIMIT_MESSAGE = 'Too many client searches in the last hour. Try again later';
 
 function actorFor(session: ResolvedSession, request: Request): ClientActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -231,12 +234,22 @@ export class ClientsController {
     return this.clients.list(session.account.id, query.before);
   }
 
-  /** Searches every client, but returns only what is needed to recognise one. */
+  /** Searches every client, but returns only what is needed to recognise one, a limited number of times an hour. */
   @Get('search')
   @RequirePermission('clients.search')
   @ResponseSchema(searchSchema)
-  async search(@Query({ schema: searchQuerySchema }) query: z.infer<typeof searchQuerySchema>) {
-    return { clients: await this.clients.search(query.q) };
+  async search(
+    @Query({ schema: searchQuerySchema }) query: z.infer<typeof searchQuerySchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.clients.search(query.q, actorFor(session, request));
+    if (result.outcome === 'limited') {
+      response.setHeader('Retry-After', String(SEARCH_WINDOW_SECONDS));
+      throw new HttpException(SEARCH_LIMIT_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    return { clients: result.clients };
   }
 
   /** A client the caller may not see answers 404, like one that does not exist. */

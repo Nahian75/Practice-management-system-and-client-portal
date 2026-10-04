@@ -234,9 +234,9 @@ export class ClientsRepository {
    * limited by visibility: it returns summaries only, so people can avoid
    * creating a client twice. An exact reference comes first.
    */
-  search(text: string, limit: number): Promise<ClientSummary[]> {
+  search(text: string, limit: number, executor: Kysely<Database> = this.db): Promise<ClientSummary[]> {
     const pattern = `%${text.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-    return this.db
+    return executor
       .selectFrom('clients')
       .leftJoin('client_individuals as i', 'i.client_id', 'clients.id')
       .leftJoin('client_organisations as o', 'o.client_id', 'clients.id')
@@ -296,6 +296,14 @@ export class ClientsRepository {
       };
       await trx.updateTable('client_organisations').set(columns).where('client_id', '=', clientId).execute();
     }
+  }
+
+  /**
+   * Serialises one person's searches until the transaction ends, so requests
+   * sent in parallel cannot all pass the hourly limit before any is recorded.
+   */
+  async lockSearchesBy(accountId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.client_search:${accountId}`}, 0))`.execute(trx);
   }
 
   /**
