@@ -23,7 +23,22 @@ import { COUNTRY_CODES } from '../common/validation/country-codes.js';
 import type { Client } from './client.js';
 import { ClientsService, type ClientActor } from './clients.service.js';
 
-const text = (max: number) => z.string().trim().min(1).max(max);
+// Control characters (null bytes, line breaks, tabs) and direction overrides are
+// refused: a null byte cannot be stored, a line break can split a letter or an
+// email header later, and an override makes a name display as something other
+// than what is stored. Free text must also contain a letter or a digit, so it
+// cannot be made only of invisible characters.
+const UNSAFE_CHARACTERS = /[\p{Cc}‪-‮⁦-⁩]/u;
+const VISIBLE_CHARACTER = /[\p{L}\p{N}]/u;
+
+const text = (max: number, min = 1) =>
+  z
+    .string()
+    .trim()
+    .min(min)
+    .max(max)
+    .refine((value) => !UNSAFE_CHARACTERS.test(value), 'Contains control or text-direction characters')
+    .refine((value) => VISIBLE_CHARACTER.test(value), 'Must contain a letter or a digit');
 /** For creation: a field left out is stored as null. */
 const optional = <T extends z.ZodType>(schema: T) => schema.nullish().transform((value) => value ?? null);
 
@@ -119,7 +134,7 @@ const contactPatchSchema = z
   })
   .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
 
-const takeOverSchema =z.strictObject({ reason: z.string().trim().min(10).max(500) });
+const takeOverSchema = z.strictObject({ reason: text(500, 10) });
 
 const listQuerySchema =z.strictObject({ before: reference.optional() });
 const searchQuerySchema = z.strictObject({ q: z.string().trim().min(2).max(100) });

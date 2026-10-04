@@ -122,7 +122,9 @@ A contact is always looked up together with its client, so a contact id from
 one client cannot be used through another client's address; a test tries it.
 
 Request bodies are strict: an unknown field is a 400, so `reference`,
-`created_by` or `status` cannot be slipped in.
+`created_by` or `status` cannot be slipped in. Free-text fields refuse control
+characters (null bytes, line breaks, tabs) and text-direction overrides, and
+must contain a letter or a digit ([review C1](reviews/2026-10-04-clients.md)).
 
 ## Audit
 
@@ -195,4 +197,4 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **7b.** `GET /clients`, search, `PATCH /clients/:id`. Done.
 - **7c.** Taking over a client. Done.
 - **7d.** Contacts. Done.
-- Security review of the module.
+- Security review of the module. Done: [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md). C1 fixed; C2, C3 and C8 decided, to be built next.

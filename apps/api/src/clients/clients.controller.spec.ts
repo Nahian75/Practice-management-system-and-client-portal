@@ -161,6 +161,11 @@ describe('Clients', () => {
       ['a date of birth in the future', { ...INDIVIDUAL, dateOfBirth: '2999-01-01' }],
       ['a date of birth before 1900', { ...INDIVIDUAL, dateOfBirth: '1899-12-31' }],
       ['an impossible date', { ...INDIVIDUAL, dateOfBirth: '1981-02-29' }],
+      ['a null byte, which the database cannot store', { ...INDIVIDUAL, givenNames: 'Ja\u0000ne' }],
+      ['a line break in a name', { ...INDIVIDUAL, familyName: 'Doe\nBcc: someone@example.com' }],
+      ['a right-to-left override in a name', { ...INDIVIDUAL, familyName: 'Doe‮evil' }],
+      ['a name of invisible characters only', { ...INDIVIDUAL, givenNames: '​​' }],
+      ['a tab in an address line', { ...INDIVIDUAL, address: { line1: '1\tHigh St', town: 'Leeds', country: 'GB' } }],
       ['an unknown organisation type', { ...ORGANISATION, organisationType: 'club' }],
       ['a registration number with symbols', { ...ORGANISATION, registrationNumber: 'SC-123' }],
     ])('refuses %s', async (_case, body) => {
@@ -518,6 +523,7 @@ describe('Clients', () => {
         ['no family name', { givenNames: 'Sam' }],
         ['an invalid email', { ...SAM, email: 'sam.example' }],
         ['an active flag', { ...SAM, active: false }],
+        ['a line break in a job title', { ...SAM, jobTitle: 'Director\nof Finance' }],
         ['a client id', { ...SAM, clientId: '00000000-0000-7000-8000-000000000000' }],
       ])('refuses %s', async (_case, body) => {
         expect((await as(token).post(`/clients/${organisationId}/contacts`, body)).status).toBe(400);
@@ -702,6 +708,7 @@ describe('Clients', () => {
         ['no reason', {}],
         ['a short reason', { reason: '  left    ' }],
         ['a reason over 500 characters', { reason: 'x'.repeat(501) }],
+        ['a reason with a null byte', { reason: 'Left the firm\u0000 last month' }],
         ['someone else to hand it to', { ...REASON, toAccountId: '00000000-0000-7000-8000-000000000000' }],
       ])('refuses %s', async (_case, body) => {
         expect((await as(partnerToken).post(`/clients/${clientId}/take-over`, body)).status).toBe(400);

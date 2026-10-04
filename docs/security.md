@@ -150,10 +150,12 @@ process before it accepts any request.
 |---|---|---|
 | 2026-10-04 | Authentication module | [reviews/2026-10-04-authentication.md](reviews/2026-10-04-authentication.md) |
 | 2026-10-04 | Users and roles module | [reviews/2026-10-04-users-roles.md](reviews/2026-10-04-users-roles.md) |
+| 2026-10-04 | Clients module | [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md) |
 
 Open items from reviews that must be closed before production: F2 (load
-balancer rate limiting), F3 (retention), F5 (persistent email outbox), U2
-(notices for role grants, awaiting approval).
+balancer rate limiting), F3 (retention), F5 (persistent email outbox), C2
+(search limit and record, decided, to be built), C6 (encrypted storage and
+backups).
 
 ## Client addresses
 
