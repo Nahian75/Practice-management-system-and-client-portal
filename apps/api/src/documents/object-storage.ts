@@ -35,9 +35,16 @@ export class ObjectStorage implements OnApplicationShutdown {
     });
   }
 
-  /** Streams `body` into the bucket in parts, so its length need not be known in advance. */
-  async put(key: string, body: Readable): Promise<void> {
-    await new Upload({ client: this.client, params: { Bucket: this.bucket, Key: checked(key), Body: body } }).done();
+  /**
+   * Streams `body` into the bucket in parts, so its length need not be known
+   * in advance. `abort` cancels it, removing any parts already sent.
+   */
+  async put(key: string, body: Readable, abort?: AbortController): Promise<void> {
+    await new Upload({
+      client: this.client,
+      params: { Bucket: this.bucket, Key: checked(key), Body: body },
+      ...(abort ? { abortController: abort } : {}),
+    }).done();
   }
 
   async get(key: string): Promise<Readable> {

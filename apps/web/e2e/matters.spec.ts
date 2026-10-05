@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { noAxeViolations, randomName, unique, watchForCspViolations } from './support/checks';
+import { follow, noAxeViolations, randomName, unique, watchForCspViolations } from './support/checks';
 import { openMatter } from './support/matters';
 import { apiSessionFor, signedInStaff } from './support/session';
 
@@ -23,7 +23,7 @@ test('a fee earner opens a matter with a clear conflict check, and finds it agai
   const opponent = randomName();
 
   await page.goto(`/clients/${client.id}`);
-  await page.getByRole('link', { name: 'Open a matter' }).click();
+  await follow(page, page.getByRole('link', { name: 'Open a matter' }));
   await noAxeViolations(page);
   await page.getByRole('group', { name: 'Other party 1' }).getByLabel('Name').fill(opponent);
   await page.getByRole('button', { name: 'Run conflict check' }).click();

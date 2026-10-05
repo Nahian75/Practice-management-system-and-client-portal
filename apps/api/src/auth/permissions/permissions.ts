@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   'matters.edit',
   'matters.supervise',
   'matters.access_with_reason',
+  'documents.add',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -55,8 +56,18 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'matters.view',
     'matters.edit',
     'matters.supervise',
+    'documents.add',
   ],
-  fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit', 'matters.open', 'matters.view', 'matters.edit'],
+  fee_earner: [
+    'clients.create',
+    'clients.view',
+    'clients.search',
+    'clients.edit',
+    'matters.open',
+    'matters.view',
+    'matters.edit',
+    'documents.add',
+  ],
   accounts: [],
   compliance: ['staff.view', 'audit.view', 'matters.access_with_reason'],
 };

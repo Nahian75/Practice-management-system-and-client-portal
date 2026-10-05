@@ -106,6 +106,13 @@ describe('document storage', () => {
 
       await expect(storing).rejects.toThrow();
     });
+
+    it('fails at once when the file fails before storage starts reading it', async () => {
+      const broken = new Readable({ read() {} });
+      broken.destroy(new Error('Refused before any byte was read'));
+
+      await expect(vault.store(broken)).rejects.toThrow('Refused before any byte was read');
+    }, 5_000);
   });
 
   describe('the scanner', () => {

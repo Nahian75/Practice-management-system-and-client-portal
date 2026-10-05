@@ -35,7 +35,24 @@ export class DocumentVault {
   async store(plaintext: Readable): Promise<StoredFile> {
     const storageKey = randomUUID();
     const fileKey = newFileKey();
-    await this.storage.put(storageKey, piped(plaintext, new EncryptingStream(fileKey)));
+    const encrypting = piped(plaintext, new EncryptingStream(fileKey));
+    // The storage library waits for data it may never get if the file fails before it starts
+    // reading: the first failure ends the wait and cancels the upload.
+    const abort = new AbortController();
+    const failed = new Promise<never>((_resolve, reject) => {
+      const fail = (error: unknown) => {
+        abort.abort();
+        reject(error instanceof Error ? error : new Error('The file could not be stored'));
+      };
+      if (encrypting.errored) {
+        fail(encrypting.errored);
+      }
+      encrypting.once('error', fail);
+    });
+    const storing = this.storage.put(storageKey, encrypting, abort);
+    failed.catch(() => undefined);
+    storing.catch(() => undefined);
+    await Promise.race([storing, failed]);
     return { storageKey, sealedKey: this.keys.seal(fileKey, contextFor(storageKey)) };
   }
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { noAxeViolations } from './support/checks';
+import { follow, noAxeViolations } from './support/checks';
 import { openMatter } from './support/matters';
 import { apiSessionFor, signedInStaff, signIn } from './support/session';
 
@@ -14,7 +14,7 @@ test('a team member changes the title and type of work', async ({ page, request 
   await page.goto(`/matters/${matter.id}`);
   await expect(page.getByRole('link', { name: 'Change the team' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Close the matter' })).toHaveCount(0);
-  await page.getByRole('link', { name: 'Change details' }).click();
+  await follow(page, page.getByRole('link', { name: 'Change details' }));
   await noAxeViolations(page);
   await page.getByLabel('Title').fill('Sale of 3 Mill Lane');
   await page.getByLabel('Type of work').selectOption('Residential property');
@@ -32,7 +32,7 @@ test('the supervising partner adds and removes a fee earner, then hands over sup
   const matter = await openMatter(page.request, await accountIdOf(page));
 
   await page.goto(`/matters/${matter.id}`);
-  await page.getByRole('link', { name: 'Change the team' }).click();
+  await follow(page, page.getByRole('link', { name: 'Change the team' }));
   await noAxeViolations(page);
   await page.getByLabel('Colleague').selectOption(feeEarner.staff.displayName);
   await page.getByRole('button', { name: 'Add to the team' }).click();
@@ -56,7 +56,7 @@ test('the supervising partner closes the matter, which is then final', async ({ 
   const matter = await openMatter(page.request, await accountIdOf(page));
 
   await page.goto(`/matters/${matter.id}`);
-  await page.getByRole('link', { name: 'Close the matter' }).click();
+  await follow(page, page.getByRole('link', { name: 'Close the matter' }));
   await noAxeViolations(page);
   await page.getByRole('button', { name: 'Close the matter' }).click();
   const problem = page.getByRole('alert', { name: 'There is a problem' });
@@ -81,7 +81,7 @@ test('a partner takes over supervision only when the supervising partner can no 
   await signedInStaff(page, request, ['partner']);
 
   await page.goto('/matters');
-  await page.getByRole('link', { name: 'take over supervision' }).click();
+  await follow(page, page.getByRole('link', { name: 'take over supervision' }));
   await noAxeViolations(page);
   await page.getByLabel('Matter reference').fill(matter.reference.toLowerCase());
   await page.getByLabel('Reason').fill('The supervising partner has left the firm');
@@ -105,7 +105,7 @@ test('compliance looks at a matter with a reason, and its supervising partner se
 
   await page.goto('/matters');
   await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible();
-  await page.getByRole('link', { name: 'look at a matter with a reason' }).click();
+  await follow(page, page.getByRole('link', { name: 'look at a matter with a reason' }));
   await noAxeViolations(page);
   await page.getByLabel('Matter reference').fill('C-1/1');
   await page.getByLabel('Why you need to see it').fill('Short');

@@ -51,3 +51,15 @@ export async function waitForEmails(address: string, count = 1): Promise<Receive
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 }
+
+/** The email to `address` with this subject, waiting for it; other emails to the same address are passed over. */
+export async function waitForEmailWithSubject(address: string, subject: string): Promise<ReceivedEmail | undefined> {
+  const deadline = Date.now() + WAIT_MS;
+  for (;;) {
+    const found = (await inbox(address)).find((email) => email.subject === subject);
+    if (found || Date.now() > deadline) {
+      return found;
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+}

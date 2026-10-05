@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
 
@@ -34,4 +34,16 @@ export async function watchForCspViolations(page: Page): Promise<string[]> {
 export function randomName(length = 12): string {
   const letters = Array.from(crypto.getRandomValues(new Uint8Array(length)), (byte) => String.fromCharCode(97 + (byte % 26))).join('');
   return letters[0]!.toUpperCase() + letters.slice(1);
+}
+
+/**
+ * Clicks a link and waits for the page it leads to. Next.js changes the
+ * address once the new page has rendered, so checks that run after this see
+ * that page, not one part-way through changing. (Waiting for the network to
+ * go quiet does not work: Next.js keeps prefetching linked pages.)
+ */
+export async function follow(page: Page, link: Locator): Promise<void> {
+  const before = page.url();
+  await link.click();
+  await page.waitForURL((url) => url.href !== before);
 }

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { COUNTRY_CODES as API_COUNTRY_CODES } from '../../api/src/common/validation/country-codes';
 import { COUNTRY_CODES as WEB_COUNTRY_CODES } from '../src/lib/country-codes';
-import { noAxeViolations, unique, watchForCspViolations } from './support/checks';
+import { follow, noAxeViolations, unique, watchForCspViolations } from './support/checks';
 import { apiSessionFor, signedInStaff } from './support/session';
 
 test('creates an individual client and shows the details in UK form', async ({ page, request }) => {
@@ -12,7 +12,7 @@ test('creates an individual client and shows the details in UK form', async ({ p
   await page.getByRole('link', { name: 'Clients' }).click();
   await expect(page.getByRole('link', { name: 'Clients' })).toHaveAttribute('aria-current', 'page');
   await noAxeViolations(page);
-  await page.getByRole('link', { name: 'Create a client' }).click();
+  await follow(page, page.getByRole('link', { name: 'Create a client' }));
   await noAxeViolations(page);
 
   await page.getByLabel('Given names').fill('Jane');
@@ -51,7 +51,7 @@ test('changes details, and clearing a field removes it', async ({ page, request 
   await page.getByRole('button', { name: 'Create client' }).click();
   await expect(page.getByText('020 7946 0000')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Change details' }).click();
+  await follow(page, page.getByRole('link', { name: 'Change details' }));
   await noAxeViolations(page);
   await page.getByLabel('Family name').fill('Smith');
   await page.getByLabel('Phone (optional)').fill('');
@@ -81,7 +81,7 @@ test('creates an organisation, adds a contact, and marks them as no longer a con
   await expect(page.getByRole('heading', { name })).toBeVisible();
   await expect(page.getByText('SC123456')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Add a contact' }).click();
+  await follow(page, page.getByRole('link', { name: 'Add a contact' }));
   await noAxeViolations(page);
   await page.getByLabel('Given names').fill('Kim');
   await page.getByLabel('Family name').fill('Ray');

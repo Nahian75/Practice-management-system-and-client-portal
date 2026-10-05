@@ -102,6 +102,8 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   `e2e/error-pages.spec.ts` sees what people see when the API is down. Its
   failed calls show in the test output as `[WebServer] fetch failed`; that is
   expected.
+- After clicking a link, tests use `follow(page, link)` (`e2e/support/checks.ts`),
+  which waits for the new page's address, before checking it with axe.
 - Test staff are set up the real way: invited with the command-line tool, the
   invitation read from Mailpit, password and authenticator set through the API.
   Codes are computed as an authenticator app does (`e2e/support/staff.ts`).

@@ -219,6 +219,27 @@ export class SecurityNoticesService {
     ]);
   }
 
+  /**
+   * Tells every compliance holder that an upload carried malware. It was
+   * refused and nothing was stored, but the uploader's computer may be
+   * infected. The matter is named by reference; the file's name stays out.
+   */
+  async malwareRefused(found: { matterReference: string; uploadedBy: string; signature: string }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const uploader = await this.accounts.findById(found.uploadedBy);
+    for (const holderId of await this.roles.activeHolders('compliance')) {
+      await this.notify(holderId, `Malware refused on ${found.matterReference}`, (name) => [
+        `Hello ${name},`,
+        '',
+        `A file uploaded to matter ${found.matterReference} by ${uploader?.display_name ?? 'a staff member'} on ${when}`,
+        `was found to contain malware (${found.signature}). It was refused and nothing was stored.`,
+        '',
+        'The computer it came from may be infected. Check with the person who uploaded',
+        "it and with whoever looks after the firm's computers.",
+      ]);
+    }
+  }
+
   private async changedBy(accountId: string | null): Promise<string> {
     const account = accountId ? await this.accounts.findById(accountId) : undefined;
     return account ? `by ${account.display_name}` : 'by the system';

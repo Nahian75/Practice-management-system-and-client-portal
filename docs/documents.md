@@ -1,10 +1,9 @@
 # Documents
 
-**Current state (2026-10-05):** Steps 10a to 10b-2 built: storage and scanner
-containers, file encryption, the tables (migration `0024`), the API's
-connections to storage and scanner (`ObjectStorage`, `DocumentVault`,
-`VirusScanner`), and file inspection (`FileInspection`), all in
-`apps/api/src/documents/`. No routes yet; step 10b-3 next.
+**Current state (2026-10-05):** Steps 10a to 10b-3 built: storage and scanner
+containers, file encryption, the tables (migration `0024`), file inspection,
+and uploading a document (`POST /matters/:id/documents`), all in
+`apps/api/src/documents/`. Listing and downloading (step 10b-4) next.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -91,14 +90,27 @@ see there.
 
 ## Upload, step by step
 
-1. The browser sends the file through the web app's `/api` pass-through.
-2. The API checks the matter is visible, open, and the person is on its team.
-3. While the file arrives: it counts the size (stops at 50 MB), reads its type
-   from the first bytes, computes its fingerprint, sends it to the scanner,
-   and encrypts it into storage.
-4. Only when the scan is clean, the type allowed and the size within the limit
-   is the version recorded in the database, with its audit record, in one
-   transaction. Otherwise the stored bytes are removed and the upload refused.
+1. The browser sends a multipart form through the web app's `/api`
+   pass-through: `title` and `category` first, then one file called `file`.
+   Anything else (a second file, a late or unknown field) refuses the upload.
+   The file is read as a stream, never held whole in memory
+   (`upload-request.ts`, using busboy).
+2. The API checks the person is on the matter's team (otherwise 404, as if it
+   did not exist) and the matter is open (otherwise 409), before reading the file.
+3. As the file arrives, three things happen to it at once: it is inspected
+   (size, type, fingerprint: `FileInspection`), scanned (ClamAV), and
+   encrypted into storage (`DocumentVault`). If any of them stops, the others
+   are stopped too, and the first to stop explains the refusal. The file
+   handed over ends only once the whole form has been read and found as
+   expected.
+4. Only when the inspection passes, the scan is clean and the file is stored
+   are the document and its first version recorded, with `document.added`, in
+   one transaction; the database checks the team and the matter once more.
+   Otherwise anything already stored is removed, the refusal is recorded as
+   `document.refused` with its reason, and for malware every compliance holder
+   is emailed (by matter reference, without the file's name).
+5. A refused upload is answered with `Connection: close`, so the rest of a
+   large upload is not read.
 
 ## Who can do what
 
@@ -115,7 +127,7 @@ the matter's team, and a document you may not see answers 404.
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| POST | `/matters/:id/documents` | `documents.add` + team, open matter | Multipart: `file`, `title`, `category` → 201 with the document. 413 too large, 415 type not allowed, 422 malware found, 503 scanner unavailable |
+| POST | `/matters/:id/documents` | `documents.add` + team, open matter | Multipart: `title`, `category`, then `file` → 201 with the document and its version 1. 400 form, title, category, empty file, file name, or interrupted; 404 not on the team; 409 matter not open; 413 over 50 MB; 415 type not accepted, or macros; 422 malware (compliance told); 503 scanner unavailable (nothing unscanned is stored) |
 | GET | `/matters/:id/documents` | `documents.view` + team | Documents not withdrawn, newest first, with the latest version |
 | GET | `/documents/:id` | `documents.view` + team | The document and every version |
 | POST | `/documents/:id/versions` | `documents.add` + team, open matter | Multipart: `file` → 201 with the new version |
@@ -162,7 +174,8 @@ Each step ships with positive and negative tests and is reviewed before the next
   stores, `DocumentVault`) and to the scanner (failing closed). Done.
 - **10b-2.** File inspection: size, fingerprint, and type from content. Done.
 - **10b-3.** Uploading a document: streaming, scanning, storing, audit, and
-  compliance told of malware.
+  compliance told of malware. Done. The web app's pass-through limits request
+  bodies, so step 10d raises its limit for this route.
 - **10b-4.** Listing and downloading documents.
 - **10c.** Versions and withdrawal.
 - **10d.** The document screens in the staff web app.
