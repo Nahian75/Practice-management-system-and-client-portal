@@ -195,26 +195,43 @@ describe('matters tables', () => {
     });
 
     // The indexed search must find exactly what comparing every name in full would (review M1).
-    it('finds the same number of matches as comparing every stored name in full', async () => {
+    it('finds the same matches as comparing every stored name in full', async () => {
       const names = ['Jane Doe', 'Acme Trading Ltd'];
 
-      const indexed = (await check(names)).matches.length;
-      const { rows } = await sql<{ total: string }>`
-        select (app.find_possible_conflicts(${names}::text[], ${client.id}) ->> 'total') as total`.execute(db);
-      const { rows: full } = await sql<{ total: string }>`
-        select count(*) as total
-        from unnest(${names}::text[]) as checked
-        cross join lateral (
-          select i.client_id, i.given_names || ' ' || i.family_name as name, 'client' as relation from client_individuals i
-          union all select o.client_id, o.legal_name, 'client' from client_organisations o
-          union all select c.client_id, c.given_names || ' ' || c.family_name, 'contact' from client_contacts c
-          union all select m.client_id, p.name, 'party' from matter_parties p join matters m on m.id = p.matter_id
-        ) k
-        where app.name_likeness(app.normalise_name(checked), app.normalise_name(k.name)) >= 0.3
-          and not (k.client_id = ${client.id} and k.relation in ('client', 'contact'))`.execute(db);
+      expect((await check(names)).matches.length).toBeGreaterThan(0);
+      // One snapshot for every count: other test files add similar names while this runs.
+      const { indexed, full, missed } = await db
+        .transaction()
+        .setIsolationLevel('repeatable read')
+        .execute(async (trx) => {
+          const { rows: [found] } = await sql<{ total: string }>`
+            select (app.find_possible_conflicts(${names}::text[], ${client.id}) ->> 'total') as total`.execute(trx);
+          // The same settings as the function, for its index condition below.
+          await sql`set local pg_trgm.similarity_threshold = 0.1`.execute(trx);
+          await sql`set local pg_trgm.word_similarity_threshold = 0.8`.execute(trx);
+          const { rows } = await sql<{ checked: string; name: string; indexable: boolean }>`
+            select checked, k.name,
+                   app.normalise_name(k.name) operator(extensions.%) app.normalise_name(checked)
+                     or app.normalise_name(k.name) operator(extensions.%>) app.normalise_name(checked) as indexable
+            from unnest(${names}::text[]) as checked
+            cross join lateral (
+              select i.client_id, i.given_names || ' ' || i.family_name as name, 'client' as relation from client_individuals i
+              union all select o.client_id, o.legal_name, 'client' from client_organisations o
+              union all select c.client_id, c.given_names || ' ' || c.family_name, 'contact' from client_contacts c
+              union all select m.client_id, p.name, 'party' from matter_parties p join matters m on m.id = p.matter_id
+            ) k
+            where app.name_likeness(app.normalise_name(checked), app.normalise_name(k.name)) >= 0.3
+              and not (k.client_id = ${client.id} and k.relation in ('client', 'contact'))`.execute(trx);
+          return {
+            indexed: Number(found?.total),
+            full: rows.length,
+            missed: rows.filter((row) => !row.indexable).map(({ checked, name }) => ({ checked, name })),
+          };
+        });
 
-      expect(indexed).toBeGreaterThan(0);
-      expect(Number(rows[0]?.total)).toBe(Number(full[0]?.total));
+      // A name here is one the index condition skips although it is a possible conflict.
+      expect(missed).toEqual([]);
+      expect(indexed).toBe(full);
     });
 
     it('opens the matter as awaiting clearance when the check found a possible match', async () => {

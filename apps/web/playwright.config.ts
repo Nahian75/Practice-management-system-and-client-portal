@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { e2eDatabaseUrl } from './e2e/support/database.mjs';
 
 // The API's local settings hold the test database and Mailpit addresses.
 process.loadEnvFile('../api/.env');
@@ -29,7 +30,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      // The built API, against the test database.
+      // The built API, against the end-to-end database (e2e/prepare-database.mjs).
       command: 'node --enable-source-maps ../api/dist/main.js',
       url: `http://127.0.0.1:${E2E_API_PORT}/health`,
       reuseExistingServer: false,
@@ -38,7 +39,7 @@ export default defineConfig({
         HOST: '127.0.0.1',
         PORT: E2E_API_PORT,
         LOG_LEVEL: 'error',
-        DATABASE_URL: required('TEST_DATABASE_URL'),
+        DATABASE_URL: e2eDatabaseUrl(required('TEST_DATABASE_URL')),
         TOTP_ENCRYPTION_KEY: required('TOTP_ENCRYPTION_KEY'),
         APP_BASE_URL: E2E_WEB_URL,
         SMTP_URL: required('SMTP_URL'),

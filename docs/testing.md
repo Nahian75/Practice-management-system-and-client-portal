@@ -77,15 +77,21 @@ npm run typecheck -w @practice/api
 ## Web app, end to end
 
 Playwright drives a real browser (Chromium) against the built web app and the
-built API, on their own ports (3100 and 3101) and the test database, so they
-never meet the development servers. Settings come from `apps/api/.env`.
+built API, on their own ports (3100 and 3101) and their own database, `pms_e2e`,
+so they never meet the development servers or the API's tests. Settings come
+from `apps/api/.env`; the database address is the test one with the name changed.
 
 ```sh
 npx playwright install chromium     # once
 npm run build -w @practice/api      # the tests start the built API
-npm run test:e2e -w @practice/web   # builds the web app, then runs the tests
+npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates pms_e2e, runs the tests
 ```
 
+- `pms_e2e` is recreated empty before every `test:e2e` (`e2e/prepare-database.mjs`,
+  with `infra/postgres/reset-test-database.sql`). It is separate from `pms_test`
+  because both suites sign in from `127.0.0.1`: sharing a database let the API
+  tests' deliberate failures use up the browser tests' per-address sign-in
+  allowance. Running `npx playwright test` directly reuses the database as it is.
 - Test staff are set up the real way: invited with the command-line tool, the
   invitation read from Mailpit, password and authenticator set through the API.
   Codes are computed as an authenticator app does (`e2e/support/staff.ts`).

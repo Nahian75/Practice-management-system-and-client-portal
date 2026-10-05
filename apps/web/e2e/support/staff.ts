@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
+import { E2E_WEB_URL } from '../../playwright.config';
+import { e2eDatabaseUrl } from './database.mjs';
 
 export interface TestStaff {
   email: string;
@@ -43,8 +45,8 @@ export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ e
       env: {
         ...process.env,
         NODE_ENV: 'test',
-        DATABASE_URL: process.env['TEST_DATABASE_URL'],
-        APP_BASE_URL: 'http://localhost:3100',
+        DATABASE_URL: e2eDatabaseUrl(process.env['TEST_DATABASE_URL'] ?? ''),
+        APP_BASE_URL: E2E_WEB_URL,
         LOG_LEVEL: 'error',
       },
       encoding: 'utf8',
