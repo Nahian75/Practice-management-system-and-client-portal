@@ -1,6 +1,6 @@
 # Deployment
 
-**Current state (2026-10-03):** Local development only. No hosted environments.
+**Current state (2026-10-05):** Local development only: the API and the web app. No hosted environments.
 
 ## Local development
 
@@ -15,8 +15,16 @@ npm run build -w @practice/api
 npm run migrate:local -w @practice/api
 npm run build -w @practice/api && npm run invite:local -w @practice/api -- --kind staff --email you@practice.test --name "Your Name" --role administrator
 # then open the invitation email in Mailpit: http://127.0.0.1:8025
-npm run start:local -w @practice/api
+npm run start:local -w @practice/api      # the API, on the private port 3001
+
+cp apps/web/.env.example apps/web/.env.local
+npm run dev -w @practice/web              # the web app: open http://localhost:3000
 ```
+
+Browsers only ever talk to the web app on port 3000; it passes `/api/...` to
+the API on 3001 ([web.md](web.md)). Accepting an invitation in the browser
+comes with web step 9b; until then the API's invitation endpoints are used
+directly.
 
 **Extensions, once per database.** `pg_trgm` and `unaccent` need the
 superuser, which the migration role deliberately is not. New data volumes get

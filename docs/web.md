@@ -1,7 +1,8 @@
 # Web app
 
-**Current state (2026-10-05):** Designed, not built. This file is the proposal
-for review; it is rewritten to match the code as each step is built.
+**Current state (2026-10-05):** Step 9a built: the app, its security headers,
+the pass-through to the API, the layout, sign in with 2FA or a backup code, sign
+out, and a signed-in home page. The other screens are designed below.
 
 The staff app, in the browser. The client portal comes later, in the same app.
 
@@ -32,6 +33,28 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - Pages that show data are rendered on the server, which calls the API with
   the visitor's cookie. Forms send JSON to `/api/...` from the browser.
 - The web app holds no secrets and never talks to the database.
+
+## Built in 9a
+
+- `apps/web`, Next.js 16.3 with React 19.3, TypeScript strict as in the API.
+- `src/proxy.ts` (Next.js 16's name for middleware) passes `/api/...` to the
+  API and gives every page a fresh nonce and the security headers. The API
+  address is built in `src/lib/api-target.ts` by setting the path on a fixed
+  URL: joined as text, `/api//evil.example/x` would have been sent to another
+  server. Tests cover that and two other tricks.
+- The API address and the name come from the environment at run time
+  (`API_URL`, `APP_NAME`); the API now listens on the private port 3001 and
+  trusts the web app as its proxy (`TRUSTED_PROXIES=loopback` locally), so
+  per-address sign-in limits still see each visitor's own address.
+- Every page is rendered per request (`force-dynamic`), so each gets its own
+  nonce and nothing signed-in is cached.
+- Server-rendered pages read from the API with only the visitor's session
+  cookie (`src/lib/api.ts`). The staff layout sends anyone without a staff
+  session to sign in; the type checker refuses to build if that check is
+  removed, because the header then uses an account that may not exist.
+- Sign-in is two steps, password then code, showing the API's own messages
+  in an error summary that takes focus.
+- Fonts are downloaded when the app is built and served from the app itself.
 
 ## Security in the web app
 

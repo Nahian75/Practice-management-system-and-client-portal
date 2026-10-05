@@ -19,6 +19,12 @@ build/
 .next/
 out/
 coverage/
+next-env.d.ts
+*.tsbuildinfo
+
+# Browser test output: screenshots and traces can show synthetic data and tokens
+test-results/
+playwright-report/
 
 # Local data — never commit uploads, dumps or databases
 uploads/

@@ -1,0 +1,221 @@
+/*
+ * The few shared tokens of a quiet, text-led look: near-black on white, deep
+ * navy for the bar, links and buttons, one muted red for errors. Every
+ * text colour has a contrast of at least 4.5 to 1 on its background.
+ */
+:root {
+  --colour-text: #0b0c0c;
+  --colour-text-secondary: #4b4f54;
+  --colour-background: #ffffff;
+  --colour-brand: #1b2a41;
+  --colour-brand-text: #ffffff;
+  --colour-rule: #b1b4b6;
+  --colour-error: #9b1c1c;
+  --colour-focus: #ffbf47;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+
+  --measure: 40rem;
+  --page: 64rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--colour-background);
+  color: var(--colour-text);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 1.1875rem;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 var(--space-3);
+}
+
+h1 {
+  font-size: 2.25rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  max-width: var(--measure);
+}
+
+a {
+  color: var(--colour-brand);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  text-decoration-thickness: 3px;
+}
+
+/* A strong, visible focus for keyboard users, on every interactive element. */
+:focus-visible {
+  outline: 3px solid var(--colour-focus);
+  outline-offset: 0;
+  box-shadow: 0 0 0 6px var(--colour-text);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip-link:focus {
+  left: var(--space-3);
+  top: var(--space-2);
+  background: var(--colour-focus);
+  color: var(--colour-text);
+  padding: var(--space-2);
+  z-index: 1;
+}
+
+.header {
+  background: var(--colour-brand);
+  color: var(--colour-brand-text);
+}
+
+.header-inner,
+.main {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--space-3);
+}
+
+.header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  min-height: 3.75rem;
+}
+
+.header-name {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.header a,
+.header button {
+  color: var(--colour-brand-text);
+}
+
+.main {
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-5);
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--colour-rule);
+  margin: var(--space-4) 0;
+}
+
+.secondary {
+  color: var(--colour-text-secondary);
+}
+
+/* Forms: labels above fields, one column, generous targets. */
+.field {
+  margin-bottom: var(--space-4);
+  max-width: var(--measure);
+}
+
+.label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.hint {
+  display: block;
+  color: var(--colour-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  font: inherit;
+  padding: var(--space-2);
+  border: 2px solid var(--colour-text);
+  border-radius: 0;
+}
+
+.input-short {
+  max-width: 10ch;
+}
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--colour-brand);
+  border-radius: 0;
+  background: var(--colour-brand);
+  color: var(--colour-brand-text);
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.link-button {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.error-summary {
+  border: 4px solid var(--colour-error);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  max-width: var(--measure);
+}
+
+.error-summary h2 {
+  font-size: 1.25rem;
+}
+
+.error-message {
+  display: block;
+  color: var(--colour-error);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}

@@ -74,6 +74,26 @@ npm test -w @practice/api
 npm run typecheck -w @practice/api
 ```
 
+## Web app, end to end
+
+Playwright drives a real browser (Chromium) against the built web app and the
+built API, on their own ports (3100 and 3101) and the test database, so they
+never meet the development servers. Settings come from `apps/api/.env`.
+
+```sh
+npx playwright install chromium     # once
+npm run build -w @practice/api      # the tests start the built API
+npm run test:e2e -w @practice/web   # builds the web app, then runs the tests
+```
+
+- Test staff are set up the real way: invited with the command-line tool, the
+  invitation read from Mailpit, password and authenticator set through the API.
+  Codes are computed as an authenticator app does (`e2e/support/staff.ts`).
+- Each authenticator code works once, so a sign-in right after accepting an
+  invitation waits for the next 30-second code, or uses a backup code.
+- Every screen is checked with axe against WCAG 2.2 AA.
+- Traces and screenshots of failures stay in the git-ignored `test-results/`.
+
 ## Conventions
 
 - Test files sit next to the code they test: `health.controller.ts` →
