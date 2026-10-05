@@ -134,6 +134,22 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   team); takeover and compliance access are linked from the Matters page for
   everyone, and the API refuses anyone else.
 
+## Built in 9e
+
+- `/staff`: every staff account with its email, status and roles, for
+  administrators, partners and compliance (`staff.view`). Others see "No access".
+- `/staff/invite` (administrators): name and email address. The person then
+  has a page of their own where roles are given, one at a time, so a refused
+  role never leaves others half done.
+- `/staff/:id`: each role with what it is for, and a button to give or
+  remove it; disabling the account (signs them out at once; roles and matter
+  teams stay) or re-enabling it (a new invitation; the old password is gone).
+- One's own account shows no change buttons: another administrator makes those
+  changes. The API refuses them anyway, and refuses removing the last active
+  administrator or compliance holder; its reasons are shown as given.
+- A partner or compliance holder pressing a change button is told only
+  administrators can change staff accounts.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
