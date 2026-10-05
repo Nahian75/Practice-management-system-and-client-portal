@@ -32,7 +32,9 @@ test('signs in with a password and an authenticator code, and signs out', async 
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await expect(page.getByText(`You are signed in as ${staff.displayName}.`)).toBeVisible();
 
+  const signedOut = page.waitForResponse('**/api/auth/sign-out');
   await page.getByRole('button', { name: 'Sign out' }).click();
+  expect((await (await signedOut).allHeaders())['clear-site-data']).toBe('"cache"');
   await expect(page).toHaveURL(/\/sign-in$/);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);

@@ -157,8 +157,9 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   (`frame-ancestors 'none'`), forms only to this site.
 - The same security headers as the API (no sniffing, strict referrer policy,
   HSTS in production, permissions policy denying camera, location and the rest).
-- No data in `localStorage` or `sessionStorage`; nothing cached by the browser
-  for signed-in pages (`Cache-Control: no-store`).
+- No data in `localStorage` or `sessionStorage`; nothing cached by the browser:
+  pages and API answers are sent with `Cache-Control: no-store`, and signing out
+  tells the browser to clear its cache (`Clear-Site-Data`, review W2).
 - What a screen shows comes from the API's answer, which the API already
   filters; the web app adds no access rules of its own and none are needed
   for safety. Hiding a button is for clarity, never a control.

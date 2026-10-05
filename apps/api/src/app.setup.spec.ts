@@ -37,6 +37,13 @@ describe('HTTP security headers', () => {
     expect(response.status).toBe(404);
     expect(response.headers['x-powered-by']).toBeUndefined();
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('tells the browser not to keep any answer (review W2)', async () => {
+    const response = await request(app.getHttpServer()).get('/health');
+
+    expect(response.headers['cache-control']).toBe('no-store');
   });
 
   it('does not allow cross-origin browser requests', async () => {

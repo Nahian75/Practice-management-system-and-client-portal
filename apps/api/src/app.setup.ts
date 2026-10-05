@@ -1,5 +1,6 @@
 import { Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { NextFunction, Request, Response } from 'express';
 import { PermissionGuard } from './auth/permissions/permission.guard.js';
 import { SessionGuard } from './auth/sessions/session.guard.js';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter.js';
@@ -14,6 +15,11 @@ export function configureApp(app: NestExpressApplication): void {
   app.set('trust proxy', app.get<Env>(ENV).TRUSTED_PROXIES);
 
   app.useSecurityHeaders();
+  // Answers carry client and staff details: the browser must not keep them, in its cache or on disk (review W2).
+  app.use((_request: Request, response: Response, next: NextFunction) => {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.enableCsrfProtection();
 
   // app.get throws if AuthModule is not loaded, so the app cannot start without the

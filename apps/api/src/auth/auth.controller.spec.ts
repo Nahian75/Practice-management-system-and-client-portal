@@ -69,6 +69,15 @@ describe('AuthController', () => {
       ]);
     });
 
+    it('tells the browser to drop what it cached during the session (review W2)', async () => {
+      const token = await sessions.start(staff, 'authenticated', {});
+
+      const response = await request(app.getHttpServer()).post('/auth/sign-out').set('Cookie', withSession(token));
+
+      expect(response.headers['clear-site-data']).toBe('"cache"');
+      expect(response.headers['cache-control']).toBe('no-store');
+    });
+
     it('records the sign-out with the request details', async () => {
       const token = await sessions.start(staff, 'authenticated', {});
 

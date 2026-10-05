@@ -93,6 +93,9 @@ so helmet is not a dependency).
 - `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
   `X-Frame-Options`, `Referrer-Policy: no-referrer` and a restrictive
   `Content-Security-Policy` are set on every response, including errors.
+- `Cache-Control: no-store` on every response, including errors, so the
+  browser never keeps client or staff details (review W2). Signing out also
+  sends `Clear-Site-Data: "cache"`.
 - CORS is off. Browsers on other origins cannot call the API.
 
 ### CSRF protection

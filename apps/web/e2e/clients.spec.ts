@@ -33,6 +33,8 @@ test('creates an individual client and shows the details in UK form', async ({ p
   await expect(page.getByText('1 High Street, Leeds, LS1 1AA, United Kingdom')).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: `Jane ${family}` })).toBeVisible();
+  const answer = await page.request.get(`/api${new URL(page.url()).pathname}`);
+  expect(answer.headers()['cache-control'], 'API answers through the pass-through are not kept (review W2)').toBe('no-store');
   await noAxeViolations(page);
 
   await page.getByRole('link', { name: 'Clients' }).click();

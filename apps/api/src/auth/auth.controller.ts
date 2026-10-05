@@ -27,6 +27,8 @@ export class AuthController {
   async signOut(@Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<void> {
     await this.sessions.signOut(readSessionToken(request), requestContext(request));
     clearSessionCookie(response);
+    // Anything the browser kept from this session goes too (review W2).
+    response.setHeader('Clear-Site-Data', '"cache"');
   }
 
   @Get('session')
