@@ -41,6 +41,27 @@ Migration `0017` stops with a clear message if they are missing.
 Behind a load balancer, set `TRUSTED_PROXIES` to its address range. Leave it
 empty when the app is reached directly.
 
+### The way in: a reverse proxy on the same machine (review W1, W3)
+
+The web app and the API both listen on `127.0.0.1` only (`npm run start`
+binds the web app there; a test fails if it does not). Browsers reach them only
+through a TLS reverse proxy on the same machine, such as Caddy or nginx, which
+must:
+
+- **Pass the browser's address last in `X-Forwarded-For`.** The web app hands
+  the header to the API unchanged, and the API (`TRUSTED_PROXIES=loopback`)
+  takes the last address that is not loopback. Whatever the browser wrote
+  itself comes earlier and is ignored. Caddy does this by default; in nginx,
+  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
+- **Remove the `x-middleware-rewrite` response header**, which names the API's
+  internal address (Caddy: `header_down -x-middleware-rewrite`; nginx:
+  `proxy_hide_header x-middleware-rewrite;`).
+- Send everything to the web app on port 3000; never expose the API's port.
+
+Never expose the web app's port directly: anyone reaching it could then choose
+the address the API records for them, and get round the per-address sign-in
+limit.
+
 `compose.yaml`:
 - Image pinned by digest, so the exact same image is pulled every time.
 - Port bound to `127.0.0.1` only: not reachable from other machines.

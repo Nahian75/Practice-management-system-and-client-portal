@@ -48,8 +48,8 @@ export default defineConfig({
       },
     },
     {
-      // The built web app, as it runs in production.
-      command: 'npx next start --port 3100',
+      // The built web app, started exactly as in production (only its port differs).
+      command: 'npm run start -- --port 3100',
       url: `${E2E_WEB_URL}/sign-in`,
       reuseExistingServer: false,
       env: { API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'Stass' },

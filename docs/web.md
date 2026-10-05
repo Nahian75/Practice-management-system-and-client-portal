@@ -163,6 +163,9 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   filters; the web app adds no access rules of its own and none are needed
   for safety. Hiding a button is for clarity, never a control.
 - Error pages show a reference, never details.
+- The web app listens on `127.0.0.1` only, and is reached through a reverse
+  proxy on the same machine that reports the browser's real address
+  ([deployment.md](deployment.md), review W1).
 
 ## Look
 
