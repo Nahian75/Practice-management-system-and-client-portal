@@ -1,9 +1,12 @@
 import { pipeline } from 'node:stream/promises';
 import {
   BadRequestException,
+  Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Logger,
@@ -20,10 +23,10 @@ import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
+import { NO_CONTENT, ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from './content-disposition.js';
-import { DocumentsService, type UploadRefusal } from './documents.service.js';
+import { DocumentsService, type DocumentActor, type UploadRefusal } from './documents.service.js';
 import { discardUpload, readUpload, UploadFormError } from './upload-request.js';
 
 const CATEGORIES = ['correspondence', 'contract', 'evidence', 'identity', 'court', 'other'] as const;
@@ -74,9 +77,15 @@ const detailsSchema = z.object({
   category: z.enum(CATEGORIES),
   createdAt: z.iso.datetime(),
   versions: z.array(versionSchema.extend({ uploadedBy: z.object({ accountId: z.uuid(), displayName: z.string() }) })),
+  withdrawal: z
+    .object({ withdrawnBy: z.object({ accountId: z.uuid(), displayName: z.string() }), reason: z.string(), withdrawnAt: z.iso.datetime() })
+    .nullable(),
 });
 
+const withdrawalSchema = z.strictObject({ reason: text(500, 10) });
+
 const DOCUMENT_NOT_FOUND_MESSAGE = 'No document with this id';
+const WITHDRAWN_MESSAGE = 'This document was withdrawn';
 
 const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
   empty: () => new BadRequestException('The file is empty'),
@@ -93,6 +102,32 @@ const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
   form: () => new BadRequestException('Send the title and category, then one file, and nothing else'),
   interrupted: () => new BadRequestException('The upload was interrupted'),
 };
+
+function actorFor(session: ResolvedSession, request: Request): DocumentActor {
+  return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
+}
+
+/**
+ * Refusals can come before the whole upload has arrived: the connection is
+ * then closed rather than read to its end.
+ */
+function closing(response: Response) {
+  return (error: HttpException) => {
+    response.setHeader('Connection', 'close');
+    return error;
+  };
+}
+
+async function readForm(request: Request, fieldNames: readonly string[], refused: (error: HttpException) => HttpException) {
+  try {
+    return await readUpload(request, fieldNames);
+  } catch (error) {
+    if (error instanceof UploadFormError) {
+      throw refused(new BadRequestException(error.message));
+    }
+    throw error;
+  }
+}
 
 @Controller()
 export class DocumentsController {
@@ -113,32 +148,15 @@ export class DocumentsController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    // Refusals can come before the whole upload has arrived: the connection is then closed rather than read to its end.
-    const refused = (error: HttpException) => {
-      response.setHeader('Connection', 'close');
-      return error;
-    };
-
-    let upload;
-    try {
-      upload = await readUpload(request, ['title', 'category']);
-    } catch (error) {
-      if (error instanceof UploadFormError) {
-        throw refused(new BadRequestException(error.message));
-      }
-      throw error;
-    }
+    const refused = closing(response);
+    const upload = await readForm(request, ['title', 'category'], refused);
     const details = uploadFieldsSchema.safeParse(upload.fields);
     if (!details.success) {
       discardUpload(upload.file);
       throw refused(new BadRequestException('Give a title (up to 200 characters) and a category, before the file'));
     }
 
-    const result = await this.documents.add(matterId, details.data, upload, {
-      actor: auditActorFor(session.account),
-      accountId: session.account.id,
-      context: requestContext(request),
-    });
+    const result = await this.documents.add(matterId, details.data, upload, actorFor(session, request));
     switch (result.outcome) {
       case 'not_found':
         throw refused(new NotFoundException('No matter with this id'));
@@ -154,6 +172,60 @@ export class DocumentsController {
           version: { ...document.version, uploadedAt: document.version.uploadedAt.toISOString() },
         };
       }
+    }
+  }
+
+  /** A multipart form with only the file, as `file`. Checked exactly as a first upload. */
+  @Post('documents/:documentId/versions')
+  @RequirePermission('documents.add')
+  @ResponseSchema(versionSchema)
+  async addVersion(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refused = closing(response);
+    const upload = await readForm(request, [], refused);
+    const result = await this.documents.addVersion(documentId, upload, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw refused(new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE));
+      case 'not_open':
+        throw refused(new ConflictException('Documents are added only to open matters'));
+      case 'withdrawn':
+        throw refused(new ConflictException(WITHDRAWN_MESSAGE));
+      case 'refused':
+        throw refused(REFUSALS[result.reason]());
+      case 'added':
+        return { ...result.version, uploadedAt: result.version.uploadedAt.toISOString() };
+    }
+  }
+
+  /** By whoever added the document, or the matter's supervising partner. Final. */
+  @Post('documents/:documentId/withdrawal')
+  @RequirePermission('documents.withdraw')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async withdraw(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: withdrawalSchema }) body: z.infer<typeof withdrawalSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    switch (await this.documents.withdraw(documentId, body.reason, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+      case 'not_allowed':
+        throw new ForbiddenException("Only whoever added the document, or the matter's supervising partner, can withdraw it");
+      case 'not_open':
+        throw new ConflictException('Documents on a closed matter cannot be withdrawn');
+      case 'already_withdrawn':
+        throw new ConflictException(WITHDRAWN_MESSAGE);
+      case 'changed':
+        throw new ConflictException('The document or its matter changed meanwhile. Reload and try again');
+      case 'withdrawn':
+        return;
     }
   }
 
@@ -192,6 +264,7 @@ export class DocumentsController {
       ...document,
       createdAt: document.createdAt.toISOString(),
       versions: document.versions.map((version) => ({ ...version, uploadedAt: version.uploadedAt.toISOString() })),
+      withdrawal: document.withdrawal && { ...document.withdrawal, withdrawnAt: document.withdrawal.withdrawnAt.toISOString() },
     };
   }
 
@@ -210,13 +283,12 @@ export class DocumentsController {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    const result = await this.documents.download(documentId, number, {
-      actor: auditActorFor(session.account),
-      accountId: session.account.id,
-      context: requestContext(request),
-    });
+    const result = await this.documents.download(documentId, number, actorFor(session, request));
     if (result.outcome === 'not_found') {
       throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+    }
+    if (result.outcome === 'withdrawn') {
+      throw new HttpException(WITHDRAWN_MESSAGE, HttpStatus.GONE);
     }
     response.status(HttpStatus.OK);
     response.setHeader('Content-Type', result.mediaType);

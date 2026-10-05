@@ -70,6 +70,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `matters.supervise` — clear conflicts and change the team on matters you supervise; take over supervision from a partner who can no longer act; close matters you supervise ([rules](matters.md#opening-a-matter)) | | ✓ | | | |
 | `documents.view` — list and download the documents of matters you are on the team of | | ✓ | ✓ | | |
 | `documents.add` — add documents to open matters you are on the team of ([rules](documents.md#who-can-do-what)) | | ✓ | ✓ | | |
+| `documents.withdraw` — withdraw a document you added, or any on a matter you supervise, with a reason | | ✓ | ✓ | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 
 Administrators deliberately cannot read the audit log: the people who change

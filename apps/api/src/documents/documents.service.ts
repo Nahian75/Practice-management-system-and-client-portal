@@ -5,7 +5,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import { text } from '../common/validation/safe-text.js';
-import type { DocumentCategory, DocumentMediaType } from '../database/schema.js';
+import type { Kysely } from 'kysely';
+import type { Database, DocumentCategory, DocumentMediaType } from '../database/schema.js';
 import { DocumentVault, type StoredFile } from './document-vault.js';
 import { DocumentsRepository, type DocumentDetails, type DocumentSummary } from './documents.repository.js';
 import { FileInspection, FileRefusedError, type InspectedFile, type RefusalReason } from './file-inspection.js';
@@ -34,11 +35,25 @@ export type AddResult =
   | { outcome: 'not_found' | 'not_open' }
   | { outcome: 'refused'; reason: UploadRefusal };
 
+export type AddVersionResult =
+  | { outcome: 'added'; version: AddedDocument['version'] }
+  | { outcome: 'not_found' | 'not_open' | 'withdrawn' }
+  | { outcome: 'refused'; reason: UploadRefusal };
+
+export type WithdrawResult = 'withdrawn' | 'not_found' | 'not_open' | 'already_withdrawn' | 'not_allowed' | 'changed';
+
+interface AcceptedFile {
+  fileName: string;
+  inspected: InspectedFile;
+  stored: StoredFile;
+}
+
 export const DOCUMENTS_PAGE_SIZE = 100;
 
 export type DownloadResult =
   | { outcome: 'ready'; file: Readable; fileName: string; mediaType: DocumentMediaType; sizeBytes: number }
-  | { outcome: 'not_found' };
+  | { outcome: 'not_found' }
+  | { outcome: 'withdrawn' };
 
 type Received = { inspected: InspectedFile; stored: StoredFile } | { refusal: UploadRefusal; signature?: string };
 
@@ -71,65 +86,166 @@ export class DocumentsService {
       discardUpload(upload.file);
       return { outcome: matter ? 'not_open' : 'not_found' };
     }
+    const accepted = await this.accept({ matterId, matterReference: matter.reference }, upload, by, async (file, trx) => {
+      const added = await this.documents.insert(
+        { matterId, title: details.title, category: details.category, createdBy: by.accountId },
+        { fileName: file.fileName, ...file.inspected, storageKey: file.stored.storageKey, sealedKey: file.stored.sealedKey },
+        trx,
+      );
+      await this.recordVersion('document.added', added.id, matterId, added.version.number, file.inspected, by, trx);
+      return added;
+    });
+    if (accepted.outcome !== 'accepted') {
+      return accepted;
+    }
+    const { value: document, file } = accepted;
+    return {
+      outcome: 'added',
+      document: {
+        id: document.id,
+        title: document.title,
+        category: document.category,
+        createdAt: document.created_at,
+        version: { ...versionOf(file), number: document.version.number, uploadedAt: document.version.uploaded_at },
+      },
+    };
+  }
+
+  /** A new version of a document, checked and stored exactly as a first upload. Earlier versions are kept. */
+  async addVersion(documentId: string, upload: { fileName: string; file: Readable }, by: DocumentActor): Promise<AddVersionResult> {
+    const document = await this.documents.findForChange(documentId, by.accountId);
+    if (!document || document.withdrawn || document.matterStatus !== 'open') {
+      discardUpload(upload.file);
+      return { outcome: !document ? 'not_found' : document.withdrawn ? 'withdrawn' : 'not_open' };
+    }
+    const accepted = await this.accept(
+      { matterId: document.matterId, matterReference: document.matterReference },
+      upload,
+      by,
+      async (file, trx) => {
+        const version = await this.documents.insertVersion(
+          documentId,
+          { fileName: file.fileName, ...file.inspected, storageKey: file.stored.storageKey, sealedKey: file.stored.sealedKey },
+          by.accountId,
+          trx,
+        );
+        await this.recordVersion('document.version_added', documentId, document.matterId, version.number, file.inspected, by, trx);
+        return version;
+      },
+    );
+    if (accepted.outcome !== 'accepted') {
+      return accepted;
+    }
+    return { outcome: 'added', version: { ...versionOf(accepted.file), number: accepted.value.number, uploadedAt: accepted.value.uploaded_at } };
+  }
+
+  /**
+   * Withdraws a document added by mistake: by whoever added it, or by the
+   * matter's supervising partner. It is kept, with its versions, but no
+   * longer listed or downloaded. The reason is kept with the withdrawal,
+   * not in the audit log.
+   */
+  async withdraw(documentId: string, reason: string, by: DocumentActor): Promise<WithdrawResult> {
+    const document = await this.documents.findForChange(documentId, by.accountId);
+    if (!document) {
+      return 'not_found';
+    }
+    if (document.withdrawn) {
+      return 'already_withdrawn';
+    }
+    if (document.matterStatus !== 'open') {
+      return 'not_open';
+    }
+    if (document.createdBy !== by.accountId && !document.viewerSupervises) {
+      return 'not_allowed';
+    }
+    try {
+      await this.documents.transaction(async (trx) => {
+        await this.documents.withdraw(documentId, by.accountId, reason, trx);
+        await this.audit.record(
+          {
+            actor: by.actor,
+            action: 'document.withdrawn',
+            outcome: 'success',
+            resource: { type: 'document', id: documentId },
+            metadata: { matterId: document.matterId },
+            ...by.context,
+          },
+          trx,
+        );
+      });
+      return 'withdrawn';
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return 'already_withdrawn';
+      }
+      // The matter closed, or the person left its team, a moment earlier.
+      if (isCheckViolation(error)) {
+        return 'changed';
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Receives an upload for a matter and, if it is accepted, records it with
+   * `record` in one transaction. A refused file, or one the database will not
+   * take after all, leaves nothing stored.
+   */
+  private async accept<T>(
+    target: { matterId: string; matterReference: string },
+    upload: { fileName: string; file: Readable },
+    by: DocumentActor,
+    record: (file: AcceptedFile, trx: Kysely<Database>) => Promise<T>,
+  ): Promise<{ outcome: 'accepted'; value: T; file: AcceptedFile } | { outcome: 'refused'; reason: UploadRefusal } | { outcome: 'not_open' }> {
     const fileName = fileNameSchema.safeParse(upload.fileName);
     if (!fileName.success) {
       discardUpload(upload.file);
-      return this.refuse(matterId, by, 'file_name');
+      return this.refuse(target.matterId, by, 'file_name');
     }
 
     const received = await this.receive(fileName.data, upload.file);
     if ('refusal' in received) {
       if (received.refusal === 'malware' && received.signature) {
-        await this.notices.malwareRefused({ matterReference: matter.reference, uploadedBy: by.accountId, signature: received.signature });
+        await this.notices.malwareRefused({ matterReference: target.matterReference, uploadedBy: by.accountId, signature: received.signature });
       }
-      return this.refuse(matterId, by, received.refusal, received.signature);
+      return this.refuse(target.matterId, by, received.refusal, received.signature);
     }
 
-    const { inspected, stored } = received;
+    const file = { fileName: fileName.data, ...received };
     try {
-      const document = await this.documents.transaction(async (trx) => {
-        const added = await this.documents.insert(
-          { matterId, title: details.title, category: details.category, createdBy: by.accountId },
-          { fileName: fileName.data, ...inspected, storageKey: stored.storageKey, sealedKey: stored.sealedKey },
-          trx,
-        );
-        await this.audit.record(
-          {
-            actor: by.actor,
-            action: 'document.added',
-            outcome: 'success',
-            resource: { type: 'document', id: added.id },
-            metadata: { matterId, version: added.version.number, mediaType: inspected.mediaType, sizeBytes: inspected.sizeBytes },
-            ...by.context,
-          },
-          trx,
-        );
-        return added;
-      });
-      return {
-        outcome: 'added',
-        document: {
-          id: document.id,
-          title: document.title,
-          category: document.category,
-          createdAt: document.created_at,
-          version: {
-            number: document.version.number,
-            fileName: fileName.data,
-            mediaType: inspected.mediaType,
-            sizeBytes: inspected.sizeBytes,
-            uploadedAt: document.version.uploaded_at,
-          },
-        },
-      };
+      const value = await this.documents.transaction((trx) => record(file, trx));
+      return { outcome: 'accepted', value, file };
     } catch (error) {
-      await this.vault.discard(stored.storageKey);
-      // The matter was closed, or the person removed from its team, while the file arrived.
+      await this.vault.discard(received.stored.storageKey);
+      // The matter was closed, the person removed from its team, or the document withdrawn, while the file arrived.
       if (isCheckViolation(error)) {
         return { outcome: 'not_open' };
       }
       throw error;
     }
+  }
+
+  private recordVersion(
+    action: 'document.added' | 'document.version_added',
+    documentId: string,
+    matterId: string,
+    version: number,
+    inspected: InspectedFile,
+    by: DocumentActor,
+    trx: Kysely<Database>,
+  ): Promise<void> {
+    return this.audit.record(
+      {
+        actor: by.actor,
+        action,
+        outcome: 'success',
+        resource: { type: 'document', id: documentId },
+        metadata: { matterId, version, mediaType: inspected.mediaType, sizeBytes: inspected.sizeBytes },
+        ...by.context,
+      },
+      trx,
+    );
   }
 
   /** One page of the matter's documents; undefined if `viewerId` is not on its team. */
@@ -154,6 +270,9 @@ export class DocumentsService {
     const version = await this.documents.findVersionToDownload(documentId, number, by.accountId);
     if (!version) {
       return { outcome: 'not_found' };
+    }
+    if (version.withdrawn) {
+      return { outcome: 'withdrawn' };
     }
     const file = await this.vault.open({
       storageKey: version.storage_key,
@@ -227,7 +346,7 @@ export class DocumentsService {
     return { inspected: inspection.result(), stored: store.value };
   }
 
-  private async refuse(matterId: string, by: DocumentActor, reason: UploadRefusal, signature?: string): Promise<AddResult> {
+  private async refuse(matterId: string, by: DocumentActor, reason: UploadRefusal, signature?: string): Promise<{ outcome: 'refused'; reason: UploadRefusal }> {
     await this.audit.record({
       actor: by.actor,
       action: 'document.refused',
@@ -258,6 +377,12 @@ function refusalFor(
     return { refusal: 'malware', signature: scan.value.signature };
   }
   return undefined;
+}
+
+const versionOf = (file: AcceptedFile) => ({ fileName: file.fileName, mediaType: file.inspected.mediaType, sizeBytes: file.inspected.sizeBytes });
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === '23505';
 }
 
 function isCheckViolation(error: unknown): boolean {

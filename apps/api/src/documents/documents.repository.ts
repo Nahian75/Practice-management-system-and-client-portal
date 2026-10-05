@@ -28,6 +28,17 @@ export interface DocumentDetails {
   category: DocumentCategory;
   createdAt: Date;
   versions: (VersionSummary & { uploadedBy: { accountId: string; displayName: string } })[];
+  withdrawal: { withdrawnBy: { accountId: string; displayName: string }; reason: string; withdrawnAt: Date } | null;
+}
+
+/** What deciding on a change to a document needs, for someone on its matter's team. */
+export interface DocumentForChange {
+  matterId: string;
+  matterStatus: MatterStatus;
+  matterReference: string;
+  createdBy: string;
+  withdrawn: boolean;
+  viewerSupervises: boolean;
 }
 
 export interface NewDocument {
@@ -71,23 +82,7 @@ export class DocumentsRepository {
       .values({ matter_id: document.matterId, title: document.title, category: document.category, created_by: document.createdBy })
       .returning(['id', 'title', 'category', 'created_at'])
       .executeTakeFirstOrThrow();
-    const first = await trx
-      .insertInto('document_versions')
-      .values({
-        document_id: created.id,
-        file_name: version.fileName,
-        media_type: version.mediaType,
-        size_bytes: version.sizeBytes,
-        sha256: version.sha256,
-        storage_key: version.storageKey,
-        key_version: version.sealedKey.keyVersion,
-        key_nonce: version.sealedKey.nonce,
-        wrapped_key: version.sealedKey.ciphertext,
-        key_tag: version.sealedKey.authTag,
-        uploaded_by: document.createdBy,
-      })
-      .returning(['number', 'uploaded_at'])
-      .executeTakeFirstOrThrow();
+    const first = await this.insertVersion(created.id, version, document.createdBy, trx);
     return { ...created, version: first };
   }
 
@@ -115,6 +110,9 @@ export class DocumentsRepository {
         'document_versions.uploaded_at',
       ])
       .where('documents.matter_id', '=', matterId)
+      .where(({ not, exists, selectFrom }) =>
+        not(exists(selectFrom('document_withdrawals').select('document_withdrawals.id').whereRef('document_withdrawals.document_id', '=', 'documents.id'))),
+      )
       .where('document_versions.number', '=', (eb) =>
         eb.selectFrom('document_versions as latest').select((latest) => latest.fn.max('latest.number').as('number')).whereRef('latest.document_id', '=', 'documents.id'),
       )
@@ -158,12 +156,25 @@ export class DocumentsRepository {
       .where('document_versions.document_id', '=', documentId)
       .orderBy('document_versions.number')
       .execute();
+    const withdrawal = await this.db
+      .selectFrom('document_withdrawals')
+      .innerJoin('accounts', 'accounts.id', 'document_withdrawals.withdrawn_by')
+      .select(['document_withdrawals.withdrawn_by', 'accounts.display_name', 'document_withdrawals.reason', 'document_withdrawals.withdrawn_at'])
+      .where('document_withdrawals.document_id', '=', documentId)
+      .executeTakeFirst();
     return {
       id: document.id,
       matterId: document.matter_id,
       title: document.title,
       category: document.category,
       createdAt: document.created_at,
+      withdrawal: withdrawal
+        ? {
+            withdrawnBy: { accountId: withdrawal.withdrawn_by, displayName: withdrawal.display_name },
+            reason: withdrawal.reason,
+            withdrawnAt: withdrawal.withdrawn_at,
+          }
+        : null,
       versions: versions.map((version) => ({
         number: version.number,
         fileName: version.file_name,
@@ -173,6 +184,69 @@ export class DocumentsRepository {
         uploadedBy: { accountId: version.uploaded_by, displayName: version.display_name },
       })),
     };
+  }
+
+  /** The document's matter and state, if `viewerId` is on its matter's team. */
+  async findForChange(documentId: string, viewerId: string): Promise<DocumentForChange | undefined> {
+    const row = await this.db
+      .selectFrom('documents')
+      .innerJoin('matters', 'matters.id', 'documents.matter_id')
+      .select(({ exists, selectFrom }) => [
+        'documents.matter_id',
+        'documents.created_by',
+        'matters.status',
+        'matters.reference',
+        exists(selectFrom('document_withdrawals').select('document_withdrawals.id').whereRef('document_withdrawals.document_id', '=', 'documents.id')).as(
+          'withdrawn',
+        ),
+        exists(
+          selectFrom('matter_team')
+            .select('matter_team.id')
+            .whereRef('matter_team.matter_id', '=', 'documents.matter_id')
+            .where('matter_team.account_id', '=', viewerId)
+            .where('matter_team.role', '=', 'supervising_partner')
+            .where('matter_team.removed_at', 'is', null),
+        ).as('supervises'),
+      ])
+      .where('documents.id', '=', documentId)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
+    return row
+      ? {
+          matterId: row.matter_id,
+          matterStatus: row.status,
+          matterReference: row.reference,
+          createdBy: row.created_by,
+          withdrawn: Boolean(row.withdrawn),
+          viewerSupervises: Boolean(row.supervises),
+        }
+      : undefined;
+  }
+
+  /** Records a new version. The database numbers it, and checks the team, that the matter is open and the document not withdrawn. */
+  insertVersion(documentId: string, version: NewVersion, uploadedBy: string, trx: Kysely<Database>) {
+    return trx
+      .insertInto('document_versions')
+      .values({
+        document_id: documentId,
+        file_name: version.fileName,
+        media_type: version.mediaType,
+        size_bytes: version.sizeBytes,
+        sha256: version.sha256,
+        storage_key: version.storageKey,
+        key_version: version.sealedKey.keyVersion,
+        key_nonce: version.sealedKey.nonce,
+        wrapped_key: version.sealedKey.ciphertext,
+        key_tag: version.sealedKey.authTag,
+        uploaded_by: uploadedBy,
+      })
+      .returning(['number', 'uploaded_at'])
+      .executeTakeFirstOrThrow();
+  }
+
+  /** Records a withdrawal. The database checks who may, that the matter is open, and that it happens once. */
+  async withdraw(documentId: string, withdrawnBy: string, reason: string, trx: Kysely<Database>): Promise<void> {
+    await trx.insertInto('document_withdrawals').values({ document_id: documentId, withdrawn_by: withdrawnBy, reason }).execute();
   }
 
   /** What is needed to send one version as a download, if `viewerId` is on its matter's team. */
@@ -192,6 +266,11 @@ export class DocumentsRepository {
         'document_versions.wrapped_key',
         'document_versions.key_tag',
       ])
+      .select(({ exists, selectFrom }) =>
+        exists(selectFrom('document_withdrawals').select('document_withdrawals.id').whereRef('document_withdrawals.document_id', '=', 'documents.id')).as(
+          'withdrawn',
+        ),
+      )
       .where('document_versions.document_id', '=', documentId)
       .where('document_versions.number', '=', number)
       .where(visibleTo(viewerId))

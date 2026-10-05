@@ -338,6 +338,14 @@ export interface DocumentVersionsTable {
   uploaded_at: DatabaseSet<Date>;
 }
 
+export interface DocumentWithdrawalsTable {
+  id: DatabaseSet<string>;
+  document_id: InsertOnly<string>;
+  withdrawn_by: InsertOnly<string>;
+  reason: InsertOnly<string>;
+  withdrawn_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -351,6 +359,7 @@ export interface Database {
   conflict_clearances: ConflictClearancesTable;
   clients: ClientsTable;
   document_versions: DocumentVersionsTable;
+  document_withdrawals: DocumentWithdrawalsTable;
   documents: DocumentsTable;
   invitations: InvitationsTable;
   matter_closures: MatterClosuresTable;

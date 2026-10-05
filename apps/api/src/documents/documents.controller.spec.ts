@@ -381,6 +381,7 @@ describe('Documents', () => {
             uploadedBy: { accountId: feeEarner.id, displayName: 'Test staff' },
           },
         ],
+        withdrawal: null,
       });
     });
 
@@ -465,6 +466,142 @@ describe('Documents', () => {
 
       // The transfer fails as a whole: never a shorter file that looks complete.
       await expect(download(token, added.body.id)).rejects.toThrow();
+    });
+  });
+
+  describe('POST /documents/:id/versions', () => {
+    const addVersion = (sessionToken: string, documentId: string, file: Buffer, fileName: string) =>
+      request(app.getHttpServer()).post(`/documents/${documentId}/versions`).set('Cookie', cookie(sessionToken)).attach('file', file, fileName);
+    const contentOf = async (documentId: string, number: number) =>
+      (
+        await request(app.getHttpServer())
+          .get(`/documents/${documentId}/versions/${number}/content`)
+          .set('Cookie', cookie(token))
+          .buffer(true)
+          .parse((response, done) => {
+            const chunks: Buffer[] = [];
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.on('end', () => done(null, Buffer.concat(chunks)));
+          })
+      ).body as Buffer;
+
+    it('adds version 2, keeping version 1 downloadable', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const signed = Buffer.from('%PDF-1.7\n% signed by both parties\n%%EOF\n', 'ascii');
+
+      const response = await addVersion(await signedIn(partner), added.body.id, signed, 'lease-signed.pdf');
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual({ number: 2, fileName: 'lease-signed.pdf', mediaType: 'application/pdf', sizeBytes: signed.length, uploadedAt: expect.any(String) });
+      expect(await contentOf(added.body.id, 1)).toEqual(PDF);
+      expect(await contentOf(added.body.id, 2)).toEqual(signed);
+      const listed = await request(app.getHttpServer()).get(`/matters/${matterId}/documents`).set('Cookie', cookie(token));
+      expect(listed.body.documents[0].latest).toMatchObject({ number: 2, fileName: 'lease-signed.pdf' });
+      const event = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'metadata'])
+        .where('resource_id', '=', added.body.id)
+        .where('action', '=', 'document.version_added')
+        .executeTakeFirstOrThrow();
+      expect(event).toEqual({ actor_id: partner.id, metadata: { matterId, version: 2, mediaType: 'application/pdf', sizeBytes: signed.length } });
+    });
+
+    it('checks a new version exactly as a first upload', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      const response = await addVersion(token, added.body.id, Buffer.from('<html></html>'), 'lease.pdf');
+
+      expect(response.status).toBe(415);
+      const versions = await db.selectFrom('document_versions').select('number').where('document_id', '=', added.body.id).execute();
+      expect(versions).toEqual([{ number: 1 }]);
+    });
+
+    it('answers 404 to someone not on the team, and refuses extra form fields', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const outsider = await signedIn(await staffWith('fee_earner'));
+
+      expect((await addVersion(outsider, added.body.id, PDF, 'lease.pdf')).status).toBe(404);
+      const withTitle = await request(app.getHttpServer())
+        .post(`/documents/${added.body.id}/versions`)
+        .set('Cookie', cookie(token))
+        .field('title', 'Renamed')
+        .attach('file', PDF, 'lease.pdf');
+      expect(withTitle.status).toBe(400);
+    });
+
+    it('refuses a closed matter', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await request(app.getHttpServer())
+        .post(`/matters/${matterId}/close`)
+        .set('Cookie', cookie(await signedIn(partner)))
+        .send({ reason: 'Lease renewed and signed' })
+        .expect(204);
+
+      expect((await addVersion(token, added.body.id, PDF, 'lease.pdf')).status).toBe(409);
+    });
+  });
+
+  describe('POST /documents/:id/withdrawal', () => {
+    const withdraw = (sessionToken: string, documentId: string, reason = 'Uploaded to the wrong matter by mistake') =>
+      request(app.getHttpServer()).post(`/documents/${documentId}/withdrawal`).set('Cookie', cookie(sessionToken)).send({ reason });
+
+    it('withdraws a document: kept and shown as withdrawn, but no longer listed, downloaded or versioned', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const server = request(app.getHttpServer());
+
+      expect((await withdraw(token, added.body.id)).status).toBe(204);
+
+      expect((await server.get(`/matters/${matterId}/documents`).set('Cookie', cookie(token))).body.documents).toEqual([]);
+      const found = await server.get(`/documents/${added.body.id}`).set('Cookie', cookie(token));
+      expect(found.body.withdrawal).toEqual({
+        withdrawnBy: { accountId: feeEarner.id, displayName: 'Test staff' },
+        reason: 'Uploaded to the wrong matter by mistake',
+        withdrawnAt: expect.any(String),
+      });
+      expect((await server.get(`/documents/${added.body.id}/versions/1/content`).set('Cookie', cookie(token))).status).toBe(410);
+      const newVersion = await server.post(`/documents/${added.body.id}/versions`).set('Cookie', cookie(token)).attach('file', PDF, 'lease.pdf');
+      expect(newVersion.status).toBe(409);
+    });
+
+    it('records the withdrawal by ids, without the reason', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      await withdraw(token, added.body.id);
+
+      const event = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'metadata'])
+        .where('resource_id', '=', added.body.id)
+        .where('action', '=', 'document.withdrawn')
+        .executeTakeFirstOrThrow();
+      expect(event).toEqual({ actor_id: feeEarner.id, metadata: { matterId } });
+    });
+
+    it("lets the matter's supervising partner withdraw someone else's document", async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      expect((await withdraw(await signedIn(partner), added.body.id)).status).toBe(204);
+    });
+
+    it('refuses another fee earner on the team, and answers 404 to someone not on it', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const colleague = await staffWith('fee_earner');
+      await request(app.getHttpServer())
+        .put(`/matters/${matterId}/team/${colleague.id}`)
+        .set('Cookie', cookie(await signedIn(partner)))
+        .expect(204);
+      const outsider = await signedIn(await staffWith('partner'));
+
+      expect((await withdraw(await signedIn(colleague), added.body.id)).status).toBe(403);
+      expect((await withdraw(outsider, added.body.id)).status).toBe(404);
+    });
+
+    it('withdraws once, and needs a reason of 10 to 500 characters', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      expect((await withdraw(token, added.body.id, 'Mistake')).status).toBe(400);
+      expect((await withdraw(token, added.body.id)).status).toBe(204);
+      expect((await withdraw(token, added.body.id)).status).toBe(409);
     });
   });
 });

@@ -1,10 +1,10 @@
 # Documents
 
-**Current state (2026-10-05):** Steps 10a to 10b-4 built: storage and scanner
-containers, file encryption, the tables (migration `0024`), file inspection,
-uploading, listing and downloading documents, all in `apps/api/src/documents/`.
-Versions and withdrawal (step 10c) next. Compliance access to documents, through
-the matter's compliance access, is not built yet.
+**Current state (2026-10-05):** Steps 10a to 10c built in the API
+(`apps/api/src/documents/`, migrations `0024` and `0025`): encrypted storage,
+scanning, file inspection, uploading, listing, downloading, new versions and
+withdrawal. The screens in the staff web app (step 10d) are next. Compliance
+access to documents, through the matter's compliance access, is not built yet.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -20,6 +20,7 @@ see there.
 | Allowed files | PDF; Word, Excel, PowerPoint (current formats only, no macro-enabled ones); plain text; JPEG, PNG; emails (`.eml`). The type is read from the file's content, not its name. At most 50 MB | Project owner |
 | Versions | A new version never replaces the old: every version is kept and can be downloaded | Rule: records are kept |
 | Deleting | Never. A document added by mistake is withdrawn, with a reason: hidden from the list, kept, audited | Rule: records are kept |
+| Downloading a withdrawn document | Refused, also to the team (410): a document added by mistake is often another client's. It stays stored, with every version | Project owner |
 | Who sees and adds documents | The matter's team only, as for the matter. Compliance through the existing compliance access, with its reason | Project owner (follows Matters) |
 | Who withdraws | Whoever uploaded it, or the matter's supervising partner | Project owner |
 | Closed matters | Documents stay readable; nothing can be added, versioned or withdrawn | Project owner (follows Matters) |
@@ -39,8 +40,14 @@ see there.
 ## Tables
 
 - `documents`: `id`, `matter_id`, `title`, `category`, `created_by`,
-  `created_at`. Withdrawal (`withdrawn_at`, `withdrawn_by`,
-  `withdrawal_reason`) comes with step 10c.
+  `created_at`.
+- `document_withdrawals` (migration `0025`): `document_id` (one each),
+  `withdrawn_by`, `reason` (10 to 500 characters), `withdrawn_at`. Insert only,
+  like matter closures: the record is the only way a document becomes
+  withdrawn, and it cannot be undone or changed. The database checks the
+  person added the document or supervises the matter, is on its team, and the
+  matter is open. Withdrawal and new versions take the same per-document lock,
+  and a withdrawn document takes no new versions.
 - `document_versions`: `id`, `document_id`, `number`, `file_name`,
   `media_type`, `size_bytes`, `sha256`, `storage_key`, and the sealed file
   key (`key_version`, `key_nonce`, `wrapped_key`, `key_tag`), `uploaded_by`,
@@ -131,9 +138,9 @@ the matter's team, and a document you may not see answers 404.
 | POST | `/matters/:id/documents` | `documents.add` + team, open matter | Multipart: `title`, `category`, then `file` → 201 with the document and its version 1. 400 form, title, category, empty file, file name, or interrupted; 404 not on the team; 409 matter not open; 413 over 50 MB; 415 type not accepted, or macros; 422 malware (compliance told); 503 scanner unavailable (nothing unscanned is stored) |
 | GET | `/matters/:id/documents` | `documents.view` + team | `{documents, next}`: 100 at a time, newest first, each with its latest version; `?before=<next>` for the next page. 404 if not on the team |
 | GET | `/documents/:id` | `documents.view` + team | The document and every version, with who uploaded each. 404 if not on the team |
-| POST | `/documents/:id/versions` | `documents.add` + team, open matter | Multipart: `file` → 201 with the new version |
+| POST | `/documents/:id/versions` | `documents.add` + team, open matter | Multipart with only `file` → 201 `{number, fileName, mediaType, sizeBytes, uploadedAt}`. Checked and stored exactly as a first upload, with the same refusals; earlier versions are kept. 404 not on the team, 409 matter not open or document withdrawn |
 | GET | `/documents/:id/versions/:number/content` | `documents.view` + team | The file, decrypted as it is sent. Always `Content-Disposition: attachment` (the exact name encoded, and a plain fallback), its `Content-Length`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`. Recorded before it is sent. If the stored file fails its integrity check part-way, the connection is cut, so the browser reports a failed download rather than saving altered content. 404 if not on the team |
-| POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204 |
+| POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204. Final. 403 neither the uploader nor the supervising partner, 404 not on the team, 409 already withdrawn, matter closed, or changed meanwhile. Afterwards the document is not listed, its versions answer 410, and `GET /documents/:id` shows who withdrew it, when and why |
 
 ## Audit
 
@@ -178,6 +185,6 @@ Each step ships with positive and negative tests and is reviewed before the next
   compliance told of malware. Done. The web app's pass-through limits request
   bodies, so step 10d raises its limit for this route.
 - **10b-4.** Listing and downloading documents. Done.
-- **10c.** Versions and withdrawal.
+- **10c.** Versions and withdrawal. Done.
 - **10d.** The document screens in the staff web app.
 - Security review of the module.

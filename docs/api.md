@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-05):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, and documents (upload, list, download).
+**Current state (2026-10-05):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, and documents (upload, list, download, versions, withdrawal).
 
 ## Endpoints
 
@@ -47,6 +47,8 @@
 | GET | `/matters/:matterId/documents` | `documents.view` + team | `{documents, next}`: 100 at a time, newest first, with each one's latest version. `?before=<next>` |
 | GET | `/documents/:documentId` | `documents.view` + team | The document and every version |
 | GET | `/documents/:documentId/versions/:number/content` | `documents.view` + team | The file, as a download; recorded. See [documents.md](documents.md#api) |
+| POST | `/documents/:documentId/versions` | `documents.add` + team, open matter | Multipart `file` → 201 with the new version, checked as a first upload |
+| POST | `/documents/:documentId/withdrawal` | `documents.withdraw` + uploader or supervising partner | `{reason}` → 204. Final; the document is no longer listed or downloaded |
 | POST | `/matters/:matterId/documents` | `documents.add` + team, open matter | Multipart `title`, `category`, then `file` (PDF, Word, Excel, PowerPoint, text, email, JPEG, PNG; up to 50 MB) → 201. Scanned for malware and stored encrypted; see [documents.md](documents.md#api) for every refusal |
 | GET | `/colleagues` | `matters.open` | `{"colleagues": [{id, displayName, isPartner}]}`: active staff who can be put on a matter's team (partner or fee earner), by name. No email addresses or other roles |
 | POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person can still see the client (active and holding `clients.view`) |

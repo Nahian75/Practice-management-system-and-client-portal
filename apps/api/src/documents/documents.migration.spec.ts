@@ -200,4 +200,67 @@ describe('documents tables', () => {
       await expect(addDocument(matterId, feeEarner.id, { size_bytes: 50 * 1024 * 1024 })).resolves.toMatchObject({ number: 1 });
     });
   });
+
+  describe('withdrawal', () => {
+    const withdraw = (documentId: string, by: string, reason = 'Uploaded to the wrong matter by mistake') =>
+      db.insertInto('document_withdrawals').values({ document_id: documentId, withdrawn_by: by, reason }).execute();
+
+    it('lets whoever added the document withdraw it, and then takes no new versions', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await withdraw(document.id, feeEarner.id);
+
+      await expect(addVersion(document.id, feeEarner.id)).rejects.toThrow(/withdrawn and takes no new versions/);
+    });
+
+    it("lets the matter's supervising partner withdraw someone else's document", async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await expect(withdraw(document.id, partner.id)).resolves.toBeDefined();
+    });
+
+    it('refuses another fee earner on the team, and anyone not on it', async () => {
+      const colleague = await staffWith('fee_earner');
+      await db.insertInto('matter_team').values({ matter_id: matterId, account_id: colleague.id, role: 'fee_earner', added_by: partner.id }).execute();
+      const outsider = await staffWith('partner');
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await expect(withdraw(document.id, colleague.id)).rejects.toThrow(/whoever added it or by the matter's supervising partner/);
+      await expect(withdraw(document.id, outsider.id)).rejects.toThrow(/matter's team/);
+    });
+
+    it('withdraws a document once only', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await withdraw(document.id, feeEarner.id);
+
+      await expect(withdraw(document.id, partner.id)).rejects.toThrow(/duplicate key/);
+    });
+
+    it('refuses on a closed matter', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await db.insertInto('matter_closures').values({ matter_id: matterId, closed_by: partner.id, reason: 'Lease renewed and signed' }).execute();
+
+      await expect(withdraw(document.id, feeEarner.id)).rejects.toThrow(/only to open matters/);
+    });
+
+    it.each([
+      ['too short', 'Mistake'],
+      ['over 500 characters', 'x'.repeat(501)],
+      ['with a control character', `Wrong matter${String.fromCharCode(10)}entirely`],
+    ])('refuses a reason %s', async (_case, reason) => {
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await expect(withdraw(document.id, feeEarner.id, reason)).rejects.toThrow(/violates check constraint/);
+    });
+
+    it.each([
+      ['undo a withdrawal', (id: string) => sql`delete from document_withdrawals where document_id = ${id}`],
+      ['change its reason', (id: string) => sql`update document_withdrawals set reason = 'Something else entirely' where document_id = ${id}`],
+    ])('does not let the app %s', async (_case, statement) => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await withdraw(document.id, feeEarner.id);
+
+      await expect(statement(document.id).execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
 });
