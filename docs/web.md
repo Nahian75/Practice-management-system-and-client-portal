@@ -163,7 +163,10 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - What a screen shows comes from the API's answer, which the API already
   filters; the web app adds no access rules of its own and none are needed
   for safety. Hiding a button is for clarity, never a control.
-- Error pages show a reference, never details.
+- Error pages show a reference, never details: when a page fails (for example,
+  the API is down) it shows Next.js's error reference, which finds the full
+  error in the server's log. Addresses with no page, and malformed ids, get
+  "Page not found" (review W4).
 - The web app listens on `127.0.0.1` only, and is reached through a reverse
   proxy on the same machine that reports the browser's real address
   ([deployment.md](deployment.md), review W1).

@@ -14,6 +14,8 @@ const required = (name: string): string => {
 
 /** Their own ports, so the tests never meet the development servers. */
 export const E2E_WEB_URL = 'http://localhost:3100';
+/** The same web app with no API behind it, to show what people see when the API is down. */
+export const E2E_NO_API_WEB_URL = 'http://localhost:3102';
 const E2E_API_PORT = '3101';
 
 export default defineConfig({
@@ -54,6 +56,14 @@ export default defineConfig({
       url: `${E2E_WEB_URL}/sign-in`,
       reuseExistingServer: false,
       env: { API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'Stass' },
+    },
+    {
+      // Nothing listens on 3109: every call to the API is refused, as when it is down.
+      // Its pages need the API, so readiness is the port being open.
+      command: 'npm run start -- --port 3102',
+      port: 3102,
+      reuseExistingServer: false,
+      env: { API_URL: 'http://127.0.0.1:3109', APP_NAME: 'Stass' },
     },
   ],
 });

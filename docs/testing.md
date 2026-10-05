@@ -92,6 +92,10 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   because both suites sign in from `127.0.0.1`: sharing a database let the API
   tests' deliberate failures use up the browser tests' per-address sign-in
   allowance. Running `npx playwright test` directly reuses the database as it is.
+- A second copy of the web app runs on 3102 with no API behind it, so
+  `e2e/error-pages.spec.ts` sees what people see when the API is down. Its
+  failed calls show in the test output as `[WebServer] fetch failed`; that is
+  expected.
 - Test staff are set up the real way: invited with the command-line tool, the
   invitation read from Mailpit, password and authenticator set through the API.
   Codes are computed as an authenticator app does (`e2e/support/staff.ts`).
