@@ -1,9 +1,10 @@
 # Documents
 
-**Current state (2026-10-05):** Steps 10a and 10b-1 built: storage and scanner
-containers, file encryption, the tables (migration `0024`), and the API's
+**Current state (2026-10-05):** Steps 10a to 10b-2 built: storage and scanner
+containers, file encryption, the tables (migration `0024`), the API's
 connections to storage and scanner (`ObjectStorage`, `DocumentVault`,
-`VirusScanner` in `apps/api/src/documents/`). No routes yet; step 10b-2 next.
+`VirusScanner`), and file inspection (`FileInspection`), all in
+`apps/api/src/documents/`. No routes yet; step 10b-3 next.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -67,6 +68,26 @@ see there.
   re-encrypting files.
 - The storage holds only encrypted bytes; the database holds only wrapped keys.
   Neither alone opens a file.
+
+## How a file's type is checked
+
+`FileInspection` reads the file as it streams, passing it on unchanged:
+
+- **The name decides what the file must be:** `.pdf`, `.docx`, `.xlsx`,
+  `.pptx`, `.txt`, `.eml`, `.jpg`/`.jpeg`, `.png`, in any case. Any other
+  extension (`.html`, `.svg`, `.js`, the old `.doc`, the macro-enabled
+  `.docm`) is refused without looking further.
+- **The content must agree.** PDF, JPEG and PNG by their first bytes (checked
+  as soon as they arrive, so a mismatch stops the upload at once). Word, Excel
+  and PowerPoint files are ZIP files: their table of contents, at the end of
+  the file, must list `[Content_Types].xml` and the right main part
+  (`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`), and no
+  `vbaProject.bin` (macros). Text and emails must be valid UTF-8 with no null
+  bytes; an email must start with a header line.
+- **A file that disagrees is refused, never relabelled.** The stored type comes
+  from the name only once the content has confirmed it.
+- Size is counted as it arrives and the upload stopped as soon as it passes
+  50 MB; the SHA-256 fingerprint is computed on the way.
 
 ## Upload, step by step
 
@@ -139,8 +160,10 @@ Each step ships with positive and negative tests and is reviewed before the next
   tests (no routes yet). Done.
 - **10b-1.** The tables; the API's connections to storage (encrypting as it
   stores, `DocumentVault`) and to the scanner (failing closed). Done.
-- **10b-2.** Uploading, listing and downloading documents on a matter, with
-  scanning, type and size checks, and audit.
+- **10b-2.** File inspection: size, fingerprint, and type from content. Done.
+- **10b-3.** Uploading a document: streaming, scanning, storing, audit, and
+  compliance told of malware.
+- **10b-4.** Listing and downloading documents.
 - **10c.** Versions and withdrawal.
 - **10d.** The document screens in the staff web app.
 - Security review of the module.
