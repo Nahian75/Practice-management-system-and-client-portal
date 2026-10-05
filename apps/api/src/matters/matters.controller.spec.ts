@@ -649,6 +649,95 @@ describe('Matters', () => {
     });
   });
 
+  describe('editing and closing (step 8f)', () => {
+    const REASON = { reason: 'Completion took place on 1 October' };
+    let matterId: string;
+    let partnerToken: string;
+
+    const patch = (sessionToken: string, body: object) =>
+      request(app.getHttpServer()).patch(`/matters/${matterId}`).set('Cookie', `__Host-session=${sessionToken}`).send(body);
+    const close = (sessionToken: string, body: object = REASON) => as(sessionToken).post(`/matters/${matterId}/close`, body);
+    const eventsOf = (action: string) =>
+      db.selectFrom('audit_events').select(['actor_id', 'metadata']).where('resource_id', '=', matterId).where('action', '=', action).execute();
+
+    beforeEach(async () => {
+      matterId = (await open(token)).body.id;
+      partnerToken = await signedIn(partner);
+    });
+
+    describe('PATCH /matters/:matterId', () => {
+      it('lets anyone on the team change the title and type, recording which fields changed', async () => {
+        const response = await patch(token, { title: 'Sale of 12 High Street', matterType: 'commercial_property' });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ title: 'Sale of 12 High Street', matterType: 'commercial_property' });
+        expect(await eventsOf('matter.updated')).toEqual([{ actor_id: feeEarner.id, metadata: { fields: 'matterType,title' } }]);
+      });
+
+      it('records nothing when the values are the same as before', async () => {
+        await patch(token, { title: 'Purchase of 12 High Street' });
+
+        expect(await eventsOf('matter.updated')).toEqual([]);
+      });
+
+      it.each<[string, object]>([
+        ['nothing to change', {}],
+        ['a status', { status: 'closed' }],
+        ['a client', { clientId: '00000000-0000-7000-8000-000000000000' }],
+        ['a title with a line break', { title: 'Sale\nof a house' }],
+      ])('refuses %s', async (_case, body) => {
+        expect((await patch(token, body)).status).toBe(400);
+      });
+
+      it('does not find, or change, a matter the caller is not on, and is closed to accounts staff', async () => {
+        expect((await patch(await signedIn(await staffWith('partner')), { title: 'Changed by an outsider' })).status).toBe(404);
+        expect((await patch(await signedIn(await staffWith('accounts')), { title: 'Changed by accounts' })).status).toBe(403);
+
+        expect((await as(token).get(`/matters/${matterId}`)).body.title).toBe('Purchase of 12 High Street');
+        expect(await eventsOf('matter.updated')).toEqual([]);
+      });
+    });
+
+    describe('POST /matters/:matterId/close', () => {
+      it('closes the matter, recording the closure without its reason', async () => {
+        expect((await close(partnerToken)).status).toBe(204);
+
+        expect((await as(token).get(`/matters/${matterId}`)).body.status).toBe('closed');
+        const events = await eventsOf('matter.closed');
+        expect(events).toEqual([{ actor_id: partner.id, metadata: { closureId: expect.any(String) } }]);
+        expect(JSON.stringify(events)).not.toContain('Completion');
+      });
+
+      it('leaves a closed matter unchangeable: no edits, no team changes, no second closure', async () => {
+        await close(partnerToken);
+
+        expect((await patch(token, { title: 'Changed again' })).status).toBe(409);
+        expect(
+          (await request(app.getHttpServer()).put(`/matters/${matterId}/team/${(await staffWith('fee_earner')).id}`).set('Cookie', `__Host-session=${partnerToken}`))
+            .status,
+        ).toBe(409);
+        expect((await as(partnerToken).post(`/matters/${matterId}/supervisor`, { accountId: (await staffWith('partner')).id })).status).toBe(409);
+        expect((await close(partnerToken)).status).toBe(409);
+      });
+
+      it('is refused to a partner on the team who is not its supervising partner, and closed to fee earners', async () => {
+        const otherPartner = await staffWith('partner');
+        await request(app.getHttpServer()).put(`/matters/${matterId}/team/${otherPartner.id}`).set('Cookie', `__Host-session=${partnerToken}`);
+
+        expect((await close(await signedIn(otherPartner))).status).toBe(403);
+        expect((await close(token)).status).toBe(403);
+        expect((await as(token).get(`/matters/${matterId}`)).body.status).toBe('open');
+      });
+
+      it.each<[string, object]>([
+        ['no reason', {}],
+        ['a short reason', { reason: 'done' }],
+      ])('refuses %s', async (_case, body) => {
+        expect((await close(partnerToken, body)).status).toBe(400);
+      });
+    });
+  });
+
   describe('seeing matters', () => {
     let matterId: string;
 

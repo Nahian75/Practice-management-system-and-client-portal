@@ -6,7 +6,7 @@ import { SecurityNoticesService } from '../auth/notices/security-notices.service
 import { permissionsFor } from '../auth/permissions/permissions.js';
 import { SearchQuota } from '../clients/search-quota.js';
 import type { RequestContext } from '../common/http/request-context.js';
-import type { ConflictMatchRow, Database, MatterStatus, MatterTeamRole } from '../database/schema.js';
+import type { ConflictMatchRow, Database, MatterStatus, MatterTeamRole, MatterType } from '../database/schema.js';
 import type { ConflictCheck, Matter, MatterSummary, NewMatter } from './matter.js';
 import { MattersRepository } from './matters.repository.js';
 
@@ -25,9 +25,19 @@ export type OpenResult =
 
 export type ClearanceResult = 'cleared' | 'not_found' | 'not_supervisor' | 'not_awaiting_clearance';
 
+export type EditResult = 'updated' | 'not_found' | 'closed';
+export type CloseResult = 'closed' | 'not_found' | 'not_supervisor' | 'already_closed';
+
 export type SupervisionTakeoverResult = 'taken_over' | 'not_found' | 'supervisor_can_act';
 
-export type TeamChangeResult = 'changed' | 'unchanged' | 'not_found' | 'not_supervisor' | 'invalid_member' | 'is_supervisor';
+export type TeamChangeResult =
+  | 'changed'
+  | 'unchanged'
+  | 'not_found'
+  | 'not_supervisor'
+  | 'matter_closed'
+  | 'invalid_member'
+  | 'is_supervisor';
 
 export type ConflictCheckResult = { outcome: 'checked'; check: ConflictCheck } | { outcome: 'client_not_found' | 'limited' };
 
@@ -377,14 +387,83 @@ export class MattersService {
     return outcome.result;
   }
 
-  /** Under the team lock: the caller must be on the team (else not found) and its supervising partner. */
+  /**
+   * Changes the title or type of a matter the caller is on. The audit record
+   * names the fields that changed, never the title. Nothing is recorded when
+   * nothing changed; a closed matter cannot change.
+   */
+  update(matterId: string, patch: { title?: string; matterType?: MatterType }, by: MatterActor): Promise<EditResult> {
+    return this.matters.transaction(async (trx): Promise<EditResult> => {
+      const current = await this.matters.lockForEdit(matterId, by.accountId, trx);
+      if (!current) {
+        return 'not_found';
+      }
+      if (current.status === 'closed') {
+        return 'closed';
+      }
+
+      const fields = [
+        ...(patch.matterType !== undefined && patch.matterType !== current.matter_type ? ['matterType'] : []),
+        ...(patch.title !== undefined && patch.title !== current.title ? ['title'] : []),
+      ];
+      if (fields.length === 0) {
+        return 'updated';
+      }
+      await this.matters.updateMatter(matterId, patch, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'matter.updated',
+          outcome: 'success',
+          resource: { type: 'matter', id: matterId },
+          metadata: { fields: fields.sort().join(',') },
+          ...by.context,
+        },
+        trx,
+      );
+      return 'updated';
+    });
+  }
+
+  /** The supervising partner closes the matter, giving a reason. Closing is final. */
+  close(matterId: string, reason: string, by: MatterActor): Promise<CloseResult> {
+    return this.matters.transaction(async (trx): Promise<CloseResult> => {
+      switch (await this.refuseUnlessSupervisor(matterId, by, trx)) {
+        case 'not_found':
+          return 'not_found';
+        case 'not_supervisor':
+          return 'not_supervisor';
+        case 'matter_closed':
+          return 'already_closed';
+      }
+
+      const closureId = await this.matters.recordClosure({ matterId, closedBy: by.accountId, reason }, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'matter.closed',
+          outcome: 'success',
+          resource: { type: 'matter', id: matterId },
+          metadata: { closureId },
+          ...by.context,
+        },
+        trx,
+      );
+      return 'closed';
+    });
+  }
+
+  /** Under the team lock: the caller must be on the team (else not found), its supervising partner, and the matter not closed. */
   private async refuseUnlessSupervisor(matterId: string, by: MatterActor, trx: Kysely<Database>): Promise<TeamChangeResult | null> {
     await this.matters.lockTeam(matterId, trx);
     const state = await this.matters.supervisionState(matterId, by.accountId, trx);
     if (!state) {
       return 'not_found';
     }
-    return state.is_supervisor ? null : 'not_supervisor';
+    if (!state.is_supervisor) {
+      return 'not_supervisor';
+    }
+    return state.status === 'closed' ? 'matter_closed' : null;
   }
 
   private async recordTeamEvent(

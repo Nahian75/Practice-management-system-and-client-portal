@@ -502,6 +502,82 @@ describe('matters tables', () => {
     });
   });
 
+  describe('editing and closing (step 8f)', () => {
+    let matterId: string;
+
+    const close = (closedBy: string, id = matterId) =>
+      db
+        .insertInto('matter_closures')
+        .values({ matter_id: id, closed_by: closedBy, reason: 'Completion took place on 1 October' })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+    const statusOf = async (id: string) =>
+      (await db.selectFrom('matters').select('status').where('id', '=', id).executeTakeFirstOrThrow()).status;
+
+    beforeEach(async () => {
+      matterId = (
+        await openMatter([
+          [partner.id, 'supervising_partner'],
+          [feeEarner.id, 'fee_earner'],
+        ])
+      ).id;
+    });
+
+    it('lets the title and type be corrected', async () => {
+      await db.updateTable('matters').set({ title: 'Sale of 12 High Street', matter_type: 'commercial_property' }).where('id', '=', matterId).execute();
+
+      expect(
+        await db.selectFrom('matters').select(['title', 'matter_type']).where('id', '=', matterId).executeTakeFirstOrThrow(),
+      ).toEqual({ title: 'Sale of 12 High Street', matter_type: 'commercial_property' });
+    });
+
+    it('closes the matter when its supervising partner records a closure', async () => {
+      await close(partner.id);
+
+      expect(await statusOf(matterId)).toBe('closed');
+    });
+
+    it.each<[string, () => Promise<string>]>([
+      ['a fee earner on the team', async () => feeEarner.id],
+      ['a partner not on the team', async () => (await staffWith('partner')).id],
+    ])('refuses a closure by %s', async (_case, closer) => {
+      await expect(close(await closer())).rejects.toThrow(/only by its active supervising partner/);
+      expect(await statusOf(matterId)).toBe('open');
+    });
+
+    describe('once closed', () => {
+      beforeEach(async () => {
+        await close(partner.id);
+      });
+
+      it.each<[string, () => Promise<unknown>]>([
+        ['its title', () => db.updateTable('matters').set({ title: 'Changed' }).where('id', '=', matterId).execute()],
+        ['a second closure', () => close(partner.id)],
+        ['a new team member', async () =>
+          db.insertInto('matter_team').values({ matter_id: matterId, account_id: (await staffWith('fee_earner')).id, role: 'fee_earner', added_by: partner.id }).execute()],
+        ['a removal from the team', async () => {
+          const { id } = await db
+            .selectFrom('matter_team')
+            .select('id')
+            .where('matter_id', '=', matterId)
+            .where('account_id', '=', feeEarner.id)
+            .executeTakeFirstOrThrow();
+          return db.updateTable('matter_team').set({ removed_at: new Date(), removed_by: partner.id }).where('id', '=', id).execute();
+        }],
+      ])('refuses a change to %s', async (_case, change) => {
+        await expect(change()).rejects.toThrow(/closed/);
+        expect(await statusOf(matterId)).toBe('closed');
+      });
+    });
+
+    it('keeps every closure as it was', async () => {
+      const { id } = await close(partner.id);
+
+      await expect(sql`update matter_closures set reason = 'Rewritten afterwards' where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+      await expect(sql`delete from matter_closures where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
+
   describe('app role restrictions', () => {
     let matterId: string;
 

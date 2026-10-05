@@ -35,6 +35,8 @@
 | POST | `/matters/:matterId/conflict-clearance` | `matters.supervise` + supervising partner | `{"reason"}` (10 to 500 characters) → 204: the matter opens. 403 not the supervising partner, 404 not on the team, 409 not awaiting clearance |
 | GET | `/matters` | `matters.view` | `{"matters": [...], "next"}`: matters you are on the team of, 50 at a time, newest first. `?before=<next>` |
 | GET | `/matters/:matterId` | `matters.view` + team | Details, client summary and team. 404 if not on the team |
+| PATCH | `/matters/:matterId` | `matters.edit` + team | `{title?, matterType?}` → 200 with the matter. 409 closed |
+| POST | `/matters/:matterId/close` | `matters.supervise` + supervising partner | `{"reason"}` → 204. Final. 403 not the supervising partner, 409 already closed |
 | PUT | `/matters/:matterId/team/:accountId` | `matters.supervise` + supervising partner | Adds a fee earner. 204, also when already on the team. 400 not active staff who can work on matters |
 | DELETE | `/matters/:matterId/team/:accountId` | `matters.supervise` + supervising partner | Removes a fee earner, who loses access at once. 204, also when not on the team. 409 for the supervising partner |
 | POST | `/matters/:matterId/supervisor` | `matters.supervise` + supervising partner | `{accountId}` → 204: hands supervision to that partner; the previous one stays as a fee earner. 400 not an active partner |

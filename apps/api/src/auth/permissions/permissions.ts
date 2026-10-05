@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   'clients.take_over',
   'matters.open',
   'matters.view',
+  'matters.edit',
   'matters.supervise',
 ] as const;
 
@@ -51,9 +52,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'clients.take_over',
     'matters.open',
     'matters.view',
+    'matters.edit',
     'matters.supervise',
   ],
-  fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit', 'matters.open', 'matters.view'],
+  fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit', 'matters.open', 'matters.view', 'matters.edit'],
   accounts: [],
   compliance: ['staff.view', 'audit.view'],
 };

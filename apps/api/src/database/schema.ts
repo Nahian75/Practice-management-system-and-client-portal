@@ -212,8 +212,8 @@ export interface MattersTable {
   number: DatabaseSet<number>;
   /** Set by the database: the client's reference and the number, C-000123/001. */
   reference: DatabaseSet<string>;
-  title: InsertOnly<string>;
-  matter_type: InsertOnly<MatterType>;
+  title: Writable<string>;
+  matter_type: Writable<MatterType>;
   status: DatabaseSet<MatterStatus>;
   opened_by: InsertOnly<string>;
   opened_at: DatabaseSet<Date>;
@@ -284,6 +284,14 @@ export interface MatterSupervisionTakeoversTable {
   taken_at: DatabaseSet<Date>;
 }
 
+export interface MatterClosuresTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  closed_by: InsertOnly<string>;
+  reason: InsertOnly<string>;
+  closed_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -297,6 +305,7 @@ export interface Database {
   conflict_clearances: ConflictClearancesTable;
   clients: ClientsTable;
   invitations: InvitationsTable;
+  matter_closures: MatterClosuresTable;
   matter_parties: MatterPartiesTable;
   matter_supervision_takeovers: MatterSupervisionTakeoversTable;
   matter_team: MatterTeamTable;

@@ -311,6 +311,38 @@ export class MattersRepository {
     return id;
   }
 
+  /** Locks the matter row until the transaction ends, if `viewerId` is on its team, and returns what can be edited. */
+  lockForEdit(matterId: string, viewerId: string, trx: Kysely<Database>) {
+    return trx
+      .selectFrom('matters')
+      .select(['matters.status', 'matters.title', 'matters.matter_type'])
+      .where('matters.id', '=', matterId)
+      .where(visibleTo(viewerId))
+      .forUpdate()
+      .executeTakeFirst();
+  }
+
+  async updateMatter(matterId: string, patch: { title?: string; matterType?: MatterType }, trx: Kysely<Database>): Promise<void> {
+    await trx
+      .updateTable('matters')
+      .set({
+        ...(patch.title !== undefined && { title: patch.title }),
+        ...(patch.matterType !== undefined && { matter_type: patch.matterType }),
+      })
+      .where('id', '=', matterId)
+      .execute();
+  }
+
+  /** Records the closure. The database checks it is the supervising partner, and closes the matter. */
+  async recordClosure(closure: { matterId: string; closedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
+    const { id } = await trx
+      .insertInto('matter_closures')
+      .values({ matter_id: closure.matterId, closed_by: closure.closedBy, reason: closure.reason })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
+  }
+
   /** Records the clearance. The database checks the rules and opens the matter. */
   async recordClearance(clearance: { matterId: string; clearedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
     const { id } = await trx

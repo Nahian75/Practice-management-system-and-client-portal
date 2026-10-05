@@ -11,6 +11,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -105,6 +106,10 @@ const conflictCheckSchema = z.object({
 });
 const clearanceRequestSchema = z.strictObject({ reason: text(500, 10) });
 const handOverSchema = z.strictObject({ accountId: z.uuid() });
+const closeSchema = z.strictObject({ reason: text(500, 10) });
+const matterPatchSchema = z
+  .strictObject({ title: text(200).optional(), matterType: z.enum(MATTER_TYPES).optional() })
+  .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
 const supervisionTakeoverSchema = z.strictObject({
   matterReference: z.string().trim().toUpperCase().regex(/^C-[0-9]{6,}\/[0-9]{3,}$/),
   reason: text(500, 10),
@@ -114,6 +119,7 @@ const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nu
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
 
 export const MATTER_NOT_FOUND_MESSAGE = 'No matter with this id';
+const MATTER_CLOSED_MESSAGE = 'This matter is closed';
 const CLIENT_NOT_FOUND_MESSAGE = 'No client with this id';
 
 const serialiseCheck = (check: ConflictCheck) => ({
@@ -133,9 +139,14 @@ function answerTeamChange(result: TeamChangeResult): void {
       throw new BadRequestException('Team members must be active staff who can work on matters; a supervising partner must be a partner');
     case 'is_supervisor':
       throw new ConflictException('The supervising partner leaves the team only by handing over to another partner');
+    case 'matter_closed':
+      throw new ConflictException(MATTER_CLOSED_MESSAGE);
     case 'changed':
     case 'unchanged':
       return;
+    default:
+      // A new result that is not answered above fails to compile here.
+      return result satisfies never;
   }
 }
 
@@ -246,6 +257,48 @@ export class MattersController {
       case 'not_awaiting_clearance':
         throw new ConflictException('This matter is not awaiting conflict clearance');
       case 'cleared':
+        return;
+    }
+  }
+
+  @Patch('matters/:matterId')
+  @RequirePermission('matters.edit')
+  @ResponseSchema(matterSchema)
+  async update(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: matterPatchSchema }) body: z.infer<typeof matterPatchSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    switch (await this.matters.update(matterId, body, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+      case 'closed':
+        throw new ConflictException(MATTER_CLOSED_MESSAGE);
+      case 'updated':
+        return this.find(matterId, session);
+    }
+  }
+
+  /** Closing is final: the matter can no longer change, nor can its team. */
+  @Post('matters/:matterId/close')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async close(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: closeSchema }) body: z.infer<typeof closeSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    switch (await this.matters.close(matterId, body.reason, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+      case 'not_supervisor':
+        throw new ForbiddenException("Only the matter's supervising partner can close it");
+      case 'already_closed':
+        throw new ConflictException(MATTER_CLOSED_MESSAGE);
+      case 'closed':
         return;
     }
   }

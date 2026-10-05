@@ -1,10 +1,10 @@
 # Matters
 
-**Current state (2026-10-05):** Steps 8a to 8e built: matters and teams,
+**Current state (2026-10-05):** Steps 8a to 8f built: matters and teams,
 conflict checks required for opening, other parties, clearing a possible
 conflict, team changes and handing over supervision, taking over supervision
-from a partner who can no longer act, seeing your matters, and client
-visibility through matter teams. Editing, closing and compliance access are
+from a partner who can no longer act, editing and closing, seeing your
+matters, and client visibility through matter teams. Compliance access is
 designed below.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
@@ -152,6 +152,22 @@ takes over supervision, giving a reason**. Built in 8e (migration `0020`):
   it, and compliance holders are emailed by matter reference only.
 - The previous supervising partner is not kept on the team: they cannot act.
 
+## Editing and closing
+
+Built in 8f (migration `0021`):
+
+- `PATCH /matters/:id` changes the title or type (`matters.edit`, anyone on the
+  team). The audit record names the fields, never the title; sending the same
+  values records nothing.
+- `POST /matters/:id/close` with a reason, by the supervising partner only.
+  As for clearance, recording a row in `matter_closures` is what closes the
+  matter, checked by a `SECURITY DEFINER` trigger; `matter.closed` records the
+  closure id and the reason stays with the closure. A matter awaiting clearance
+  can be closed too, for example when the conflict is real.
+- **Closing is final**, for every role: the database refuses any change to a
+  closed matter, its team, or its status, so no clearance, handover or
+  takeover can follow. The API answers 409.
+
 ## Conflict checks
 
 Built in 8b (migration `0017`). A check compares each name given, plus the
@@ -269,6 +285,8 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **8c.** Clearance by the supervising partner, email to compliance. Done.
 - **8d.** Team changes and handing over supervision. Done.
 - **8e.** Taking over supervision from a partner who can no longer act. Done.
-- **8f.** Editing, closing.
+- **8f.** Editing, closing. Done. Adding other parties after opening is not
+  built: a new party needs a new conflict check, and possibly clearance again,
+  on an open matter. To be designed with the project owner.
 - **8g.** Compliance access with a reason.
 - Security review of the module.
