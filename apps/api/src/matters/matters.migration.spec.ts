@@ -431,6 +431,77 @@ describe('matters tables', () => {
     });
   });
 
+  describe('supervision takeover (step 8e)', () => {
+    let matterId: string;
+    let taker: TestAccount;
+
+    const takeOver = (overrides: Record<string, unknown> = {}) =>
+      db
+        .insertInto('matter_supervision_takeovers')
+        .values({
+          matter_id: matterId,
+          from_account_id: partner.id,
+          to_account_id: taker.id,
+          reason: 'Supervising partner has left the firm',
+          ...overrides,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+    const supervisorOf = async (id: string) =>
+      (
+        await db
+          .selectFrom('matter_team')
+          .select('account_id')
+          .where('matter_id', '=', id)
+          .where('role', '=', 'supervising_partner')
+          .where('removed_at', 'is', null)
+          .executeTakeFirstOrThrow()
+      ).account_id;
+
+    beforeEach(async () => {
+      matterId = (await openMatter()).id;
+      taker = await staffWith('partner');
+    });
+
+    it('moves supervision when the supervising partner is disabled', async () => {
+      await setAccountStatus(db, partner.id, 'disabled');
+
+      await takeOver();
+
+      expect(await supervisorOf(matterId)).toBe(taker.id);
+    });
+
+    it('moves supervision when the supervising partner no longer holds the partner role', async () => {
+      await revokeTestRole(db, partner.id, 'partner');
+
+      await takeOver();
+
+      expect(await supervisorOf(matterId)).toBe(taker.id);
+    });
+
+    it('refuses while the supervising partner can still act', async () => {
+      await expect(takeOver()).rejects.toThrow(/can no longer act/);
+      expect(await supervisorOf(matterId)).toBe(partner.id);
+    });
+
+    it('refuses a taker who is not a partner', async () => {
+      await setAccountStatus(db, partner.id, 'disabled');
+      const notPartner = await staffWith('fee_earner');
+
+      await expect(takeOver({ to_account_id: notPartner.id })).rejects.toThrow(/by an active partner/);
+    });
+
+    it('keeps every takeover as it was', async () => {
+      await setAccountStatus(db, partner.id, 'disabled');
+      const { id } = await takeOver();
+
+      await expect(sql`update matter_supervision_takeovers set reason = 'Rewritten afterwards' where id = ${id}`.execute(db)).rejects.toThrow(
+        /permission denied/,
+      );
+      await expect(sql`delete from matter_supervision_takeovers where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
+
   describe('app role restrictions', () => {
     let matterId: string;
 

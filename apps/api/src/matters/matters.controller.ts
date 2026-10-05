@@ -105,6 +105,10 @@ const conflictCheckSchema = z.object({
 });
 const clearanceRequestSchema = z.strictObject({ reason: text(500, 10) });
 const handOverSchema = z.strictObject({ accountId: z.uuid() });
+const supervisionTakeoverSchema = z.strictObject({
+  matterReference: z.string().trim().toUpperCase().regex(/^C-[0-9]{6,}\/[0-9]{3,}$/),
+  reason: text(500, 10),
+});
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
@@ -284,6 +288,26 @@ export class MattersController {
     @Req() request: Request,
   ): Promise<void> {
     answerTeamChange(await this.matters.handOverSupervision(matterId, body.accountId, actorFor(session, request)));
+  }
+
+  /** For a partner who is not on the team yet, so the matter is named by its reference. */
+  @Post('matter-supervision-takeovers')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async takeOverSupervision(
+    @Body({ schema: supervisionTakeoverSchema }) body: z.infer<typeof supervisionTakeoverSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    switch (await this.matters.takeOverSupervision(body.matterReference, body.reason, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException('No matter with this reference');
+      case 'supervisor_can_act':
+        throw new ConflictException('The supervising partner of this matter can still act');
+      case 'taken_over':
+        return;
+    }
   }
 
   @Get('clients/:clientId/matters')

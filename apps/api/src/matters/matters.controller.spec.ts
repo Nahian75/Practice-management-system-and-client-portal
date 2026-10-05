@@ -215,9 +215,14 @@ describe('Matters', () => {
 
       const response = await check([`Jon ${token2} Smyth`]);
 
-      expect(response.body.matches).toEqual([
-        { checkedName: `Jon ${token2} Smyth`, matchedName: `John ${token2} Smith`, relation: 'client', clientReference: theirs.reference, matterReference: null },
-      ]);
+      // Contains, not equals: "John <random> Smith" clients from earlier runs can score near the threshold too.
+      expect(response.body.matches).toContainEqual({
+        checkedName: `Jon ${token2} Smyth`,
+        matchedName: `John ${token2} Smith`,
+        relation: 'client',
+        clientReference: theirs.reference,
+        matterReference: null,
+      });
     });
 
     describe('opening on a check', () => {
@@ -230,7 +235,8 @@ describe('Matters', () => {
 
         expect(opened.body.status).toBe('awaiting_clearance');
         const shown = await as(await signedIn(partner)).get(`/matters/${opened.body.id}/conflict-check`);
-        expect(shown.body.matches).toEqual([expect.objectContaining({ checkedName: `${existing} Holdings Ltd`, relation: 'client' })]);
+        // Contains, not equals: the client's own random name can be near another test's now and then.
+        expect(shown.body.matches).toContainEqual(expect.objectContaining({ checkedName: `${existing} Holdings Ltd`, relation: 'client' }));
         expect((await as(await signedIn(await staffWith('partner'))).get(`/matters/${opened.body.id}/conflict-check`)).status).toBe(404);
       });
 
@@ -553,6 +559,93 @@ describe('Matters', () => {
     it('is closed to fee earners, and not found by partners off the team', async () => {
       expect((await put(token, (await staffWith('fee_earner')).id)).status).toBe(403);
       expect((await put(await signedIn(await staffWith('partner')), feeEarner.id)).status).toBe(404);
+    });
+  });
+
+  describe('POST /matter-supervision-takeovers (step 8e)', () => {
+    const REASON = 'Supervising partner has left the firm';
+    let matterId: string;
+    let reference: string;
+    let taker: TestAccount;
+    let takerToken: string;
+
+    const takeOver = (sessionToken: string, body: object = { matterReference: reference, reason: REASON }) =>
+      as(sessionToken).post('/matter-supervision-takeovers', body);
+
+    beforeEach(async () => {
+      ({ id: matterId, reference } = (await open(token)).body);
+      taker = await staffWith('partner');
+      takerToken = await signedIn(taker);
+    });
+
+    describe('when the supervising partner can no longer act', () => {
+      beforeEach(async () => {
+        await setAccountStatus(db, partner.id, 'disabled');
+      });
+
+      it('makes the taker supervising partner, who can then see and manage the matter', async () => {
+        expect((await as(takerToken).get(`/matters/${matterId}`)).status).toBe(404);
+
+        expect((await takeOver(takerToken, { matterReference: reference.toLowerCase(), reason: REASON })).status).toBe(204);
+
+        const team = (await as(takerToken).get(`/matters/${matterId}`)).body.team.map((m: { accountId: string; role: string }) => [m.accountId, m.role]);
+        expect(team).toContainEqual([taker.id, 'supervising_partner']);
+        expect(team).not.toContainEqual([partner.id, 'supervising_partner']);
+        expect((await as(takerToken).post(`/matters/${matterId}/supervisor`, { accountId: (await staffWith('partner')).id })).status).toBe(204);
+      });
+
+      it('records the takeover without its reason, and tells compliance by matter reference only', async () => {
+        const holder = await staffWith('compliance');
+
+        await takeOver(takerToken);
+
+        const events = await db
+          .selectFrom('audit_events')
+          .select(['actor_id', 'action', 'metadata'])
+          .where('resource_id', '=', matterId)
+          .where('action', '=', 'matter.supervision_taken_over')
+          .execute();
+        expect(events).toEqual([
+          { actor_id: taker.id, action: 'matter.supervision_taken_over', metadata: { takeoverId: expect.any(String), from: partner.id } },
+        ]);
+        expect(JSON.stringify(events)).not.toContain('left the firm');
+        await expect
+          .poll(async () => (await inbox(holder.email)).filter((email) => email.subject.includes(reference)), { timeout: 15_000 })
+          .toHaveLength(1);
+        const [email] = (await inbox(holder.email)).filter((message) => message.subject.includes(reference));
+        expect(email?.text).not.toContain('left the firm');
+      });
+
+      it.each<[string, () => object]>([
+        ['a reference in the wrong form', () => ({ matterReference: 'M-1', reason: REASON })],
+        ['a short reason', () => ({ matterReference: reference, reason: 'gone' })],
+        ['a matter id instead of a reference', () => ({ matterId, reason: REASON })],
+      ])('refuses %s', async (_case, body) => {
+        expect((await takeOver(takerToken, body())).status).toBe(400);
+      });
+
+      it('is closed to fee earners', async () => {
+        expect((await takeOver(token)).status).toBe(403);
+      });
+    });
+
+    it('refuses while the supervising partner can still act, and records the attempt', async () => {
+      const response = await takeOver(takerToken);
+
+      expect(response.status).toBe(409);
+      expect((await as(takerToken).get(`/matters/${matterId}`)).status).toBe(404);
+      expect(
+        await db
+          .selectFrom('audit_events')
+          .select(['actor_id', 'action', 'metadata'])
+          .where('resource_id', '=', matterId)
+          .where('action', '=', 'matter.supervision_takeover_refused')
+          .execute(),
+      ).toEqual([{ actor_id: taker.id, action: 'matter.supervision_takeover_refused', metadata: { reason: 'supervisor_can_act' } }]);
+    });
+
+    it('does not find a reference that does not exist', async () => {
+      expect((await takeOver(takerToken, { matterReference: 'C-999999/999', reason: REASON })).status).toBe(404);
     });
   });
 

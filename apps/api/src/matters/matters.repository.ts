@@ -263,6 +263,54 @@ export class MattersRepository {
       .execute();
   }
 
+  /** The matter with this reference. Not limited by visibility: a partner taking over supervision is not on the team yet. */
+  findByReference(reference: string, trx: Kysely<Database>) {
+    return trx.selectFrom('matters').select(['id', 'reference']).where('reference', '=', reference).executeTakeFirst();
+  }
+
+  /** The matter's supervising partner, and whether they can still act: an active account holding the partner role. */
+  async supervisor(matterId: string, trx: Kysely<Database>) {
+    const row = await trx
+      .selectFrom('matter_team')
+      .innerJoin('accounts', 'accounts.id', 'matter_team.account_id')
+      .select(['matter_team.account_id', 'accounts.status'])
+      .select((eb) =>
+        eb
+          .exists(
+            eb
+              .selectFrom('account_roles')
+              .select('account_roles.id')
+              .whereRef('account_roles.account_id', '=', 'matter_team.account_id')
+              .where('account_roles.role', '=', 'partner')
+              .where('account_roles.revoked_at', 'is', null),
+          )
+          .as('is_partner'),
+      )
+      .where('matter_team.matter_id', '=', matterId)
+      .where('matter_team.role', '=', 'supervising_partner')
+      .where('matter_team.removed_at', 'is', null)
+      .executeTakeFirstOrThrow();
+    return { accountId: row.account_id, canAct: row.status === 'active' && Boolean(row.is_partner) };
+  }
+
+  /** Records a takeover of supervision. The database checks the rules and changes the team. */
+  async recordSupervisionTakeover(
+    takeover: { matterId: string; fromAccountId: string; toAccountId: string; reason: string },
+    trx: Kysely<Database>,
+  ): Promise<string> {
+    const { id } = await trx
+      .insertInto('matter_supervision_takeovers')
+      .values({
+        matter_id: takeover.matterId,
+        from_account_id: takeover.fromAccountId,
+        to_account_id: takeover.toAccountId,
+        reason: takeover.reason,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
+  }
+
   /** Records the clearance. The database checks the rules and opens the matter. */
   async recordClearance(clearance: { matterId: string; clearedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
     const { id } = await trx

@@ -135,6 +135,29 @@ export class SecurityNoticesService {
     }
   }
 
+  /** As for client takeovers: every other compliance holder, by matter reference only, without the reason. */
+  async supervisionTakenOver(change: { matterReference: string; fromAccountId: string; toAccountId: string }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const from = await this.accounts.findById(change.fromAccountId);
+    const to = await this.accounts.findById(change.toAccountId);
+    if (!from || !to) {
+      return;
+    }
+    for (const holderId of await this.roles.activeHolders('compliance')) {
+      if (holderId === change.toAccountId) {
+        continue;
+      }
+      await this.notify(holderId, `Supervision of ${change.matterReference} was taken over`, (name) => [
+        `Hello ${name},`,
+        '',
+        `${to.display_name} took over supervision of matter ${change.matterReference} from ${from.display_name} on ${when}.`,
+        '',
+        'You are told because you hold the compliance role. The reason given is recorded',
+        'with the takeover; the audit log points to it.',
+      ]);
+    }
+  }
+
   async roleRevoked(accountId: string, role: StaffRole, revokedBy: string | null): Promise<void> {
     const when = this.clock.now().toUTCString();
     const by = await this.changedBy(revokedBy);

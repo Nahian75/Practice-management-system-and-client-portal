@@ -25,6 +25,8 @@ export type OpenResult =
 
 export type ClearanceResult = 'cleared' | 'not_found' | 'not_supervisor' | 'not_awaiting_clearance';
 
+export type SupervisionTakeoverResult = 'taken_over' | 'not_found' | 'supervisor_can_act';
+
 export type TeamChangeResult = 'changed' | 'unchanged' | 'not_found' | 'not_supervisor' | 'invalid_member' | 'is_supervisor';
 
 export type ConflictCheckResult = { outcome: 'checked'; check: ConflictCheck } | { outcome: 'client_not_found' | 'limited' };
@@ -324,6 +326,57 @@ export class MattersService {
     });
   }
 
+  /**
+   * Makes the caller supervising partner of a matter whose supervising
+   * partner can no longer act (account not active, or no partner role). The
+   * caller is usually not on the team, so the matter is named by reference.
+   * The reason is kept with the takeover; the audit log points to it.
+   */
+  async takeOverSupervision(matterReference: string, reason: string, by: MatterActor): Promise<SupervisionTakeoverResult> {
+    const outcome = await this.matters.transaction(
+      async (trx): Promise<{ result: SupervisionTakeoverResult; matterId?: string; from?: string }> => {
+        const matter = await this.matters.findByReference(matterReference, trx);
+        if (!matter) {
+          return { result: 'not_found' };
+        }
+        await this.matters.lockTeam(matter.id, trx);
+        const supervisor = await this.matters.supervisor(matter.id, trx);
+        if (supervisor.canAct) {
+          return { result: 'supervisor_can_act', matterId: matter.id };
+        }
+
+        const takeoverId = await this.matters.recordSupervisionTakeover(
+          { matterId: matter.id, fromAccountId: supervisor.accountId, toAccountId: by.accountId, reason },
+          trx,
+        );
+        await this.recordTeamEvent(
+          'matter.supervision_taken_over',
+          matter.id,
+          { takeoverId, from: supervisor.accountId },
+          by,
+          trx,
+        );
+        return { result: 'taken_over', matterId: matter.id, from: supervisor.accountId };
+      },
+    );
+
+    if (outcome.result === 'taken_over' && outcome.from) {
+      await this.notices.supervisionTakenOver({ matterReference, fromAccountId: outcome.from, toAccountId: by.accountId });
+    }
+    // Trying to take a matter from a partner who can still act is worth noticing.
+    if (outcome.result === 'supervisor_can_act' && outcome.matterId) {
+      await this.audit.record({
+        actor: by.actor,
+        action: 'matter.supervision_takeover_refused',
+        outcome: 'denied',
+        resource: { type: 'matter', id: outcome.matterId },
+        metadata: { reason: 'supervisor_can_act' },
+        ...by.context,
+      });
+    }
+    return outcome.result;
+  }
+
   /** Under the team lock: the caller must be on the team (else not found) and its supervising partner. */
   private async refuseUnlessSupervisor(matterId: string, by: MatterActor, trx: Kysely<Database>): Promise<TeamChangeResult | null> {
     await this.matters.lockTeam(matterId, trx);
@@ -335,7 +388,11 @@ export class MattersService {
   }
 
   private async recordTeamEvent(
-    action: 'matter.team_member_added' | 'matter.team_member_removed' | 'matter.supervisor_changed',
+    action:
+      | 'matter.team_member_added'
+      | 'matter.team_member_removed'
+      | 'matter.supervisor_changed'
+      | 'matter.supervision_taken_over',
     matterId: string,
     metadata: Record<string, string>,
     by: MatterActor,

@@ -65,7 +65,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `clients.edit` — change the details of a client you can see | | ✓ | ✓ | | |
 | `matters.open` — open matters for clients you can see | | ✓ | ✓ | | |
 | `matters.view` — open matters you are on the team of | | ✓ | ✓ | | |
-| `matters.supervise` — clear conflicts and change the team on matters you supervise ([rules](matters.md#opening-a-matter)) | | ✓ | | | |
+| `matters.supervise` — clear conflicts and change the team on matters you supervise; take over supervision from a partner who can no longer act ([rules](matters.md#opening-a-matter)) | | ✓ | | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 
 Administrators deliberately cannot read the audit log: the people who change

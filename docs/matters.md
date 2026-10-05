@@ -1,10 +1,11 @@
 # Matters
 
-**Current state (2026-10-05):** Steps 8a to 8d built: matters and teams,
+**Current state (2026-10-05):** Steps 8a to 8e built: matters and teams,
 conflict checks required for opening, other parties, clearing a possible
-conflict, team changes and handing over supervision, seeing your matters, and
-client visibility through matter teams. Editing, closing and compliance access
-are designed below.
+conflict, team changes and handing over supervision, taking over supervision
+from a partner who can no longer act, seeing your matters, and client
+visibility through matter teams. Editing, closing and compliance access are
+designed below.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -133,10 +134,23 @@ matter's team queue on an advisory lock. Every change is audited:
 `matter.team_member_added`, `matter.team_member_removed` (account and role),
 `matter.supervisor_changed` (from and to).
 
-**Open question:** if the supervising partner is disabled or loses the partner
-role, nobody can change the team, clear a conflict, or (from 8e) close the
-matter. As for clients, a partner could take over supervision with a reason,
-or this could wait for compliance access (8f). Decide before 8e.
+### Taking over supervision
+
+Decided by the project owner: when the supervising partner can no longer act
+(account not active, or no longer holding the partner role), **another partner
+takes over supervision, giving a reason**. Built in 8e (migration `0020`):
+
+- `POST /matter-supervision-takeovers` with `{matterReference, reason}`. The
+  partner is usually not on the team and cannot see the matter, so it is named
+  by the reference on the file (`C-000123/001`). 404 no such matter, 409 the
+  supervising partner can still act; that refusal is audited.
+- Recording a row in `matter_supervision_takeovers` is what changes the team:
+  a `SECURITY DEFINER` trigger checks the rule, ends the old supervision and
+  makes the taker supervising partner. With the service's own check removed,
+  the database still refuses.
+- The reason stays with the takeover; `matter.supervision_taken_over` points to
+  it, and compliance holders are emailed by matter reference only.
+- The previous supervising partner is not kept on the team: they cannot act.
 
 ## Conflict checks
 
@@ -221,6 +235,7 @@ unchanged.
 | POST | `/matters/:id/conflict-clearance` | `matters.supervise` + supervising partner | `{reason}` |
 | PUT/DELETE | `/matters/:id/team/:accountId` | `matters.supervise` + supervising partner | Add or remove a fee earner. 204, also when nothing needed to change |
 | POST | `/matters/:id/supervisor` | `matters.supervise` + supervising partner | `{accountId}`: hand supervision to another partner |
+| POST | `/matter-supervision-takeovers` | `matters.supervise` | `{matterReference, reason}`: take over from a supervising partner who can no longer act |
 | POST | `/matters/:id/close` | `matters.supervise` + supervising partner | `{reason}` |
 | POST | `/matters/:id/access` | `matters.access_with_reason` | `{reason}`; opens the matter read-only for that request |
 | GET | `/clients/:id/matters` | `clients.view` + client visibility | The client's matters you can see |
@@ -253,6 +268,7 @@ Each step ships with positive and negative tests and is reviewed before the next
   possible matches, `awaiting_clearance`. Done.
 - **8c.** Clearance by the supervising partner, email to compliance. Done.
 - **8d.** Team changes and handing over supervision. Done.
-- **8e.** Editing, closing.
-- **8f.** Compliance access with a reason.
+- **8e.** Taking over supervision from a partner who can no longer act. Done.
+- **8f.** Editing, closing.
+- **8g.** Compliance access with a reason.
 - Security review of the module.

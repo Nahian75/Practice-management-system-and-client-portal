@@ -275,6 +275,15 @@ export interface ConflictClearancesTable {
   cleared_at: DatabaseSet<Date>;
 }
 
+export interface MatterSupervisionTakeoversTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  from_account_id: InsertOnly<string>;
+  to_account_id: InsertOnly<string>;
+  reason: InsertOnly<string>;
+  taken_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -289,6 +298,7 @@ export interface Database {
   clients: ClientsTable;
   invitations: InvitationsTable;
   matter_parties: MatterPartiesTable;
+  matter_supervision_takeovers: MatterSupervisionTakeoversTable;
   matter_team: MatterTeamTable;
   matters: MattersTable;
   password_resets: PasswordResetsTable;
