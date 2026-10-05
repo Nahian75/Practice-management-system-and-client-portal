@@ -9,6 +9,7 @@
   },
   "scripts": {
     "check:dependency-age": "node scripts/check-dependency-age.mjs",
-    "check:hidden-characters": "node scripts/check-hidden-characters.mjs --all"
+    "check:hidden-characters": "node scripts/check-hidden-characters.mjs --all",
+    "db:reset-test": "docker compose exec -T postgres psql -U postgres -d pms -q -f - < infra/postgres/reset-test-database.sql"
   }
 }

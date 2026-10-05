@@ -18,6 +18,14 @@ export class AuditService {
     await this.repository.insert(toRow(event), transaction);
   }
 
+  /** How many units (`metadata.units`, 1 where absent) this actor used on these actions in the last `seconds`. */
+  sumUnitsRecent(
+    query: { actorId: string; actions: readonly string[]; seconds: number },
+    transaction?: Kysely<Database>,
+  ): Promise<number> {
+    return this.repository.sumUnitsRecent(query, transaction);
+  }
+
   /** How often this actor did this in the last `seconds`. Lets a limit use the audit record as its count. */
   countRecent(query: { actorId: string; action: string; seconds: number }, transaction?: Kysely<Database>): Promise<number> {
     return this.repository.countRecent(query, transaction);

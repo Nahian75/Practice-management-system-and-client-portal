@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
@@ -11,6 +11,8 @@ import type { ConflictCheck, Matter, MatterSummary, NewMatter } from './matter.j
 import { MattersRepository } from './matters.repository.js';
 
 export const MATTERS_PAGE_SIZE = 50;
+export const COMPLIANCE_ACCESSES_PER_HOUR = 30;
+export const COMPLIANCE_WINDOW_SECONDS = 60 * 60;
 
 /** The signed-in staff member acting, and the request it came from. */
 export interface MatterActor {
@@ -35,6 +37,13 @@ export interface ComplianceAccess {
 export type ComplianceAccessesResult =
   | { outcome: 'listed'; accesses: ComplianceAccess[] }
   | { outcome: 'not_found' | 'not_supervisor' };
+
+export type ComplianceAccessResult = { outcome: 'accessed'; matter: Matter } | { outcome: 'not_found' | 'limited' };
+
+type ComplianceAccessOutcome =
+  | { kind: 'accessed'; details: Matter; supervisorId: string }
+  | { kind: 'not_found' }
+  | { kind: 'limited'; alert: boolean };
 
 export type EditResult = 'updated' | 'not_found' | 'closed';
 export type CloseResult = 'closed' | 'not_found' | 'not_supervisor' | 'already_closed';
@@ -72,7 +81,8 @@ export class MattersService {
       if (!(await this.matters.clientIsVisible(clientId, by.accountId, trx))) {
         return { outcome: 'client_not_found' };
       }
-      if (!(await this.quota.allows(by, trx))) {
+      // Each name is one unit of the hourly allowance (review M2); the client's own name, added by the database, is free.
+      if (!(await this.quota.allows(by, trx, names.length))) {
         return { outcome: 'limited' };
       }
 
@@ -83,7 +93,7 @@ export class MattersService {
           action: 'matter.conflict_check_run',
           outcome: 'success',
           resource: { type: 'client', id: clientId },
-          metadata: { checkId: check.id, names: check.names.length, matches: check.match_count },
+          metadata: { checkId: check.id, names: check.names.length, matches: check.match_count, units: names.length },
           ...by.context,
         },
         trx,
@@ -469,11 +479,15 @@ export class MattersService {
    * reason. Each look is a new access: nothing lasting is granted. The matter
    * is read through the access record, and the supervising partner is told.
    */
-  async accessWithReason(matterReference: string, reason: string, by: MatterActor): Promise<Matter | undefined> {
-    const outcome = await this.matters.transaction(async (trx) => {
+  async accessWithReason(matterReference: string, reason: string, by: MatterActor): Promise<ComplianceAccessResult> {
+    const outcome = await this.matters.transaction(async (trx): Promise<ComplianceAccessOutcome> => {
+      const allowance = await this.complianceAllowance(by, trx);
+      if (!allowance.allowed) {
+        return { kind: 'limited', alert: allowance.newlyLimited };
+      }
       const matter = await this.matters.findByReference(matterReference, trx);
       if (!matter) {
-        return undefined;
+        return { kind: 'not_found' };
       }
       const accessId = await this.matters.recordComplianceAccess({ matterId: matter.id, accessedBy: by.accountId, reason }, trx);
       await this.audit.record(
@@ -488,18 +502,56 @@ export class MattersService {
         trx,
       );
       const details = await this.matters.findByComplianceAccess(matter.id, accessId, trx);
-      return details && { details, supervisor: await this.matters.supervisor(matter.id, trx) };
+      if (!details) {
+        throw new Error('Matter not readable through its own access');
+      }
+      return { kind: 'accessed', details, supervisorId: (await this.matters.supervisor(matter.id, trx)).accountId };
     });
-    if (!outcome) {
-      return undefined;
-    }
 
-    await this.notices.complianceAccessed({
-      matterReference: outcome.details.reference,
-      supervisorId: outcome.supervisor.accountId,
-      accessedBy: by.accountId,
-    });
-    return outcome.details;
+    switch (outcome.kind) {
+      case 'limited':
+        if (outcome.alert) {
+          await this.notices.complianceAccessLimitReached({ accountId: by.accountId, limit: COMPLIANCE_ACCESSES_PER_HOUR });
+        }
+        return { outcome: 'limited' };
+      case 'not_found':
+        return { outcome: 'not_found' };
+      case 'accessed':
+        await this.notices.complianceAccessed({
+          matterReference: outcome.details.reference,
+          supervisorId: outcome.supervisorId,
+          accessedBy: by.accountId,
+        });
+        return { outcome: 'accessed', matter: outcome.details };
+    }
+  }
+
+  /**
+   * At most COMPLIANCE_ACCESSES_PER_HOUR accesses per person (review M4),
+   * counted from the audit records under a per-person lock. Reaching the
+   * limit is recorded once an hour, and that first time other compliance
+   * holders and administrators are told.
+   */
+  private async complianceAllowance(by: MatterActor, trx: Kysely<Database>): Promise<{ allowed: boolean; newlyLimited: boolean }> {
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.compliance_access:${by.accountId}`}, 0))`.execute(trx);
+    const window = { actorId: by.accountId, seconds: COMPLIANCE_WINDOW_SECONDS };
+    if ((await this.audit.countRecent({ ...window, action: 'matter.accessed_with_reason' }, trx)) < COMPLIANCE_ACCESSES_PER_HOUR) {
+      return { allowed: true, newlyLimited: false };
+    }
+    if ((await this.audit.countRecent({ ...window, action: 'matter.compliance_access_limited' }, trx)) > 0) {
+      return { allowed: false, newlyLimited: false };
+    }
+    await this.audit.record(
+      {
+        actor: by.actor,
+        action: 'matter.compliance_access_limited',
+        outcome: 'denied',
+        metadata: { limit: COMPLIANCE_ACCESSES_PER_HOUR },
+        ...by.context,
+      },
+      trx,
+    );
+    return { allowed: false, newlyLimited: true };
   }
 
   /** The compliance accesses to a matter, for its supervising partner only. */

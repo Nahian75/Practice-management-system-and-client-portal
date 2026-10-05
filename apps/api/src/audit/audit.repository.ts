@@ -11,6 +11,24 @@ export class AuditRepository {
     await executor.insertInto('audit_events').values(row).execute();
   }
 
+  /**
+   * The sum of `metadata.units` over events with these actions by this actor
+   * in the last `seconds`, counting 1 for an event that records no units.
+   */
+  async sumUnitsRecent(
+    query: { actorId: string; actions: readonly string[]; seconds: number },
+    executor: Kysely<Database> = this.db,
+  ): Promise<number> {
+    const { units } = await executor
+      .selectFrom('audit_events')
+      .select(sql<string>`coalesce(sum(coalesce((metadata ->> 'units')::integer, 1)), 0)`.as('units'))
+      .where('actor_id', '=', query.actorId)
+      .where('action', 'in', query.actions)
+      .where('occurred_at', '>', sql<Date>`clock_timestamp() - make_interval(secs => ${query.seconds})`)
+      .executeTakeFirstOrThrow();
+    return Number(units);
+  }
+
   /** Events with this action by this actor in the last `seconds`, by the database's clock. */
   async countRecent(
     query: { actorId: string; action: string; seconds: number },

@@ -19,8 +19,18 @@ Each migration test works in its own randomly named schema and drops it afterwar
 
 Before any test runs, `test/global-setup.ts` applies the real migrations to
 `pms_test` as `pms_owner`. Audit rows cannot be deleted, even in the test
-database, so tests identify their own rows by a random actor ID. To start from
-an empty test database: `docker compose down -v && docker compose up -d`.
+database, so tests identify their own rows by a random actor ID, and the test
+database grows with every run. To start from an empty test database, without
+touching the development database:
+
+```sh
+npm run db:reset-test
+```
+
+It recreates `pms_test` with the same setup as the init scripts
+(`infra/postgres/reset-test-database.sql`); the next test run applies every
+migration again. Tests must not rely on rows left by earlier runs or other
+files: a test that needs data creates it.
 
 ## Email tests
 

@@ -179,6 +179,34 @@ export class SecurityNoticesService {
     ]);
   }
 
+  /**
+   * Tells every other compliance holder, and every administrator, that
+   * someone reached the hourly limit of compliance accesses (Matters review
+   * M4). Names the person only, never a matter.
+   */
+  async complianceAccessLimitReached(reached: { accountId: string; limit: number }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const person = await this.accounts.findById(reached.accountId);
+    if (!person) {
+      return;
+    }
+    const recipients = new Set([
+      ...(await this.roles.activeHolders('compliance')),
+      ...(await this.roles.activeHolders('administrator')),
+    ]);
+    recipients.delete(reached.accountId);
+    for (const recipientId of recipients) {
+      await this.notify(recipientId, 'Compliance access limit reached', (name) => [
+        `Hello ${name},`,
+        '',
+        `${person.display_name} opened ${reached.limit} matters with a compliance reason within an hour,`,
+        `the most allowed, on ${when}. Further accesses are refused until the hour has passed.`,
+        '',
+        'If this was not expected, check their recent accesses in the audit log, and their account.',
+      ]);
+    }
+  }
+
   async roleRevoked(accountId: string, role: StaffRole, revokedBy: string | null): Promise<void> {
     const when = this.clock.now().toUTCString();
     const by = await this.changedBy(revokedBy);

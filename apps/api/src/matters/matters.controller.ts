@@ -27,7 +27,13 @@ import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-sch
 import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from '../clients/search-quota.js';
 import { text } from '../common/validation/safe-text.js';
 import type { ConflictCheck } from './matter.js';
-import { MattersService, type MatterActor, type TeamChangeResult } from './matters.service.js';
+import {
+  COMPLIANCE_ACCESSES_PER_HOUR,
+  COMPLIANCE_WINDOW_SECONDS,
+  MattersService,
+  type MatterActor,
+  type TeamChangeResult,
+} from './matters.service.js';
 
 const MATTER_TYPES = [
   'residential_property',
@@ -383,12 +389,21 @@ export class MattersController {
     @Body({ schema: referenceWithReasonSchema }) body: z.infer<typeof referenceWithReasonSchema>,
     @CurrentSession() session: ResolvedSession,
     @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    const matter = await this.matters.accessWithReason(body.matterReference, body.reason, actorFor(session, request));
-    if (!matter) {
-      throw new NotFoundException('No matter with this reference');
+    const result = await this.matters.accessWithReason(body.matterReference, body.reason, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException('No matter with this reference');
+      case 'limited':
+        response.setHeader('Retry-After', String(COMPLIANCE_WINDOW_SECONDS));
+        throw new HttpException(
+          `At most ${COMPLIANCE_ACCESSES_PER_HOUR} compliance accesses an hour. Try again later`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      case 'accessed':
+        return { ...result.matter, openedAt: result.matter.openedAt.toISOString() };
     }
-    return { ...matter, openedAt: matter.openedAt.toISOString() };
   }
 
   /** Who from compliance opened the matter, when and why: for its supervising partner. */

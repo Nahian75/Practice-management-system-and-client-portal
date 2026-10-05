@@ -14,6 +14,7 @@ import { ClientsModule } from '../clients/clients.module.js';
 import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
+import { MailOutbox } from '../mail/mail-outbox.js';
 import { MattersModule } from './matters.module.js';
 import { MattersRepository } from './matters.repository.js';
 
@@ -205,7 +206,9 @@ describe('Matters', () => {
         .where('actor_id', '=', feeEarner.id)
         .where('action', '=', 'matter.conflict_check_run')
         .execute();
-      expect(events).toEqual([{ action: 'matter.conflict_check_run', metadata: { checkId: response.body.id, names: 2, matches: 0 } }]);
+      expect(events).toEqual([
+        { action: 'matter.conflict_check_run', metadata: { checkId: response.body.id, names: 2, matches: 0, units: 1 } },
+      ]);
       expect(JSON.stringify(events)).not.toContain(name);
     });
 
@@ -292,6 +295,29 @@ describe('Matters', () => {
       });
     });
 
+    // Review M2: one name is one unit of the 60-an-hour allowance shared with client search.
+    it('counts each name checked towards the hourly allowance', async () => {
+      const twenty = () => Array.from({ length: 20 }, () => uniqueName());
+
+      for (let checkNumber = 0; checkNumber < 3; checkNumber++) {
+        expect((await check(twenty())).status).toBe(201);
+      }
+
+      expect((await check([uniqueName()])).status).toBe(429);
+      expect((await as(token).get(`/clients/search?q=${uniqueName()}`)).status).toBe(429);
+    });
+
+    it('refuses a check that does not fit in what is left, whole, and allows a smaller one', async () => {
+      for (let search = 0; search < 50; search++) {
+        await as(token).get(`/clients/search?q=${uniqueName()}`);
+      }
+      const checksBefore = await db.selectFrom('conflict_checks').select('id').where('requested_by', '=', feeEarner.id).execute();
+
+      expect((await check(Array.from({ length: 11 }, () => uniqueName()))).status).toBe(429);
+      expect(await db.selectFrom('conflict_checks').select('id').where('requested_by', '=', feeEarner.id).execute()).toEqual(checksBefore);
+      expect((await check(Array.from({ length: 10 }, () => uniqueName()))).status).toBe(201);
+    });
+
     it('counts towards the hourly search allowance', async () => {
       for (let search = 0; search < 60; search++) {
         await as(token).get(`/clients/search?q=${uniqueName()}`);
@@ -304,9 +330,14 @@ describe('Matters', () => {
     });
 
     it('keeps the 50 strongest matches of a common name, and says how many there were', async () => {
-      const response = await check(['Jane Doe']);
+      const common = uniqueName();
+      for (let created = 0; created < 55; created++) {
+        await as(token).post('/clients', { kind: 'individual', givenNames: common, familyName: 'Smith' });
+      }
 
-      expect(response.body.matchCount).toBeGreaterThan(50);
+      const response = await check([`${common} Smith`]);
+
+      expect(response.body.matchCount).toBeGreaterThanOrEqual(55);
       expect(response.body.matches).toHaveLength(50);
     });
 
@@ -815,6 +846,53 @@ describe('Matters', () => {
 
     it('does not find a reference that does not exist', async () => {
       expect((await access(officerToken, { matterReference: 'C-999999/999', reason: REASON })).status).toBe(404);
+    });
+
+    describe('hourly limit (review M4)', () => {
+      it('refuses the 31st access in an hour, records it once, and alerts the other compliance holders and administrators', async () => {
+        const colleague = await staffWith('compliance');
+        const administrator = await staffWith('administrator');
+        for (let accessNumber = 0; accessNumber < 30; accessNumber++) {
+          expect((await access(officerToken)).status).toBe(200);
+        }
+
+        const refused = await access(officerToken);
+        await access(officerToken);
+
+        expect(refused.status).toBe(429);
+        expect(refused.headers['retry-after']).toBe('3600');
+        expect(
+          await db
+            .selectFrom('audit_events')
+            .select(['action', 'metadata'])
+            .where('actor_id', '=', officer.id)
+            .where('action', '=', 'matter.compliance_access_limited')
+            .execute(),
+        ).toEqual([{ action: 'matter.compliance_access_limited', metadata: { limit: 30 } }]);
+        for (const recipient of [colleague, administrator]) {
+          await expect
+            .poll(async () => (await inbox(recipient.email)).filter((email) => email.subject === 'Compliance access limit reached'), { timeout: 15_000 })
+            .toHaveLength(1);
+        }
+        await app.get(MailOutbox).drain();
+        expect((await inbox(officer.email)).filter((email) => email.subject === 'Compliance access limit reached')).toEqual([]);
+      });
+
+      it('limits each person separately', async () => {
+        for (let accessNumber = 0; accessNumber < 30; accessNumber++) {
+          await access(officerToken);
+        }
+
+        expect((await access(await signedIn(await staffWith('compliance')))).status).toBe(200);
+      });
+
+      // Without the per-person lock, accesses in flight together would all pass the count first.
+      it('lets exactly 30 of 35 accesses sent at once through', async () => {
+        const statuses = (await Promise.all(Array.from({ length: 35 }, () => access(officerToken)))).map((r) => r.status);
+
+        expect(statuses.filter((status) => status === 200)).toHaveLength(30);
+        expect(statuses.filter((status) => status === 429)).toHaveLength(5);
+      });
     });
 
     it.each(['partner', 'fee_earner', 'administrator'] as const)('is closed to %s', async (role) => {

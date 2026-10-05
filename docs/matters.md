@@ -188,6 +188,9 @@ partner. Built in 8g (migration `0022`):
 - `matter.accessed_with_reason` records the access id; the reason stays with
   the access. The supervising partner is emailed (matter reference only) and
   sees every access, with its reason, at `GET /matters/:id/compliance-accesses`.
+- At most 30 accesses per person per hour (review M4); the 31st gets 429.
+  Reaching the limit is recorded once an hour and emailed to every other
+  compliance holder and administrator.
 
 ## Conflict checks
 
@@ -234,8 +237,8 @@ among the names checked, compared the same way.
 A possible match shows the name, the reference of the client or matter, and
 how it relates (client, contact, opponent, ...). Nothing else: no addresses,
 no matter details. Checks count towards the same hourly allowance as client
-search (review C2, 60 an hour together). Each is stored with its names; the
-audit log records only the counts.
+search (review C2, 60 an hour together), one unit per name checked (review
+M2). Each is stored with its names; the audit log records only the counts.
 
 `pg_trgm` and `unaccent` are PostgreSQL extensions. The migration role may
 not install extensions (by design), so the superuser installs them once into
@@ -320,4 +323,4 @@ Each step ships with positive and negative tests and is reviewed before the next
   built: a new party needs a new conflict check, and possibly clearance again,
   on an open matter. To be designed with the project owner.
 - **8g.** Compliance access with a reason. Done.
-- Security review of the module. Done: [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md). M1 fixed (indexed conflict checks); M2 and M4 decided, to be built next.
+- Security review of the module. Done: [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md). M1, M2 and M4 fixed; M3 accepted; M5 open for design.

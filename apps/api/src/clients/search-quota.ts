@@ -9,7 +9,11 @@ export const SEARCHES_PER_HOUR = 60;
 export const SEARCH_WINDOW_SECONDS = 60 * 60;
 export const SEARCH_LIMIT_MESSAGE = 'Too many client searches or conflict checks in the last hour. Try again later';
 
-/** Everything that looks across all clients counts towards the one hourly allowance (review C2). */
+/**
+ * Everything that looks across all clients counts towards the one hourly
+ * allowance (review C2): a search is one unit, a conflict check one per name
+ * checked (review M2 of Matters), recorded as `units` in its audit metadata.
+ */
 const COUNTED_ACTIONS = ['client.searched', 'matter.conflict_check_run'] as const;
 
 /**
@@ -22,19 +26,22 @@ export class SearchQuota {
   constructor(private readonly audit: AuditService) {}
 
   /**
-   * Call inside the transaction that will record the search or check. Holds a
-   * per-person lock until it ends, so requests sent together cannot all pass
-   * the count before any is recorded. Going over is recorded once an hour.
+   * Whether `units` more fit in the allowance. Call inside the transaction that
+   * will record the search or check. Holds a per-person lock until it ends, so
+   * requests sent together cannot all pass the count before any is recorded.
+   * A request that does not fit is refused whole. Going over is recorded once
+   * an hour.
    */
-  async allows(by: { actor: AuditActor; accountId: string; context?: RequestContext }, trx: Kysely<Database>): Promise<boolean> {
+  async allows(
+    by: { actor: AuditActor; accountId: string; context?: RequestContext },
+    trx: Kysely<Database>,
+    units = 1,
+  ): Promise<boolean> {
     await sql`select pg_advisory_xact_lock(hashtextextended(${`app.client_search:${by.accountId}`}, 0))`.execute(trx);
     const window = { actorId: by.accountId, seconds: SEARCH_WINDOW_SECONDS };
 
-    let used = 0;
-    for (const action of COUNTED_ACTIONS) {
-      used += await this.audit.countRecent({ ...window, action }, trx);
-    }
-    if (used < SEARCHES_PER_HOUR) {
+    const used = await this.audit.sumUnitsRecent({ ...window, actions: COUNTED_ACTIONS }, trx);
+    if (used + units <= SEARCHES_PER_HOUR) {
       return true;
     }
 
