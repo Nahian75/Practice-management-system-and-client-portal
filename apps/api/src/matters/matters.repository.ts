@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql, type ExpressionBuilder, type Kysely } from 'kysely';
+import { sql, type Expression, type ExpressionBuilder, type Kysely, type SqlBool } from 'kysely';
 import { clientName, visibleTo as clientVisibleTo } from '../clients/clients.repository.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, MatterTeamRole, MatterType } from '../database/schema.js';
@@ -10,8 +10,8 @@ import type { Matter, MatterSummary, NewParty, Party, TeamMember } from './matte
  * member of the matter's team. Every query that returns or changes a matter
  * filters with it. Holding the partner role alone opens nothing.
  */
-export function visibleTo(viewerId: string) {
-  return (eb: ExpressionBuilder<Database, 'matters'>) =>
+export function visibleTo(viewerId: string): MatterFilter {
+  return (eb) =>
     eb.exists(
       eb
         .selectFrom('matter_team')
@@ -19,6 +19,24 @@ export function visibleTo(viewerId: string) {
         .whereRef('matter_team.matter_id', '=', 'matters.id')
         .where('matter_team.account_id', '=', viewerId)
         .where('matter_team.removed_at', 'is', null),
+    );
+}
+
+/** Which matters a query may reach. Every matter query takes one; there is no unfiltered read. */
+export type MatterFilter = (eb: ExpressionBuilder<Database, 'matters'>) => Expression<SqlBool>;
+
+/**
+ * The one matter a recorded compliance access is for (step 8g). Compliance
+ * reads a matter through the access record, never without one.
+ */
+export function reachedByComplianceAccess(accessId: string): MatterFilter {
+  return (eb) =>
+    eb.exists(
+      eb
+        .selectFrom('matter_compliance_accesses')
+        .select('matter_compliance_accesses.id')
+        .where('matter_compliance_accesses.id', '=', accessId)
+        .whereRef('matter_compliance_accesses.matter_id', '=', 'matters.id'),
     );
 }
 
@@ -90,31 +108,40 @@ export class MattersRepository {
   }
 
   /** The matter, if `viewerId` is on its team. */
-  async findVisible(matterId: string, viewerId: string): Promise<Matter | undefined> {
-    const row = await this.summaries(viewerId)
+  findVisible(matterId: string, viewerId: string): Promise<Matter | undefined> {
+    return this.findDetails(matterId, visibleTo(viewerId));
+  }
+
+  /** The matter a recorded compliance access is for. */
+  findByComplianceAccess(matterId: string, accessId: string, executor: Kysely<Database> = this.db): Promise<Matter | undefined> {
+    return this.findDetails(matterId, reachedByComplianceAccess(accessId), executor);
+  }
+
+  private async findDetails(matterId: string, filter: MatterFilter, executor: Kysely<Database> = this.db): Promise<Matter | undefined> {
+    const row = await this.summaries(filter, executor)
       .select('matters.opened_at')
       .where('matters.id', '=', matterId)
       .executeTakeFirst();
     if (!row) {
       return undefined;
     }
-    const team = await this.db
+    const team = await executor
       .selectFrom('matter_team')
       .innerJoin('accounts', 'accounts.id', 'matter_team.account_id')
       .innerJoin('matters', 'matters.id', 'matter_team.matter_id')
       .select(['matter_team.account_id', 'accounts.display_name', 'matter_team.role'])
       .where('matter_team.matter_id', '=', matterId)
       .where('matter_team.removed_at', 'is', null)
-      .where(visibleTo(viewerId))
+      .where(filter)
       .orderBy('matter_team.role', 'desc')
       .orderBy('accounts.display_name')
       .execute();
-    const parties = await this.db
+    const parties = await executor
       .selectFrom('matter_parties')
       .innerJoin('matters', 'matters.id', 'matter_parties.matter_id')
       .select(['matter_parties.id', 'matter_parties.role', 'matter_parties.kind', 'matter_parties.name'])
       .where('matter_parties.matter_id', '=', matterId)
-      .where(visibleTo(viewerId))
+      .where(filter)
       .orderBy('matter_parties.added_at')
       .execute();
     return {
@@ -129,7 +156,7 @@ export class MattersRepository {
 
   /** Matters `viewerId` is on the team of, newest first. `before` is the id of the last matter on the previous page. */
   async listVisible(viewerId: string, page: { before?: string; clientId?: string; limit: number }): Promise<MatterSummary[]> {
-    let query = this.summaries(viewerId);
+    let query = this.summaries(visibleTo(viewerId));
     if (page.before !== undefined) {
       query = query.where('matters.id', '<', page.before);
     }
@@ -343,6 +370,33 @@ export class MattersRepository {
     return id;
   }
 
+  /** Records a compliance access. The database checks the accessor holds the compliance role. */
+  async recordComplianceAccess(access: { matterId: string; accessedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
+    const { id } = await trx
+      .insertInto('matter_compliance_accesses')
+      .values({ matter_id: access.matterId, accessed_by: access.accessedBy, reason: access.reason })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
+  }
+
+  /** Every compliance access to the matter, newest first. The caller has checked it is the supervising partner. */
+  complianceAccesses(matterId: string) {
+    return this.db
+      .selectFrom('matter_compliance_accesses')
+      .innerJoin('accounts', 'accounts.id', 'matter_compliance_accesses.accessed_by')
+      .select([
+        'matter_compliance_accesses.id',
+        'matter_compliance_accesses.accessed_by',
+        'accounts.display_name',
+        'matter_compliance_accesses.reason',
+        'matter_compliance_accesses.accessed_at',
+      ])
+      .where('matter_compliance_accesses.matter_id', '=', matterId)
+      .orderBy('matter_compliance_accesses.accessed_at', 'desc')
+      .execute();
+  }
+
   /** Records the clearance. The database checks the rules and opens the matter. */
   async recordClearance(clearance: { matterId: string; clearedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
     const { id } = await trx
@@ -379,8 +433,8 @@ export class MattersRepository {
     return this.db.transaction().execute(work);
   }
 
-  private summaries(viewerId: string) {
-    return this.db
+  private summaries(filter: MatterFilter, executor: Kysely<Database> = this.db) {
+    return executor
       .selectFrom('matters')
       .innerJoin('clients', 'clients.id', 'matters.client_id')
       .leftJoin('client_individuals as i', 'i.client_id', 'clients.id')
@@ -396,7 +450,7 @@ export class MattersRepository {
         'clients.kind as client_kind',
         clientName.as('client_name'),
       ])
-      .where(visibleTo(viewerId));
+      .where(filter);
   }
 }
 

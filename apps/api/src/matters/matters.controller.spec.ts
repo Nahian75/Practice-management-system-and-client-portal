@@ -15,6 +15,7 @@ import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
 import { MattersModule } from './matters.module.js';
+import { MattersRepository } from './matters.repository.js';
 
 @Module({ imports: [ClientsModule, MattersModule] })
 class ClientsAndMattersModule {}
@@ -735,6 +736,104 @@ describe('Matters', () => {
       ])('refuses %s', async (_case, body) => {
         expect((await close(partnerToken, body)).status).toBe(400);
       });
+    });
+  });
+
+  describe('compliance access with a reason (step 8g)', () => {
+    const REASON = 'Quarterly file review of property matters';
+    let matterId: string;
+    let reference: string;
+    let officer: TestAccount;
+    let officerToken: string;
+
+    const access = (sessionToken: string, body: object = { matterReference: reference, reason: REASON }) =>
+      as(sessionToken).post('/matter-compliance-accesses', body);
+
+    beforeEach(async () => {
+      ({ id: matterId, reference } = (await open(token, { parties: [{ role: 'opponent', kind: 'individual', name: `Opponent ${uniqueName()}` }] })).body);
+      officer = await staffWith('compliance');
+      officerToken = await signedIn(officer);
+    });
+
+    it('shows compliance the matter, read-only, by reference', async () => {
+      const response = await access(officerToken);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ id: matterId, reference, team: expect.any(Array), parties: [expect.objectContaining({ role: 'opponent' })] });
+    });
+
+    it('grants nothing lasting: compliance still cannot open the matter or its client directly', async () => {
+      await access(officerToken);
+
+      expect((await as(officerToken).get(`/matters/${matterId}`)).status).toBe(403);
+      expect((await as(officerToken).get(`/clients/${client.id}`)).status).toBe(403);
+    });
+
+    it('records each access without its reason, and tells the supervising partner', async () => {
+      await access(officerToken);
+      await access(officerToken);
+
+      const events = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'metadata'])
+        .where('resource_id', '=', matterId)
+        .where('action', '=', 'matter.accessed_with_reason')
+        .execute();
+      expect(events).toEqual([
+        { actor_id: officer.id, metadata: { accessId: expect.any(String) } },
+        { actor_id: officer.id, metadata: { accessId: expect.any(String) } },
+      ]);
+      expect(JSON.stringify(events)).not.toContain('Quarterly');
+      await expect
+        .poll(async () => (await inbox(partner.email)).filter((email) => email.subject === `Compliance opened ${reference}`), { timeout: 15_000 })
+        .toHaveLength(2);
+    });
+
+    it('lists the accesses, with their reasons, to the supervising partner only', async () => {
+      await access(officerToken);
+
+      const listed = await as(await signedIn(partner)).get(`/matters/${matterId}/compliance-accesses`);
+
+      expect(listed.status).toBe(200);
+      expect(listed.body.accesses).toEqual([
+        { id: expect.any(String), accessedBy: { accountId: officer.id, displayName: expect.any(String) }, reason: REASON, accessedAt: expect.any(String) },
+      ]);
+      expect((await as(token).get(`/matters/${matterId}/compliance-accesses`)).status).toBe(403);
+      const otherPartner = await staffWith('partner');
+      await request(app.getHttpServer())
+        .put(`/matters/${matterId}/team/${otherPartner.id}`)
+        .set('Cookie', `__Host-session=${await signedIn(partner)}`);
+      expect((await as(await signedIn(otherPartner)).get(`/matters/${matterId}/compliance-accesses`)).status).toBe(403);
+    });
+
+    it.each<[string, () => object]>([
+      ['a short reason', () => ({ matterReference: reference, reason: 'audit' })],
+      ['a matter id instead of a reference', () => ({ matterId, reason: REASON })],
+    ])('refuses %s', async (_case, body) => {
+      expect((await access(officerToken, body())).status).toBe(400);
+    });
+
+    it('does not find a reference that does not exist', async () => {
+      expect((await access(officerToken, { matterReference: 'C-999999/999', reason: REASON })).status).toBe(404);
+    });
+
+    it.each(['partner', 'fee_earner', 'administrator'] as const)('is closed to %s', async (role) => {
+      expect((await access(await signedIn(await staffWith(role)))).status).toBe(403);
+    });
+
+    // The read goes through the access record: an access to one matter cannot read another.
+    it('reads a matter only through an access to that same matter', async () => {
+      const otherMatterId = (await open(token)).body.id;
+      await access(officerToken);
+      const { id: accessId } = await db
+        .selectFrom('matter_compliance_accesses')
+        .select('id')
+        .where('matter_id', '=', matterId)
+        .executeTakeFirstOrThrow();
+      const repository = app.get(MattersRepository);
+
+      expect(await repository.findByComplianceAccess(otherMatterId, accessId)).toBeUndefined();
+      expect(await repository.findByComplianceAccess(matterId, accessId)).toMatchObject({ id: matterId });
     });
   });
 

@@ -1,8 +1,8 @@
 # Authorization
 
 **Current state (2026-10-04):** Layers 1 and 2 built, including the
-staff-management endpoints. Layer 3 (records) built for clients and for matter teams; compliance access
-with a reason comes with Matters step 8e.
+staff-management endpoints. Layer 3 (records) built for clients, matter teams, and compliance access with
+a reason.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -66,6 +66,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `matters.open` — open matters for clients you can see | | ✓ | ✓ | | |
 | `matters.view` — open matters you are on the team of | | ✓ | ✓ | | |
 | `matters.edit` — change the title and type of your matters | | ✓ | ✓ | | |
+| `matters.access_with_reason` — open any matter read-only, for one request, by recording a reason | | | | | ✓ |
 | `matters.supervise` — clear conflicts and change the team on matters you supervise; take over supervision from a partner who can no longer act; close matters you supervise ([rules](matters.md#opening-a-matter)) | | ✓ | | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 
@@ -156,7 +157,7 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters and clients (partly built)
+## Layer 3: matters and clients (built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 

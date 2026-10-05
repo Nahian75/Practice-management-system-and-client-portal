@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   'matters.view',
   'matters.edit',
   'matters.supervise',
+  'matters.access_with_reason',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -57,7 +58,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
   ],
   fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit', 'matters.open', 'matters.view', 'matters.edit'],
   accounts: [],
-  compliance: ['staff.view', 'audit.view'],
+  compliance: ['staff.view', 'audit.view', 'matters.access_with_reason'],
 };
 
 export function permissionsFor(roles: Iterable<StaffRole>): ReadonlySet<Permission> {

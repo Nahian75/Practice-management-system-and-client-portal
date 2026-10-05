@@ -25,6 +25,17 @@ export type OpenResult =
 
 export type ClearanceResult = 'cleared' | 'not_found' | 'not_supervisor' | 'not_awaiting_clearance';
 
+export interface ComplianceAccess {
+  id: string;
+  accessedBy: { accountId: string; displayName: string };
+  reason: string;
+  accessedAt: Date;
+}
+
+export type ComplianceAccessesResult =
+  | { outcome: 'listed'; accesses: ComplianceAccess[] }
+  | { outcome: 'not_found' | 'not_supervisor' };
+
 export type EditResult = 'updated' | 'not_found' | 'closed';
 export type CloseResult = 'closed' | 'not_found' | 'not_supervisor' | 'already_closed';
 
@@ -451,6 +462,65 @@ export class MattersService {
       );
       return 'closed';
     });
+  }
+
+  /**
+   * Compliance opens a matter they are not on, read-only, by recording a
+   * reason. Each look is a new access: nothing lasting is granted. The matter
+   * is read through the access record, and the supervising partner is told.
+   */
+  async accessWithReason(matterReference: string, reason: string, by: MatterActor): Promise<Matter | undefined> {
+    const outcome = await this.matters.transaction(async (trx) => {
+      const matter = await this.matters.findByReference(matterReference, trx);
+      if (!matter) {
+        return undefined;
+      }
+      const accessId = await this.matters.recordComplianceAccess({ matterId: matter.id, accessedBy: by.accountId, reason }, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'matter.accessed_with_reason',
+          outcome: 'success',
+          resource: { type: 'matter', id: matter.id },
+          metadata: { accessId },
+          ...by.context,
+        },
+        trx,
+      );
+      const details = await this.matters.findByComplianceAccess(matter.id, accessId, trx);
+      return details && { details, supervisor: await this.matters.supervisor(matter.id, trx) };
+    });
+    if (!outcome) {
+      return undefined;
+    }
+
+    await this.notices.complianceAccessed({
+      matterReference: outcome.details.reference,
+      supervisorId: outcome.supervisor.accountId,
+      accessedBy: by.accountId,
+    });
+    return outcome.details;
+  }
+
+  /** The compliance accesses to a matter, for its supervising partner only. */
+  async complianceAccessesOf(matterId: string, viewerId: string): Promise<ComplianceAccessesResult> {
+    const state = await this.matters.transaction((trx) => this.matters.supervisionState(matterId, viewerId, trx));
+    if (!state) {
+      return { outcome: 'not_found' };
+    }
+    if (!state.is_supervisor) {
+      return { outcome: 'not_supervisor' };
+    }
+    const accesses = await this.matters.complianceAccesses(matterId);
+    return {
+      outcome: 'listed',
+      accesses: accesses.map((access) => ({
+        id: access.id,
+        accessedBy: { accountId: access.accessed_by, displayName: access.display_name },
+        reason: access.reason,
+        accessedAt: access.accessed_at,
+      })),
+    };
   }
 
   /** Under the team lock: the caller must be on the team (else not found), its supervising partner, and the matter not closed. */

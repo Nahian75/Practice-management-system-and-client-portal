@@ -190,6 +190,7 @@ Sent in the background, never slowing or failing the action that caused them:
 | Sensitive role granted | `administrator`, `compliance` or `accounts` is granted to someone else: sent to every active compliance holder |
 | Possible conflict cleared | A supervising partner clears a possible conflict: sent to every active compliance holder except that partner. Names the matter by reference only; the reason stays out |
 | Supervision taken over | A partner takes over supervision of a matter: sent to every active compliance holder except that partner. Names the matter by reference only; the reason stays out |
+| Compliance opened a matter | Compliance records an access with a reason: sent to the matter's supervising partner, by matter reference only |
 | Client taken over | A partner takes over a client: sent to every active compliance holder except that partner. Names the client by reference only; the reason stays out |
 
 Background email (`MailOutbox`) waits for anything still sending when the app

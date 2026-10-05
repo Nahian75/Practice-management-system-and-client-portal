@@ -41,6 +41,8 @@
 | DELETE | `/matters/:matterId/team/:accountId` | `matters.supervise` + supervising partner | Removes a fee earner, who loses access at once. 204, also when not on the team. 409 for the supervising partner |
 | POST | `/matters/:matterId/supervisor` | `matters.supervise` + supervising partner | `{accountId}` → 204: hands supervision to that partner; the previous one stays as a fee earner. 400 not an active partner |
 | POST | `/matter-supervision-takeovers` | `matters.supervise` | `{matterReference, reason}` → 204: the caller becomes supervising partner. Works for matters the caller cannot see yet. 404 no such reference, 409 the supervising partner can still act |
+| POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}` → 200 with the matter, read-only, for this request only; recorded, and the supervising partner is emailed. 404 no such reference |
+| GET | `/matters/:matterId/compliance-accesses` | `matters.supervise` + supervising partner | `{"accesses": [{id, accessedBy, reason, accessedAt}]}`. 403 not the supervising partner |
 | GET | `/clients/:clientId/matters` | `matters.view` + client visibility | The client's matters you are on the team of |
 | POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person can still see the client (active and holding `clients.view`) |
 

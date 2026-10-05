@@ -578,6 +578,45 @@ describe('matters tables', () => {
     });
   });
 
+  describe('compliance access (step 8g)', () => {
+    let matterId: string;
+
+    const access = (accessedBy: string) =>
+      db
+        .insertInto('matter_compliance_accesses')
+        .values({ matter_id: matterId, accessed_by: accessedBy, reason: 'Quarterly file review of property matters' })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+
+    beforeEach(async () => {
+      matterId = (await openMatter()).id;
+    });
+
+    it('records an access by someone holding the compliance role', async () => {
+      await expect(access((await staffWith('compliance')).id)).resolves.toBeDefined();
+    });
+
+    it.each<[string, () => Promise<string>]>([
+      ['a partner', async () => (await staffWith('partner')).id],
+      ['a disabled compliance holder', async () => {
+        const account = await staffWith('compliance');
+        await setAccountStatus(db, account.id, 'disabled');
+        return account.id;
+      }],
+    ])('refuses an access by %s', async (_case, accessor) => {
+      await expect(access(await accessor())).rejects.toThrow(/only by active compliance staff/);
+    });
+
+    it('keeps every access as it was', async () => {
+      const { id } = await access((await staffWith('compliance')).id);
+
+      await expect(sql`update matter_compliance_accesses set reason = 'Rewritten afterwards' where id = ${id}`.execute(db)).rejects.toThrow(
+        /permission denied/,
+      );
+      await expect(sql`delete from matter_compliance_accesses where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
+
   describe('app role restrictions', () => {
     let matterId: string;
 

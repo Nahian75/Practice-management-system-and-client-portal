@@ -19,6 +19,7 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'matters.open': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'matters.view': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'matters.edit': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
+  'matters.access_with_reason': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
   'matters.supervise': { administrator: false, partner: true, fee_earner: false, accounts: false, compliance: false },
 };
 
@@ -39,7 +40,7 @@ describe('role permissions', () => {
   });
 
   it('combines the permissions of every role held', () => {
-    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'staff.view']);
+    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'staff.view']);
   });
 
   it('gives no permissions without roles', () => {

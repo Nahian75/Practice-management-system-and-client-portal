@@ -292,6 +292,14 @@ export interface MatterClosuresTable {
   closed_at: DatabaseSet<Date>;
 }
 
+export interface MatterComplianceAccessesTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  accessed_by: InsertOnly<string>;
+  reason: InsertOnly<string>;
+  accessed_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -306,6 +314,7 @@ export interface Database {
   clients: ClientsTable;
   invitations: InvitationsTable;
   matter_closures: MatterClosuresTable;
+  matter_compliance_accesses: MatterComplianceAccessesTable;
   matter_parties: MatterPartiesTable;
   matter_supervision_takeovers: MatterSupervisionTakeoversTable;
   matter_team: MatterTeamTable;

@@ -1,11 +1,11 @@
 # Matters
 
-**Current state (2026-10-05):** Steps 8a to 8f built: matters and teams,
+**Current state (2026-10-05):** Steps 8a to 8g built: matters and teams,
 conflict checks required for opening, other parties, clearing a possible
 conflict, team changes and handing over supervision, taking over supervision
-from a partner who can no longer act, editing and closing, seeing your
-matters, and client visibility through matter teams. Compliance access is
-designed below.
+from a partner who can no longer act, editing and closing, compliance access
+with a reason, seeing your matters, and client visibility through matter
+teams. The module's security review is next.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -168,6 +168,27 @@ Built in 8f (migration `0021`):
   closed matter, its team, or its status, so no clearance, handover or
   takeover can follow. The API answers 409.
 
+## Compliance access
+
+Decided by the project owner: compliance can open a matter they are not on
+only by recording a reason, audited and visible to the matter's supervising
+partner. Built in 8g (migration `0022`):
+
+- `POST /matter-compliance-accesses` with `{matterReference, reason}`
+  (`matters.access_with_reason`, compliance only) answers with the matter,
+  read-only, for that request. **Nothing lasting is granted**: compliance still
+  gets 403 from `GET /matters/:id` and the client, and every look is a new
+  recorded access.
+- The matter is read through the access record (`reachedByComplianceAccess`):
+  even this path cannot read a matter without the row that justifies it, and an
+  access to one matter cannot read another. Every matter query in the
+  repository now takes such a filter; there is no unfiltered read.
+- The database refuses an access by anyone but an active compliance holder.
+  Accesses cannot be changed or deleted.
+- `matter.accessed_with_reason` records the access id; the reason stays with
+  the access. The supervising partner is emailed (matter reference only) and
+  sees every access, with its reason, at `GET /matters/:id/compliance-accesses`.
+
 ## Conflict checks
 
 Built in 8b (migration `0017`). A check compares each name given, plus the
@@ -253,7 +274,8 @@ unchanged.
 | POST | `/matters/:id/supervisor` | `matters.supervise` + supervising partner | `{accountId}`: hand supervision to another partner |
 | POST | `/matter-supervision-takeovers` | `matters.supervise` | `{matterReference, reason}`: take over from a supervising partner who can no longer act |
 | POST | `/matters/:id/close` | `matters.supervise` + supervising partner | `{reason}` |
-| POST | `/matters/:id/access` | `matters.access_with_reason` | `{reason}`; opens the matter read-only for that request |
+| POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}`: the matter, read-only, for that request |
+| GET | `/matters/:id/compliance-accesses` | `matters.supervise` + supervising partner | Every compliance access, with its reason |
 | GET | `/clients/:id/matters` | `clients.view` + client visibility | The client's matters you can see |
 
 ## Audit
@@ -288,5 +310,5 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **8f.** Editing, closing. Done. Adding other parties after opening is not
   built: a new party needs a new conflict check, and possibly clearance again,
   on an open matter. To be designed with the project owner.
-- **8g.** Compliance access with a reason.
+- **8g.** Compliance access with a reason. Done.
 - Security review of the module.

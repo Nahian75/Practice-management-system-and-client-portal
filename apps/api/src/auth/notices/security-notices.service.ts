@@ -158,6 +158,27 @@ export class SecurityNoticesService {
     }
   }
 
+  /**
+   * Tells the matter's supervising partner that compliance opened it. The
+   * reason is not in the email; the partner reads it in the app, where the
+   * accesses are listed.
+   */
+  async complianceAccessed(access: { matterReference: string; supervisorId: string; accessedBy: string }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const officer = await this.accounts.findById(access.accessedBy);
+    if (!officer) {
+      return;
+    }
+    await this.notify(access.supervisorId, `Compliance opened ${access.matterReference}`, (name) => [
+      `Hello ${name},`,
+      '',
+      `${officer.display_name}, who holds the compliance role, opened matter ${access.matterReference} on ${when}.`,
+      '',
+      'You are told because you supervise the matter. The reason given is shown with',
+      "the matter's compliance accesses.",
+    ]);
+  }
+
   async roleRevoked(accountId: string, role: StaffRole, revokedBy: string | null): Promise<void> {
     const when = this.clock.now().toUTCString();
     const by = await this.changedBy(revokedBy);

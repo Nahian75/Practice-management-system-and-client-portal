@@ -110,9 +110,20 @@ const closeSchema = z.strictObject({ reason: text(500, 10) });
 const matterPatchSchema = z
   .strictObject({ title: text(200).optional(), matterType: z.enum(MATTER_TYPES).optional() })
   .refine((patch) => Object.keys(patch).length > 0, 'Nothing to change');
-const supervisionTakeoverSchema = z.strictObject({
+/** A matter named by the reference on its file, for people not on its team, and why. */
+const referenceWithReasonSchema = z.strictObject({
   matterReference: z.string().trim().toUpperCase().regex(/^C-[0-9]{6,}\/[0-9]{3,}$/),
   reason: text(500, 10),
+});
+const complianceAccessesSchema = z.object({
+  accesses: z.array(
+    z.object({
+      id: z.uuid(),
+      accessedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+      reason: z.string(),
+      accessedAt: z.iso.datetime(),
+    }),
+  ),
 });
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
@@ -349,7 +360,7 @@ export class MattersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseSchema(NO_CONTENT)
   async takeOverSupervision(
-    @Body({ schema: supervisionTakeoverSchema }) body: z.infer<typeof supervisionTakeoverSchema>,
+    @Body({ schema: referenceWithReasonSchema }) body: z.infer<typeof referenceWithReasonSchema>,
     @CurrentSession() session: ResolvedSession,
     @Req() request: Request,
   ): Promise<void> {
@@ -360,6 +371,39 @@ export class MattersController {
         throw new ConflictException('The supervising partner of this matter can still act');
       case 'taken_over':
         return;
+    }
+  }
+
+  /** Compliance only: the matter, read-only, for this request. Each look is recorded with its reason. */
+  @Post('matter-compliance-accesses')
+  @RequirePermission('matters.access_with_reason')
+  @HttpCode(HttpStatus.OK)
+  @ResponseSchema(matterSchema)
+  async accessWithReason(
+    @Body({ schema: referenceWithReasonSchema }) body: z.infer<typeof referenceWithReasonSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const matter = await this.matters.accessWithReason(body.matterReference, body.reason, actorFor(session, request));
+    if (!matter) {
+      throw new NotFoundException('No matter with this reference');
+    }
+    return { ...matter, openedAt: matter.openedAt.toISOString() };
+  }
+
+  /** Who from compliance opened the matter, when and why: for its supervising partner. */
+  @Get('matters/:matterId/compliance-accesses')
+  @RequirePermission('matters.supervise')
+  @ResponseSchema(complianceAccessesSchema)
+  async complianceAccesses(@Param('matterId', { schema: z.uuid() }) matterId: string, @CurrentSession() session: ResolvedSession) {
+    const result = await this.matters.complianceAccessesOf(matterId, session.account.id);
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+      case 'not_supervisor':
+        throw new ForbiddenException("Only the matter's supervising partner sees its compliance accesses");
+      case 'listed':
+        return { accesses: result.accesses.map((access) => ({ ...access, accessedAt: access.accessedAt.toISOString() })) };
     }
   }
 
