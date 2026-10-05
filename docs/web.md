@@ -72,6 +72,30 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   A test fails if it stays.
 - A refused password shows every reason the API gives.
 
+## Built in 9c
+
+- `/clients`: the clients you are responsible for, newest first, with "Older
+  clients" for the next page. A search box looks across the whole firm by
+  name or reference, as the API allows.
+- The search runs from the browser, not the web server, so the audit record
+  of who searched keeps the searcher's own IP address. It counts against the
+  same hourly allowance as conflict checks; when that is used up, the page says
+  so.
+- `/clients/new` and `/clients/:id/edit`: one form for individuals and
+  organisations. The kind is chosen only on create. Dates of birth are three
+  boxes (day, month, year), the UK pattern. Emptying an optional field removes
+  it, rather than leaving the old value.
+- `/clients/:id`: details, contacts (organisations) and the client's matters.
+  A client someone else is responsible for shows only "You cannot see this
+  client", with the takeover form; the API decides whether a takeover is
+  allowed (partners only, with a reason, audited).
+- Contacts are added and changed on their own pages. A contact who leaves is
+  marked as no longer a contact, never deleted. The change page looks the
+  contact up in that client's own list, so another client's contact cannot be
+  opened through it.
+- Countries in address forms are the API's own list, copied; a test fails if
+  the two lists differ.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from

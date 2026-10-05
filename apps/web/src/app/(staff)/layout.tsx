@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { appName } from '@/config';
 import { currentAccount } from '@/lib/api';
+import { NavLinks } from '@/components/nav-links';
 import { SignOutButton } from './sign-out-button';
 
 /**
@@ -22,6 +23,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
           <Link className="header-name" href="/">
             {appName()}
           </Link>
+          <NavLinks />
           <span>{account.displayName}</span>
           <SignOutButton />
         </div>

@@ -91,6 +91,10 @@ npm run test:e2e -w @practice/web   # builds the web app, then runs the tests
   Codes are computed as an authenticator app does (`e2e/support/staff.ts`).
 - Each authenticator code works once, so a sign-in right after accepting an
   invitation waits for the next 30-second code, or uses a backup code.
+- Screens that need a signed-in person use `signedInStaff` (signs in through
+  the sign-in page) and `apiSessionFor` (a second person, signed in through
+  the API, to set up data such as someone else's client) from
+  `e2e/support/session.ts`. Every test gets new people, so tests never share data.
 - Every screen is checked with axe against WCAG 2.2 AA.
 - Traces and screenshots of failures stay in the git-ignored `test-results/`.
 

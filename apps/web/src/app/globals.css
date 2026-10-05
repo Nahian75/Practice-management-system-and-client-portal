@@ -237,3 +237,147 @@ a:hover {
   max-width: 28rem;
   padding-left: var(--space-4);
 }
+
+.nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav a {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav a[aria-current='page'],
+.nav a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.3em;
+}
+
+/* Lists of records: plain tables, ruled rows, no zebra stripes. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-4);
+}
+
+.table caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  vertical-align: top;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--colour-rule);
+}
+
+/* Details of one record: label and value side by side, stacked on narrow screens. */
+.summary {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  margin: 0 0 var(--space-4);
+  max-width: var(--page);
+}
+
+.summary dt,
+.summary dd {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--colour-rule);
+}
+
+.summary dt {
+  font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary dt {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+.caption {
+  display: block;
+  color: var(--colour-text-secondary);
+  font-size: 1.1875rem;
+  margin-bottom: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.button-secondary {
+  background: var(--colour-background);
+  color: var(--colour-brand);
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+
+.fieldset legend {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.radios label,
+.checkbox label {
+  display: block;
+  padding: var(--space-1) 0;
+}
+
+.radios input,
+.checkbox input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: var(--space-2);
+  vertical-align: -0.15em;
+}
+
+.select {
+  font: inherit;
+  padding: var(--space-2);
+  border: 2px solid var(--colour-text);
+  border-radius: 0;
+  background: var(--colour-background);
+  max-width: 100%;
+}
+
+/* Groups a label and its value without adding a box of its own. */
+.summary-row {
+  display: contents;
+}
+
+/* Read by screen readers, not shown: for example which row a "Change" link is in. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}

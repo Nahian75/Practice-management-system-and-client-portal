@@ -14,10 +14,18 @@ export interface SignedInAccount {
  * is passed on, nothing else from the browser. The answer is never cached.
  * `path` comes from this app's code, never from the visitor.
  */
-export async function apiGet<T>(path: `/${string}`): Promise<{ status: number; body: T | undefined }> {
+export async function apiGet<T>(
+  path: `/${string}`,
+  query: Record<string, string | undefined> = {},
+): Promise<{ status: number; body: T | undefined }> {
   const session = (await cookies()).get(SESSION_COOKIE)?.value;
   const url = new URL(apiOrigin());
   url.pathname = path;
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined) {
+      url.searchParams.set(name, value);
+    }
+  }
 
   const response = await fetch(url, {
     headers: session ? { cookie: `${SESSION_COOKIE}=${session}` } : {},
