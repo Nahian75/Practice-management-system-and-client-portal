@@ -1,5 +1,12 @@
 import type { ClientKind, ConflictMatchRow, MatterStatus, MatterTeamRole, MatterType, PartyRole } from '../database/schema.js';
 
+/** Someone who can be put on a matter's team, as the people choosing a team see them. */
+export interface Colleague {
+  id: string;
+  displayName: string;
+  isPartner: boolean;
+}
+
 export interface NewParty {
   role: PartyRole;
   kind: ClientKind;

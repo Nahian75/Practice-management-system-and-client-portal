@@ -283,6 +283,7 @@ unchanged.
 | POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}`: the matter, read-only, for that request |
 | GET | `/matters/:id/compliance-accesses` | `matters.supervise` + supervising partner | Every compliance access, with its reason |
 | GET | `/clients/:id/matters` | `clients.view` + client visibility | The client's matters you can see |
+| GET | `/colleagues` | `matters.open` | Who can be put on a team: active partners and fee earners, with name and whether each is a partner. No email addresses or other roles |
 
 ## Audit
 
@@ -323,4 +324,7 @@ Each step ships with positive and negative tests and is reviewed before the next
   built: a new party needs a new conflict check, and possibly clearance again,
   on an open matter. To be designed with the project owner.
 - **8g.** Compliance access with a reason. Done.
+- **9d-1.** `GET /colleagues`, so that people opening a matter can choose its
+  supervising partner and fee earners: `/staff` is for administrators,
+  partners and compliance, and shows more than a team picker needs. Done.
 - Security review of the module. Done: [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md). M1, M2 and M4 fixed; M3 accepted; M5 open for design.

@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Expression, type ExpressionBuilder, type Kysely, type SqlBool } from 'kysely';
 import { clientName, visibleTo as clientVisibleTo } from '../clients/clients.repository.js';
 import { DATABASE } from '../database/database.module.js';
-import type { Database, MatterTeamRole, MatterType } from '../database/schema.js';
-import type { Matter, MatterSummary, NewParty, Party, TeamMember } from './matter.js';
+import type { Database, MatterTeamRole, MatterType, StaffRole } from '../database/schema.js';
+import type { Colleague, Matter, MatterSummary, NewParty, Party, TeamMember } from './matter.js';
 
 /**
  * The visibility rule for matters (docs/matters.md), in one place: an active
@@ -77,6 +77,29 @@ export class MattersRepository {
       id: account.id,
       roles: roles.filter((row) => row.account_id === account.id).map((row) => row.role),
     }));
+  }
+
+  /** Active staff holding any of `roles`, by name, and whether each is a partner. */
+  async activeStaffHolding(roles: readonly StaffRole[]): Promise<Colleague[]> {
+    const holds = (eb: ExpressionBuilder<Database, 'accounts'>, held: readonly StaffRole[]) =>
+      eb.exists(
+        eb
+          .selectFrom('account_roles')
+          .select('account_roles.id')
+          .whereRef('account_roles.account_id', '=', 'accounts.id')
+          .where('account_roles.role', 'in', held)
+          .where('account_roles.revoked_at', 'is', null),
+      );
+    const rows = await this.db
+      .selectFrom('accounts')
+      .select((eb) => ['accounts.id', 'accounts.display_name', holds(eb, ['partner']).as('is_partner')])
+      .where('accounts.kind', '=', 'staff')
+      .where('accounts.status', '=', 'active')
+      .where((eb) => holds(eb, roles))
+      .orderBy('accounts.display_name')
+      .orderBy('accounts.id')
+      .execute();
+    return rows.map((row) => ({ id: row.id, displayName: row.display_name, isPartner: Boolean(row.is_partner) }));
   }
 
   /** Inserts the matter. The database checks the conflict check and sets the number, reference and status. */

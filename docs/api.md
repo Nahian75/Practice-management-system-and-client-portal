@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-04):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and opening and viewing matters.
+**Current state (2026-10-05):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team.
 
 ## Endpoints
 
@@ -44,6 +44,7 @@
 | POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}` → 200 with the matter, read-only, for this request only; recorded, and the supervising partner is emailed. 404 no such reference, 429 after 30 in an hour |
 | GET | `/matters/:matterId/compliance-accesses` | `matters.supervise` + supervising partner | `{"accesses": [{id, accessedBy, reason, accessedAt}]}`. 403 not the supervising partner |
 | GET | `/clients/:clientId/matters` | `matters.view` + client visibility | The client's matters you are on the team of |
+| GET | `/colleagues` | `matters.open` | `{"colleagues": [{id, displayName, isPartner}]}`: active staff who can be put on a matter's team (partner or fee earner), by name. No email addresses or other roles |
 | POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person can still see the client (active and holding `clients.view`) |
 
 `/health` returns exactly `{"status":"ok"}`. It must never return version

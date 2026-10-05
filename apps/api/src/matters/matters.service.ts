@@ -3,16 +3,19 @@ import { sql, type Kysely } from 'kysely';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
-import { permissionsFor } from '../auth/permissions/permissions.js';
+import { permissionsFor, STAFF_ROLES } from '../auth/permissions/permissions.js';
 import { SearchQuota } from '../clients/search-quota.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { ConflictMatchRow, Database, MatterStatus, MatterTeamRole, MatterType } from '../database/schema.js';
-import type { ConflictCheck, Matter, MatterSummary, NewMatter } from './matter.js';
+import type { Colleague, ConflictCheck, Matter, MatterSummary, NewMatter } from './matter.js';
 import { MattersRepository } from './matters.repository.js';
 
 export const MATTERS_PAGE_SIZE = 50;
 export const COMPLIANCE_ACCESSES_PER_HOUR = 30;
 export const COMPLIANCE_WINDOW_SECONDS = 60 * 60;
+
+/** Roles that let someone work on a matter, the same test opening a matter applies to its team. */
+const MATTER_TEAM_ROLES = STAFF_ROLES.filter((role) => permissionsFor([role]).has('matters.view'));
 
 /** The signed-in staff member acting, and the request it came from. */
 export interface MatterActor {
@@ -613,6 +616,11 @@ export class MattersService {
   async list(viewerId: string, before?: string): Promise<{ matters: MatterSummary[]; next: string | null }> {
     const matters = await this.matters.listVisible(viewerId, { before, limit: MATTERS_PAGE_SIZE });
     return { matters, next: matters.length === MATTERS_PAGE_SIZE ? (matters.at(-1)?.id ?? null) : null };
+  }
+
+  /** Everyone who could be put on a matter's team now; partners can also supervise. */
+  colleagues(): Promise<Colleague[]> {
+    return this.matters.activeStaffHolding(MATTER_TEAM_ROLES);
   }
 
   /** The client's matters that `viewerId` is on, if they can see the client at all. */

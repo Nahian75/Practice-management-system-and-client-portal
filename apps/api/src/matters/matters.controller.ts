@@ -134,6 +134,9 @@ const complianceAccessesSchema = z.object({
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
+const colleaguesSchema = z.object({
+  colleagues: z.array(z.object({ id: z.uuid(), displayName: z.string(), isPartner: z.boolean() })),
+});
 
 export const MATTER_NOT_FOUND_MESSAGE = 'No matter with this id';
 const MATTER_CLOSED_MESSAGE = 'This matter is closed';
@@ -420,6 +423,14 @@ export class MattersController {
       case 'listed':
         return { accesses: result.accesses.map((access) => ({ ...access, accessedAt: access.accessedAt.toISOString() })) };
     }
+  }
+
+  /** Names only, for choosing a matter's team: no email addresses, and no other roles. */
+  @Get('colleagues')
+  @RequirePermission('matters.open')
+  @ResponseSchema(colleaguesSchema)
+  async colleagues() {
+    return { colleagues: await this.matters.colleagues() };
   }
 
   @Get('clients/:clientId/matters')
