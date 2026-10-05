@@ -48,4 +48,4 @@ authorization decisions.
 | Compliance / AML | Not started |
 | HR | Not started |
 | AI | Not started |
-| Web app (staff) | Step 9a built: set-up, security headers, pass-through to the API, sign in and out (`apps/web/`). Invitations and password reset next ([web.md](web.md)) |
+| Web app (staff) | Steps 9a and 9b built: set-up, security headers, pass-through to the API, sign in and out, accepting invitations, password reset (`apps/web/`). Client screens next ([web.md](web.md)) |

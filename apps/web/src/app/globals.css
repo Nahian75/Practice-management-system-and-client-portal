@@ -219,3 +219,21 @@ a:hover {
   font-weight: 600;
   margin-bottom: var(--space-2);
 }
+
+.after-form {
+  margin-top: var(--space-4);
+}
+
+/* Set-up keys and backup codes: easy to read and copy, character by character. */
+.secret,
+.backup-codes code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.05em;
+}
+
+.backup-codes {
+  columns: 2;
+  max-width: 28rem;
+  padding-left: var(--space-4);
+}

@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ErrorSummary } from '@/components/error-summary';
+import { messagesOf, postJson } from '@/lib/requests';
 
 type Step = 'password' | 'code';
 
@@ -14,18 +16,14 @@ type Step = 'password' | 'code';
 export function SignInForm() {
   const router = useRouter();
   const [step, setStep] = useState<Step>('password');
-  const [error, setError] = useState<string>();
+  const [errors, setErrors] = useState<string[]>();
   const [sending, setSending] = useState(false);
 
-  async function send(path: string, body: Record<string, string>) {
+  async function send(path: `/api/${string}`, body: Record<string, string>) {
     setSending(true);
-    setError(undefined);
+    setErrors(undefined);
     try {
-      return await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      return await postJson(path, body);
     } finally {
       setSending(false);
     }
@@ -42,7 +40,7 @@ export function SignInForm() {
       setStep('code');
       return;
     }
-    setError(await messageOf(response));
+    setErrors(await messagesOf(response));
   }
 
   async function submitCode(event: FormEvent<HTMLFormElement>) {
@@ -54,18 +52,18 @@ export function SignInForm() {
       router.refresh();
       return;
     }
-    const message = await messageOf(response);
+    const messages = await messagesOf(response);
     // The waiting sign-in has ended (too many codes, or it expired): start again.
-    if (message === 'Please sign in again') {
+    if (messages.includes('Please sign in again')) {
       setStep('password');
     }
-    setError(message);
+    setErrors(messages);
   }
 
   if (step === 'code') {
     return (
       <form onSubmit={submitCode} noValidate>
-        {error && <ErrorSummary message={error} />}
+        {errors && <ErrorSummary messages={errors} />}
         <div className="field">
           <label className="label" htmlFor="code">
             Security code
@@ -95,7 +93,7 @@ export function SignInForm() {
 
   return (
     <form onSubmit={submitPassword} noValidate>
-      {error && <ErrorSummary message={error} />}
+      {errors && <ErrorSummary messages={errors} />}
       <div className="field">
         <label className="label" htmlFor="email">
           Email address
@@ -111,19 +109,10 @@ export function SignInForm() {
       <button className="button" type="submit" disabled={sending}>
         Continue
       </button>
+      <p className="after-form">
+        <Link href="/forgot-password">Forgot your password?</Link>
+      </p>
     </form>
   );
 }
 
-/** The API's message for a refused request, or a general one if it has none. */
-async function messageOf(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { message?: unknown };
-    if (typeof body.message === 'string') {
-      return body.message;
-    }
-  } catch {
-    // Not JSON: fall through to the general message.
-  }
-  return response.status === 429 ? 'Too many attempts. Try again later' : 'Something went wrong. Try again';
-}

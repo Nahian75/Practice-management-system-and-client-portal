@@ -22,9 +22,9 @@ npm run dev -w @practice/web              # the web app: open http://localhost:3
 ```
 
 Browsers only ever talk to the web app on port 3000; it passes `/api/...` to
-the API on 3001 ([web.md](web.md)). Accepting an invitation in the browser
-comes with web step 9b; until then the API's invitation endpoints are used
-directly.
+the API on 3001 ([web.md](web.md)). Open the invitation email in Mailpit and
+follow its link to choose a password and set up the authenticator app, then
+sign in at http://localhost:3000.
 
 **Extensions, once per database.** `pg_trgm` and `unaccent` need the
 superuser, which the migration role deliberately is not. New data volumes get

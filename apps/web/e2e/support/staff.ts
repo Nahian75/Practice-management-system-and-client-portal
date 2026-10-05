@@ -19,10 +19,21 @@ const MAILPIT_URL = process.env['TEST_MAILPIT_URL'] ?? 'http://127.0.0.1:8025';
  * code. Nothing is written to the database directly.
  */
 export async function createStaff(request: APIRequestContext, roles: string[] = ['fee_earner']): Promise<TestStaff> {
+  const { email, displayName, token } = await inviteStaff(roles);
+  const password = `quiet-harbour-${randomUUID()}`;
+  const passwordStep = await request.post('/api/auth/invitations/password', { data: { token, password } });
+  const { twoFactor } = (await passwordStep.json()) as { twoFactor: { secret: string } };
+  const complete = await request.post('/api/auth/invitations/complete', { data: { token, code: totp(twoFactor.secret) } });
+  const { backupCodes } = (await complete.json()) as { backupCodes: string[] };
+
+  return { email, displayName, password, secret: twoFactor.secret, backupCodes };
+}
+
+/** A staff member invited from the command line, with the token from their invitation email. */
+export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ email: string; displayName: string; token: string }> {
   const id = randomUUID().slice(0, 8);
   const email = `e2e-${randomUUID()}@example.com`;
   const displayName = `E2E Staff ${id}`;
-  const password = `quiet-harbour-${randomUUID()}`;
 
   // The command's own output is kept, to explain a missing email.
   const invited = execFileSync(
@@ -41,32 +52,26 @@ export async function createStaff(request: APIRequestContext, roles: string[] = 
     },
   );
 
-  const token = await invitationToken(email, invited);
-  const passwordStep = await request.post('/api/auth/invitations/password', { data: { token, password } });
-  const { twoFactor } = (await passwordStep.json()) as { twoFactor: { secret: string } };
-  const complete = await request.post('/api/auth/invitations/complete', { data: { token, code: totp(twoFactor.secret) } });
-  const { backupCodes } = (await complete.json()) as { backupCodes: string[] };
-
-  return { email, displayName, password, secret: twoFactor.secret, backupCodes };
+  return { email, displayName, token: await emailedToken(email, '/accept-invitation', invited) };
 }
 
-/** The token from the invitation email Mailpit caught for this address. */
-async function invitationToken(email: string, invited: string): Promise<string> {
+/** The token from a link to `path` in an email Mailpit caught for this address. */
+export async function emailedToken(email: string, path: string, context = ''): Promise<string> {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
     const { messages } = (await search.json()) as { messages: { ID: string }[] };
-    // A role given at invitation sends its own email too: look through them all.
+    // Other emails go to the same address (a role given at invitation sends one): look through them all.
     for (const message of messages) {
       const detail = (await (await fetch(`${MAILPIT_URL}/api/v1/message/${message.ID}`)).json()) as { Text: string };
-      const token = /#token=([A-Za-z0-9_-]{43})/.exec(detail.Text)?.[1];
+      const token = new RegExp(`${path}#token=([A-Za-z0-9_-]{43})`).exec(detail.Text)?.[1];
       if (token) {
         return token;
       }
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`No invitation email for ${email}. The invite command said: ${invited}`);
+  throw new Error(`No email with a ${path} link for ${email}. ${context}`);
 }
 
 /** What an authenticator app shows now (RFC 6238: SHA-1, 6 digits, 30 seconds). */

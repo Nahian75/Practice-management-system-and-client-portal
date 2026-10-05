@@ -1,8 +1,9 @@
 # Web app
 
-**Current state (2026-10-05):** Step 9a built: the app, its security headers,
-the pass-through to the API, the layout, sign in with 2FA or a backup code, sign
-out, and a signed-in home page. The other screens are designed below.
+**Current state (2026-10-05):** Steps 9a and 9b built: the app, its security
+headers, the pass-through to the API, the layout, sign in with 2FA or a backup
+code, sign out, a signed-in home page, accepting an invitation, and password
+reset. The other screens are designed below.
 
 The staff app, in the browser. The client portal comes later, in the same app.
 
@@ -55,6 +56,21 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - Sign-in is two steps, password then code, showing the API's own messages
   in an error summary that takes focus.
 - Fonts are downloaded when the app is built and served from the app itself.
+
+## Built in 9b
+
+- `/accept-invitation`: the invitation is checked, then a password (typed
+  twice), then the authenticator: a QR code and the key as text, confirmed with
+  a code; then the ten backup codes, shown this once.
+- The QR code is drawn as SVG squares in the page from the set-up link, using
+  `qrcode-generator` (MIT, no dependencies; chosen over `qrcode`, which brings a
+  command-line toolkit). The secret is never sent anywhere to become an image.
+- `/forgot-password` gives the same answer whether or not the address has an
+  account; `/reset-password` sets the new password from the emailed link.
+- Links carry their token after `#`, which browsers never send to a server;
+  the page reads it and removes it from the address bar and history at once.
+  A test fails if it stays.
+- A refused password shows every reason the API gives.
 
 ## Security in the web app
 
