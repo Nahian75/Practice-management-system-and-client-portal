@@ -10,7 +10,8 @@ Requirements: Node.js 24 LTS, Docker Desktop, gitleaks.
 cp .env.example .env              # then fill every value with a random password
 docker compose up -d              # PostgreSQL 18 on 127.0.0.1:5432, Mailpit on 127.0.0.1:1025 / :8025,
                                   # SeaweedFS (documents) on :8333, ClamAV on :3310 (first start: a few minutes)
-cp apps/api/.env.example apps/api/.env    # then fill the database URLs and TOTP_ENCRYPTION_KEY; mail settings work as given
+cp apps/api/.env.example apps/api/.env    # then fill the database URLs, TOTP_ENCRYPTION_KEY, DOCUMENT_ENCRYPTION_KEY
+                                          # and the storage key pair from .env; mail and scanner settings work as given
 npm ci
 npm run build -w @practice/api
 npm run migrate:local -w @practice/api

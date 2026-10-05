@@ -1,6 +1,9 @@
 # Documents
 
-**Current state (2026-10-05):** Step 10a built: local storage and scanner containers, and file encryption (`apps/api/src/documents/file-cipher.ts`). Not yet used by any route; step 10b next.
+**Current state (2026-10-05):** Steps 10a and 10b-1 built: storage and scanner
+containers, file encryption, the tables (migration `0024`), and the API's
+connections to storage and scanner (`ObjectStorage`, `DocumentVault`,
+`VirusScanner` in `apps/api/src/documents/`). No routes yet; step 10b-2 next.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -35,11 +38,19 @@ see there.
 ## Tables
 
 - `documents`: `id`, `matter_id`, `title`, `category`, `created_by`,
-  `created_at`, `withdrawn_at`, `withdrawn_by`, `withdrawal_reason`.
+  `created_at`. Withdrawal (`withdrawn_at`, `withdrawn_by`,
+  `withdrawal_reason`) comes with step 10c.
 - `document_versions`: `id`, `document_id`, `number`, `file_name`,
-  `media_type`, `size_bytes`, `sha256`, `storage_key`, `wrapped_key`,
-  `uploaded_by`, `uploaded_at`. Insert only: the app role cannot change or
-  delete a version.
+  `media_type`, `size_bytes`, `sha256`, `storage_key`, and the sealed file
+  key (`key_version`, `key_nonce`, `wrapped_key`, `key_tag`), `uploaded_by`,
+  `uploaded_at`. Insert only: the app role cannot change or delete a version,
+  nor choose its number.
+- The database itself refuses: a document or version from anyone not an active
+  member of the matter's team; any on a matter that is not open (awaiting
+  conflict clearance, or closed); a document without a version (checked at
+  commit); version numbers out of order (numbered under a per-document lock);
+  a file name with a slash, backslash or control character; a type not
+  allowed; an empty file or one over 50 MB.
 - The storage key is a random id, not the file name or anything about the
   client, so the storage listing reveals nothing.
 
@@ -106,7 +117,10 @@ SeaweedFS 4.47 (storage, S3 on `127.0.0.1:8333`) and ClamAV 1.5.4 (scanner, on
 SeaweedFS requires the access key from `.env` and refuses anonymous requests
 (checked: 403). It creates one bucket per database: `pms-documents`,
 `pms-documents-test`, `pms-documents-e2e`. ClamAV was checked with the
-standard EICAR test file (found) and a clean file (passed). Both versions were
+standard EICAR test file (found) and a clean file (passed). The API's settings
+are `DOCUMENTS_S3_*`, `DOCUMENT_ENCRYPTION_KEY` and `CLAMAV_*` in
+`apps/api/.env`; the storage endpoint must be https in production. ClamAV's
+daemon has no authentication, so in production it must be on a private network. Both versions were
 at least seven days old when pinned, as for npm packages.
 
 ## Not in this module
@@ -123,7 +137,9 @@ Each step ships with positive and negative tests and is reviewed before the next
 
 - **10a.** SeaweedFS and ClamAV containers; file encryption and decryption, with
   tests (no routes yet). Done.
-- **10b.** Uploading, listing and downloading documents on a matter, with
+- **10b-1.** The tables; the API's connections to storage (encrypting as it
+  stores, `DocumentVault`) and to the scanner (failing closed). Done.
+- **10b-2.** Uploading, listing and downloading documents on a matter, with
   scanning, type and size checks, and audit.
 - **10c.** Versions and withdrawal.
 - **10d.** The document screens in the staff web app.

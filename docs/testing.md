@@ -17,6 +17,12 @@ Docker, using the `pms_test` database (`TEST_DATABASE_URL`,
 `TEST_MIGRATION_DATABASE_URL` in `apps/api/.env`). They never touch `pms`.
 Each migration test works in its own randomly named schema and drops it afterwards.
 
+Document tests also need the SeaweedFS and ClamAV containers (`docker compose
+up -d`). They use the `pms-documents-test` bucket and a new random master key
+each run. Scanning is tested with the EICAR test file, which every scanner
+reports but which is harmless; `test/eicar.ts` builds it at run time, so the
+antivirus on a developer's machine does not quarantine the source.
+
 Before any test runs, `test/global-setup.ts` applies the real migrations to
 `pms_test` as `pms_owner`. Audit rows cannot be deleted, even in the test
 database, so tests identify their own rows by a random actor ID, and the test

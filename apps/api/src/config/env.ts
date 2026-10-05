@@ -77,11 +77,24 @@ const envSchema = z
     MAIL_FROM_ADDRESS: z.email(),
     MAIL_FROM_NAME: z.string().min(1).max(100).default('Practice Portal'),
     TRUSTED_PROXIES: trustedProxiesSchema,
+    /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
+    DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),
+    DOCUMENTS_S3_REGION: z.string().min(1).default('eu-west-2'),
+    DOCUMENTS_S3_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
+    DOCUMENTS_S3_ACCESS_KEY: z.string().min(1),
+    DOCUMENTS_S3_SECRET_KEY: z.string().min(16),
+    /** Seals each document's own key. Losing it makes every stored document unreadable. */
+    DOCUMENT_ENCRYPTION_KEY: encryptionKeySchema,
+    /** ClamAV's daemon. It has no authentication: reachable only on a private network. */
+    CLAMAV_HOST: z.string().min(1).default('127.0.0.1'),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === 'production' && new URL(env.APP_BASE_URL).protocol !== 'https:') {
-      ctx.addIssue({ code: 'custom', path: ['APP_BASE_URL'], message: 'must use https in production' });
+    for (const key of ['APP_BASE_URL', 'DOCUMENTS_S3_ENDPOINT'] as const) {
+      if (env.NODE_ENV === 'production' && new URL(env[key]).protocol !== 'https:') {
+        ctx.addIssue({ code: 'custom', path: [key], message: 'must use https in production' });
+      }
     }
   });
 

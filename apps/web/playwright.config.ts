@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
 import { e2eDatabaseUrl } from './e2e/support/database.mjs';
 
@@ -48,6 +49,12 @@ export default defineConfig({
         MAIL_FROM_ADDRESS: required('MAIL_FROM_ADDRESS'),
         MAIL_FROM_NAME: required('MAIL_FROM_NAME'),
         TRUSTED_PROXIES: 'loopback',
+        DOCUMENTS_S3_ENDPOINT: 'http://127.0.0.1:8333',
+        DOCUMENTS_S3_BUCKET: 'pms-documents-e2e',
+        DOCUMENTS_S3_ACCESS_KEY: required('DOCUMENTS_S3_ACCESS_KEY'),
+        DOCUMENTS_S3_SECRET_KEY: required('DOCUMENTS_S3_SECRET_KEY'),
+        // New each run, like the database: nothing stored in one run is read in another.
+        DOCUMENT_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
       },
     },
     {

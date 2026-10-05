@@ -300,6 +300,44 @@ export interface MatterComplianceAccessesTable {
   accessed_at: DatabaseSet<Date>;
 }
 
+export type DocumentCategory = 'correspondence' | 'contract' | 'evidence' | 'identity' | 'court' | 'other';
+export type DocumentMediaType =
+  | 'application/pdf'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  | 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  | 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  | 'text/plain'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'message/rfc822';
+
+export interface DocumentsTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  title: InsertOnly<string>;
+  category: InsertOnly<DocumentCategory>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface DocumentVersionsTable {
+  id: DatabaseSet<string>;
+  document_id: InsertOnly<string>;
+  /** Set by the database: the next number for this document. */
+  number: DatabaseSet<number>;
+  file_name: InsertOnly<string>;
+  media_type: InsertOnly<DocumentMediaType>;
+  size_bytes: InsertOnly<number>;
+  sha256: InsertOnly<Buffer>;
+  storage_key: InsertOnly<string>;
+  key_version: InsertOnly<number>;
+  key_nonce: InsertOnly<Buffer>;
+  wrapped_key: InsertOnly<Buffer>;
+  key_tag: InsertOnly<Buffer>;
+  uploaded_by: InsertOnly<string>;
+  uploaded_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -312,6 +350,8 @@ export interface Database {
   conflict_checks: ConflictChecksTable;
   conflict_clearances: ConflictClearancesTable;
   clients: ClientsTable;
+  document_versions: DocumentVersionsTable;
+  documents: DocumentsTable;
   invitations: InvitationsTable;
   matter_closures: MatterClosuresTable;
   matter_compliance_accesses: MatterComplianceAccessesTable;

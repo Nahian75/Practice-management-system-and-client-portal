@@ -6,7 +6,15 @@ const PRODUCTION_DATABASE_URL = 'postgres://pms_app:prod-password@db.internal:54
 
 const TOTP_KEY = Buffer.alloc(32, 7).toString('base64');
 const MAIL = { APP_BASE_URL: 'http://localhost:3000', SMTP_URL: 'smtp://127.0.0.1:1025', MAIL_FROM_ADDRESS: 'no-reply@example.com' };
-const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL, TOTP_ENCRYPTION_KEY: TOTP_KEY, ...MAIL };
+const DOCUMENT_KEY = Buffer.alloc(32, 9).toString('base64');
+const DOCUMENTS = {
+  DOCUMENTS_S3_ENDPOINT: 'http://127.0.0.1:8333',
+  DOCUMENTS_S3_BUCKET: 'pms-documents',
+  DOCUMENTS_S3_ACCESS_KEY: 'local-access-key',
+  DOCUMENTS_S3_SECRET_KEY: 'local-secret-key-0123',
+  DOCUMENT_ENCRYPTION_KEY: DOCUMENT_KEY,
+};
+const minimal = { NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL, TOTP_ENCRYPTION_KEY: TOTP_KEY, ...MAIL, ...DOCUMENTS };
 
 describe('loadEnv', () => {
   it('applies safe defaults for optional settings', () => {
@@ -20,6 +28,10 @@ describe('loadEnv', () => {
       ...MAIL,
       MAIL_FROM_NAME: 'Practice Portal',
       TRUSTED_PROXIES: [],
+      ...DOCUMENTS,
+      DOCUMENTS_S3_REGION: 'eu-west-2',
+      CLAMAV_HOST: '127.0.0.1',
+      CLAMAV_PORT: 3310,
     });
   });
 
@@ -34,7 +46,19 @@ describe('loadEnv', () => {
     expect(env).not.toHaveProperty('MIGRATION_DATABASE_URL');
   });
 
-  it.each(['NODE_ENV', 'DATABASE_URL', 'TOTP_ENCRYPTION_KEY', 'APP_BASE_URL', 'SMTP_URL', 'MAIL_FROM_ADDRESS'])('refuses to start without %s', (name) => {
+  it.each([
+    'NODE_ENV',
+    'DATABASE_URL',
+    'TOTP_ENCRYPTION_KEY',
+    'APP_BASE_URL',
+    'SMTP_URL',
+    'MAIL_FROM_ADDRESS',
+    'DOCUMENTS_S3_ENDPOINT',
+    'DOCUMENTS_S3_BUCKET',
+    'DOCUMENTS_S3_ACCESS_KEY',
+    'DOCUMENTS_S3_SECRET_KEY',
+    'DOCUMENT_ENCRYPTION_KEY',
+  ])('refuses to start without %s', (name) => {
     const source: Record<string, string> = { ...minimal };
     delete source[name];
 
@@ -65,6 +89,12 @@ describe('loadEnv', () => {
     ['TRUSTED_PROXIES', 'proxy.example.com'],
     ['TRUSTED_PROXIES', '10.0.0.0/33'],
     ['TRUSTED_PROXIES', '10.0.0.0/8/1'],
+    ['DOCUMENTS_S3_ENDPOINT', 'ftp://storage.example.com'],
+    ['DOCUMENTS_S3_BUCKET', 'Documents'],
+    ['DOCUMENTS_S3_BUCKET', '../other-bucket'],
+    ['DOCUMENTS_S3_SECRET_KEY', 'short'],
+    ['DOCUMENT_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
+    ['CLAMAV_PORT', '0'],
   ])('rejects %s=%j', (name, value) => {
     expect(() => loadEnv({ ...minimal, [name]: value })).toThrow(InvalidEnvError);
   });
@@ -88,7 +118,14 @@ describe('loadEnv', () => {
   });
 
   describe('in production', () => {
-    const production = { NODE_ENV: 'production', TOTP_ENCRYPTION_KEY: TOTP_KEY, ...MAIL, APP_BASE_URL: 'https://portal.example.com' };
+    const production = {
+      NODE_ENV: 'production',
+      TOTP_ENCRYPTION_KEY: TOTP_KEY,
+      ...MAIL,
+      APP_BASE_URL: 'https://portal.example.com',
+      ...DOCUMENTS,
+      DOCUMENTS_S3_ENDPOINT: 'https://storage.example.com',
+    };
 
     it('requires the database connection to verify the server certificate', () => {
       expect(() => loadEnv({ ...production, DATABASE_URL: PRODUCTION_DATABASE_URL })).toThrow(
@@ -112,6 +149,16 @@ describe('loadEnv', () => {
       expect(() =>
         loadEnv({ ...production, DATABASE_URL: `${PRODUCTION_DATABASE_URL}?sslmode=verify-full`, APP_BASE_URL: 'http://portal.example.com' }),
       ).toThrow(/APP_BASE_URL: must use https in production/);
+    });
+
+    it('requires document storage to be reached over https', () => {
+      expect(() =>
+        loadEnv({
+          ...production,
+          DATABASE_URL: `${PRODUCTION_DATABASE_URL}?sslmode=verify-full`,
+          DOCUMENTS_S3_ENDPOINT: 'http://storage.example.com',
+        }),
+      ).toThrow(/DOCUMENTS_S3_ENDPOINT: must use https in production/);
     });
 
     it('does not print the database password when rejecting the URL', () => {
