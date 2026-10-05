@@ -48,3 +48,4 @@ authorization decisions.
 | Compliance / AML | Not started |
 | HR | Not started |
 | AI | Not started |
+| Web app (staff) | Designed ([web.md](web.md)); not built |
