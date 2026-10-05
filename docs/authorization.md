@@ -68,6 +68,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `matters.edit` — change the title and type of your matters | | ✓ | ✓ | | |
 | `matters.access_with_reason` — open any matter read-only, for one request, by recording a reason | | | | | ✓ |
 | `matters.supervise` — clear conflicts and change the team on matters you supervise; take over supervision from a partner who can no longer act; close matters you supervise ([rules](matters.md#opening-a-matter)) | | ✓ | | | |
+| `documents.view` — list and download the documents of matters you are on the team of | | ✓ | ✓ | | |
 | `documents.add` — add documents to open matters you are on the team of ([rules](documents.md#who-can-do-what)) | | ✓ | ✓ | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 

@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { buffer } from 'node:stream/consumers';
 import { Module } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -315,6 +316,155 @@ describe('Documents', () => {
         expect(noFile.status).toBe(400);
         expect(json.status).toBe(400);
       });
+    });
+  });
+
+  describe('GET /matters/:id/documents', () => {
+    it('lists the documents, newest first, with their latest version', async () => {
+      const first = await upload(token, PDF, 'lease.pdf');
+      const second = await upload(token, Buffer.from('Call note'), 'note.txt', { title: 'Call with client', category: 'correspondence' });
+
+      const listed = await request(app.getHttpServer()).get(`/matters/${matterId}/documents`).set('Cookie', cookie(token));
+
+      expect(listed.status).toBe(200);
+      expect(listed.body).toEqual({
+        documents: [
+          {
+            id: second.body.id,
+            title: 'Call with client',
+            category: 'correspondence',
+            createdAt: expect.any(String),
+            latest: { number: 1, fileName: 'note.txt', mediaType: 'text/plain', sizeBytes: 9, uploadedAt: expect.any(String) },
+          },
+          expect.objectContaining({ id: first.body.id, title: 'Signed lease' }),
+        ],
+        next: null,
+      });
+    });
+
+    it('answers 404 to someone not on the team, as for a matter that does not exist', async () => {
+      const outsider = await signedIn(await staffWith('fee_earner'));
+      const server = request(app.getHttpServer());
+
+      expect((await server.get(`/matters/${matterId}/documents`).set('Cookie', cookie(outsider))).status).toBe(404);
+      expect((await server.get(`/matters/${randomUUID()}/documents`).set('Cookie', cookie(token))).status).toBe(404);
+    });
+
+    it('refuses a role that does not see documents, and a page marker that is not an id', async () => {
+      const server = request(app.getHttpServer());
+      const accounts = await signedIn(await staffWith('accounts'));
+
+      expect((await server.get(`/matters/${matterId}/documents`).set('Cookie', cookie(accounts))).status).toBe(403);
+      expect((await server.get(`/matters/${matterId}/documents?before=x`).set('Cookie', cookie(token))).status).toBe(400);
+    });
+  });
+
+  describe('GET /documents/:id', () => {
+    it('shows the document and each version, with who uploaded it', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      const found = await request(app.getHttpServer()).get(`/documents/${added.body.id}`).set('Cookie', cookie(token));
+
+      expect(found.body).toEqual({
+        id: added.body.id,
+        matterId,
+        title: 'Signed lease',
+        category: 'contract',
+        createdAt: expect.any(String),
+        versions: [
+          {
+            number: 1,
+            fileName: 'lease.pdf',
+            mediaType: 'application/pdf',
+            sizeBytes: PDF.length,
+            uploadedAt: expect.any(String),
+            uploadedBy: { accountId: feeEarner.id, displayName: 'Test staff' },
+          },
+        ],
+      });
+    });
+
+    it('answers 404 to someone not on the team', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const outsider = await signedIn(await staffWith('partner'));
+
+      expect((await request(app.getHttpServer()).get(`/documents/${added.body.id}`).set('Cookie', cookie(outsider))).status).toBe(404);
+    });
+  });
+
+  describe('GET /documents/:id/versions/:number/content', () => {
+    const download = (sessionToken: string, documentId: string, number = 1) =>
+      request(app.getHttpServer())
+        .get(`/documents/${documentId}/versions/${number}/content`)
+        .set('Cookie', cookie(sessionToken))
+        .buffer(true)
+        .parse((response, done) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => done(null, Buffer.concat(chunks)));
+        });
+
+    it('sends the exact file, as a download that cannot run in the browser', async () => {
+      const added = await upload(token, PDF, 'Lease – 12 High St.pdf');
+
+      const response = await download(token, added.body.id);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(PDF);
+      expect(response.headers).toMatchObject({
+        'content-type': 'application/pdf',
+        'content-length': String(PDF.length),
+        'content-disposition': `attachment; filename="Lease _ 12 High St.pdf"; filename*=UTF-8''Lease%20%E2%80%93%2012%20High%20St.pdf`,
+        'content-security-policy': "default-src 'none'; sandbox",
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'no-store',
+      });
+    });
+
+    it('records the download by ids and version', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      await download(token, added.body.id);
+
+      const event = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'metadata'])
+        .where('resource_id', '=', added.body.id)
+        .where('action', '=', 'document.downloaded')
+        .executeTakeFirstOrThrow();
+      expect(event).toEqual({ actor_id: feeEarner.id, metadata: { matterId, version: 1 } });
+    });
+
+    it('answers 404, and records nothing, for someone not on the team or a version that does not exist', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const outsider = await signedIn(await staffWith('fee_earner'));
+
+      expect((await download(outsider, added.body.id)).status).toBe(404);
+      expect((await download(token, added.body.id, 2)).status).toBe(404);
+      const downloads = await db
+        .selectFrom('audit_events')
+        .select('id')
+        .where('resource_id', '=', added.body.id)
+        .where('action', '=', 'document.downloaded')
+        .execute();
+      expect(downloads).toEqual([]);
+    });
+
+    it('cuts the download off when the stored file was changed, rather than sending altered content', async () => {
+      const original = Buffer.from('Attendance note. '.repeat(12_000));
+      const added = await upload(token, original, 'note.txt');
+      const { storage_key: storageKey } = await db
+        .selectFrom('document_versions')
+        .select('storage_key')
+        .where('document_id', '=', added.body.id)
+        .executeTakeFirstOrThrow();
+      const storage = app.get(ObjectStorage);
+      const raw = await buffer(await storage.get(storageKey));
+      raw[raw.length - 40] = (raw[raw.length - 40] ?? 0) ^ 0x01;
+      await storage.put(storageKey, Readable.from([raw]));
+
+      // The transfer fails as a whole: never a shorter file that looks complete.
+      await expect(download(token, added.body.id)).rejects.toThrow();
     });
   });
 });

@@ -1,9 +1,10 @@
 # Documents
 
-**Current state (2026-10-05):** Steps 10a to 10b-3 built: storage and scanner
+**Current state (2026-10-05):** Steps 10a to 10b-4 built: storage and scanner
 containers, file encryption, the tables (migration `0024`), file inspection,
-and uploading a document (`POST /matters/:id/documents`), all in
-`apps/api/src/documents/`. Listing and downloading (step 10b-4) next.
+uploading, listing and downloading documents, all in `apps/api/src/documents/`.
+Versions and withdrawal (step 10c) next. Compliance access to documents, through
+the matter's compliance access, is not built yet.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -128,10 +129,10 @@ the matter's team, and a document you may not see answers 404.
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | POST | `/matters/:id/documents` | `documents.add` + team, open matter | Multipart: `title`, `category`, then `file` → 201 with the document and its version 1. 400 form, title, category, empty file, file name, or interrupted; 404 not on the team; 409 matter not open; 413 over 50 MB; 415 type not accepted, or macros; 422 malware (compliance told); 503 scanner unavailable (nothing unscanned is stored) |
-| GET | `/matters/:id/documents` | `documents.view` + team | Documents not withdrawn, newest first, with the latest version |
-| GET | `/documents/:id` | `documents.view` + team | The document and every version |
+| GET | `/matters/:id/documents` | `documents.view` + team | `{documents, next}`: 100 at a time, newest first, each with its latest version; `?before=<next>` for the next page. 404 if not on the team |
+| GET | `/documents/:id` | `documents.view` + team | The document and every version, with who uploaded each. 404 if not on the team |
 | POST | `/documents/:id/versions` | `documents.add` + team, open matter | Multipart: `file` → 201 with the new version |
-| GET | `/documents/:id/versions/:number/content` | `documents.view` + team | The file, decrypted, as an attachment with `X-Content-Type-Options: nosniff` |
+| GET | `/documents/:id/versions/:number/content` | `documents.view` + team | The file, decrypted as it is sent. Always `Content-Disposition: attachment` (the exact name encoded, and a plain fallback), its `Content-Length`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`. Recorded before it is sent. If the stored file fails its integrity check part-way, the connection is cut, so the browser reports a failed download rather than saving altered content. 404 if not on the team |
 | POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204 |
 
 ## Audit
@@ -176,7 +177,7 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **10b-3.** Uploading a document: streaming, scanning, storing, audit, and
   compliance told of malware. Done. The web app's pass-through limits request
   bodies, so step 10d raises its limit for this route.
-- **10b-4.** Listing and downloading documents.
+- **10b-4.** Listing and downloading documents. Done.
 - **10c.** Versions and withdrawal.
 - **10d.** The document screens in the staff web app.
 - Security review of the module.

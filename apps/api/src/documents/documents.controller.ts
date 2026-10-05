@@ -1,12 +1,16 @@
+import { pipeline } from 'node:stream/promises';
 import {
   BadRequestException,
   ConflictException,
   Controller,
+  Get,
   HttpException,
   HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   Res,
   ServiceUnavailableException,
@@ -16,8 +20,9 @@ import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
+import { attachmentDisposition } from './content-disposition.js';
 import { DocumentsService, type UploadRefusal } from './documents.service.js';
 import { discardUpload, readUpload, UploadFormError } from './upload-request.js';
 
@@ -33,7 +38,7 @@ const MEDIA_TYPES = [
   'message/rfc822',
 ] as const;
 
-const detailsSchema = z.strictObject({ title: text(200), category: z.enum(CATEGORIES) });
+const uploadFieldsSchema = z.strictObject({ title: text(200), category: z.enum(CATEGORIES) });
 const addedSchema = z.object({
   id: z.uuid(),
   title: z.string(),
@@ -47,6 +52,31 @@ const addedSchema = z.object({
     uploadedAt: z.iso.datetime(),
   }),
 });
+
+const versionSchema = z.object({
+  number: z.number().int(),
+  fileName: z.string(),
+  mediaType: z.enum(MEDIA_TYPES),
+  sizeBytes: z.number().int(),
+  uploadedAt: z.iso.datetime(),
+});
+const listQuerySchema = z.strictObject({ before: z.uuid().optional() });
+const listSchema = z.object({
+  documents: z.array(
+    z.object({ id: z.uuid(), title: z.string(), category: z.enum(CATEGORIES), createdAt: z.iso.datetime(), latest: versionSchema }),
+  ),
+  next: z.uuid().nullable(),
+});
+const detailsSchema = z.object({
+  id: z.uuid(),
+  matterId: z.uuid(),
+  title: z.string(),
+  category: z.enum(CATEGORIES),
+  createdAt: z.iso.datetime(),
+  versions: z.array(versionSchema.extend({ uploadedBy: z.object({ accountId: z.uuid(), displayName: z.string() }) })),
+});
+
+const DOCUMENT_NOT_FOUND_MESSAGE = 'No document with this id';
 
 const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
   empty: () => new BadRequestException('The file is empty'),
@@ -66,6 +96,8 @@ const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
 
 @Controller()
 export class DocumentsController {
+  private readonly logger = new Logger(DocumentsController.name);
+
   constructor(private readonly documents: DocumentsService) {}
 
   /**
@@ -96,7 +128,7 @@ export class DocumentsController {
       }
       throw error;
     }
-    const details = detailsSchema.safeParse(upload.fields);
+    const details = uploadFieldsSchema.safeParse(upload.fields);
     if (!details.success) {
       discardUpload(upload.file);
       throw refused(new BadRequestException('Give a title (up to 200 characters) and a category, before the file'));
@@ -122,6 +154,81 @@ export class DocumentsController {
           version: { ...document.version, uploadedAt: document.version.uploadedAt.toISOString() },
         };
       }
+    }
+  }
+
+  @Get('matters/:matterId/documents')
+  @RequirePermission('documents.view')
+  @ResponseSchema(listSchema)
+  async list(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Query({ schema: listQuerySchema }) query: z.infer<typeof listQuerySchema>,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    const page = await this.documents.list(matterId, session.account.id, query.before);
+    if (!page) {
+      throw new NotFoundException('No matter with this id');
+    }
+    return {
+      documents: page.documents.map((document) => ({
+        ...document,
+        createdAt: document.createdAt.toISOString(),
+        latest: { ...document.latest, uploadedAt: document.latest.uploadedAt.toISOString() },
+      })),
+      next: page.next,
+    };
+  }
+
+  /** A document someone is not on the matter team of answers 404, like one that does not exist. */
+  @Get('documents/:documentId')
+  @RequirePermission('documents.view')
+  @ResponseSchema(detailsSchema)
+  async find(@Param('documentId', { schema: z.uuid() }) documentId: string, @CurrentSession() session: ResolvedSession) {
+    const document = await this.documents.find(documentId, session.account.id);
+    if (!document) {
+      throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+    }
+    return {
+      ...document,
+      createdAt: document.createdAt.toISOString(),
+      versions: document.versions.map((version) => ({ ...version, uploadedAt: version.uploadedAt.toISOString() })),
+    };
+  }
+
+  /**
+   * The file, decrypted as it is sent, always as a download. If the stored
+   * file fails its integrity check part-way, the connection is cut: the
+   * browser sees an incomplete download, never altered content.
+   */
+  @Get('documents/:documentId/versions/:number/content')
+  @RequirePermission('documents.view')
+  @ResponseSchema(STREAMED)
+  async download(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Param('number', { schema: z.coerce.number().int().min(1).max(1_000_000) }) number: number,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    const result = await this.documents.download(documentId, number, {
+      actor: auditActorFor(session.account),
+      accountId: session.account.id,
+      context: requestContext(request),
+    });
+    if (result.outcome === 'not_found') {
+      throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+    }
+    response.status(HttpStatus.OK);
+    response.setHeader('Content-Type', result.mediaType);
+    response.setHeader('Content-Length', String(result.sizeBytes));
+    response.setHeader('Content-Disposition', attachmentDisposition(result.fileName));
+    // Should a browser ever show it anyway: no script, no requests, its own origin.
+    response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    try {
+      await pipeline(result.file, response);
+    } catch (error) {
+      // pipeline has already cut the connection: with Content-Length set, the browser sees a failed download.
+      this.logger.error(`Download of document ${documentId} version ${number} stopped: ${error instanceof Error ? error.name : 'unknown error'}`);
     }
   }
 }

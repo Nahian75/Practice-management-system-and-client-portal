@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   'matters.edit',
   'matters.supervise',
   'matters.access_with_reason',
+  'documents.view',
   'documents.add',
 ] as const;
 
@@ -56,6 +57,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'matters.view',
     'matters.edit',
     'matters.supervise',
+    'documents.view',
     'documents.add',
   ],
   fee_earner: [
@@ -66,6 +68,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'matters.open',
     'matters.view',
     'matters.edit',
+    'documents.view',
     'documents.add',
   ],
   accounts: [],

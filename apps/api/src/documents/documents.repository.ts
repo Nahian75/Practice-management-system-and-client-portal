@@ -5,6 +5,31 @@ import { DATABASE } from '../database/database.module.js';
 import type { Database, DocumentCategory, DocumentMediaType, MatterStatus } from '../database/schema.js';
 import { visibleTo } from '../matters/matters.repository.js';
 
+export interface VersionSummary {
+  number: number;
+  fileName: string;
+  mediaType: DocumentMediaType;
+  sizeBytes: number;
+  uploadedAt: Date;
+}
+
+export interface DocumentSummary {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  createdAt: Date;
+  latest: VersionSummary;
+}
+
+export interface DocumentDetails {
+  id: string;
+  matterId: string;
+  title: string;
+  category: DocumentCategory;
+  createdAt: Date;
+  versions: (VersionSummary & { uploadedBy: { accountId: string; displayName: string } })[];
+}
+
 export interface NewDocument {
   matterId: string;
   title: string;
@@ -64,5 +89,112 @@ export class DocumentsRepository {
       .returning(['number', 'uploaded_at'])
       .executeTakeFirstOrThrow();
     return { ...created, version: first };
+  }
+
+  /**
+   * One page of the matter's documents, newest first, each with its latest
+   * version, if `viewerId` is on its team. Ids are time-ordered (uuidv7), so
+   * `before` (an id from the previous page) continues where it stopped.
+   */
+  async listForMatter(matterId: string, viewerId: string, page: { before?: string; limit: number }): Promise<DocumentSummary[] | undefined> {
+    if (!(await this.matterOnTeam(matterId, viewerId))) {
+      return undefined;
+    }
+    const rows = await this.db
+      .selectFrom('documents')
+      .innerJoin('document_versions', 'document_versions.document_id', 'documents.id')
+      .select([
+        'documents.id',
+        'documents.title',
+        'documents.category',
+        'documents.created_at',
+        'document_versions.number',
+        'document_versions.file_name',
+        'document_versions.media_type',
+        'document_versions.size_bytes',
+        'document_versions.uploaded_at',
+      ])
+      .where('documents.matter_id', '=', matterId)
+      .where('document_versions.number', '=', (eb) =>
+        eb.selectFrom('document_versions as latest').select((latest) => latest.fn.max('latest.number').as('number')).whereRef('latest.document_id', '=', 'documents.id'),
+      )
+      .$if(page.before !== undefined, (query) => query.where('documents.id', '<', page.before as string))
+      .orderBy('documents.id', 'desc')
+      .limit(page.limit)
+      .execute();
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      createdAt: row.created_at,
+      latest: { number: row.number, fileName: row.file_name, mediaType: row.media_type, sizeBytes: row.size_bytes, uploadedAt: row.uploaded_at },
+    }));
+  }
+
+  /** A document and every version, oldest first, if `viewerId` is on its matter's team. */
+  async findVisible(documentId: string, viewerId: string): Promise<DocumentDetails | undefined> {
+    const document = await this.db
+      .selectFrom('documents')
+      .innerJoin('matters', 'matters.id', 'documents.matter_id')
+      .select(['documents.id', 'documents.matter_id', 'documents.title', 'documents.category', 'documents.created_at'])
+      .where('documents.id', '=', documentId)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
+    if (!document) {
+      return undefined;
+    }
+    const versions = await this.db
+      .selectFrom('document_versions')
+      .innerJoin('accounts', 'accounts.id', 'document_versions.uploaded_by')
+      .select([
+        'document_versions.number',
+        'document_versions.file_name',
+        'document_versions.media_type',
+        'document_versions.size_bytes',
+        'document_versions.uploaded_at',
+        'document_versions.uploaded_by',
+        'accounts.display_name',
+      ])
+      .where('document_versions.document_id', '=', documentId)
+      .orderBy('document_versions.number')
+      .execute();
+    return {
+      id: document.id,
+      matterId: document.matter_id,
+      title: document.title,
+      category: document.category,
+      createdAt: document.created_at,
+      versions: versions.map((version) => ({
+        number: version.number,
+        fileName: version.file_name,
+        mediaType: version.media_type,
+        sizeBytes: version.size_bytes,
+        uploadedAt: version.uploaded_at,
+        uploadedBy: { accountId: version.uploaded_by, displayName: version.display_name },
+      })),
+    };
+  }
+
+  /** What is needed to send one version as a download, if `viewerId` is on its matter's team. */
+  findVersionToDownload(documentId: string, number: number, viewerId: string) {
+    return this.db
+      .selectFrom('document_versions')
+      .innerJoin('documents', 'documents.id', 'document_versions.document_id')
+      .innerJoin('matters', 'matters.id', 'documents.matter_id')
+      .select([
+        'documents.matter_id',
+        'document_versions.file_name',
+        'document_versions.media_type',
+        'document_versions.size_bytes',
+        'document_versions.storage_key',
+        'document_versions.key_version',
+        'document_versions.key_nonce',
+        'document_versions.wrapped_key',
+        'document_versions.key_tag',
+      ])
+      .where('document_versions.document_id', '=', documentId)
+      .where('document_versions.number', '=', number)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
   }
 }

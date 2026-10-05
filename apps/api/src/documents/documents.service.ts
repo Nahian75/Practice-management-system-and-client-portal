@@ -7,7 +7,7 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { text } from '../common/validation/safe-text.js';
 import type { DocumentCategory, DocumentMediaType } from '../database/schema.js';
 import { DocumentVault, type StoredFile } from './document-vault.js';
-import { DocumentsRepository } from './documents.repository.js';
+import { DocumentsRepository, type DocumentDetails, type DocumentSummary } from './documents.repository.js';
 import { FileInspection, FileRefusedError, type InspectedFile, type RefusalReason } from './file-inspection.js';
 import { discardUpload, UploadFormError } from './upload-request.js';
 import { VirusScanner, type ScanResult } from './virus-scanner.js';
@@ -33,6 +33,12 @@ export type AddResult =
   | { outcome: 'added'; document: AddedDocument }
   | { outcome: 'not_found' | 'not_open' }
   | { outcome: 'refused'; reason: UploadRefusal };
+
+export const DOCUMENTS_PAGE_SIZE = 100;
+
+export type DownloadResult =
+  | { outcome: 'ready'; file: Readable; fileName: string; mediaType: DocumentMediaType; sizeBytes: number }
+  | { outcome: 'not_found' };
 
 type Received = { inspected: InspectedFile; stored: StoredFile } | { refusal: UploadRefusal; signature?: string };
 
@@ -124,6 +130,44 @@ export class DocumentsService {
       }
       throw error;
     }
+  }
+
+  /** One page of the matter's documents; undefined if `viewerId` is not on its team. */
+  async list(matterId: string, viewerId: string, before?: string): Promise<{ documents: DocumentSummary[]; next: string | null } | undefined> {
+    const documents = await this.documents.listForMatter(matterId, viewerId, { before, limit: DOCUMENTS_PAGE_SIZE });
+    if (!documents) {
+      return undefined;
+    }
+    return { documents, next: documents.length === DOCUMENTS_PAGE_SIZE ? (documents.at(-1)?.id ?? null) : null };
+  }
+
+  find(documentId: string, viewerId: string): Promise<DocumentDetails | undefined> {
+    return this.documents.findVisible(documentId, viewerId);
+  }
+
+  /**
+   * One version, decrypted as it streams, for the matter's team. The download
+   * is recorded before any of it is sent. An error part-way through the stream
+   * means the stored file was changed: the caller must abandon the response.
+   */
+  async download(documentId: string, number: number, by: DocumentActor): Promise<DownloadResult> {
+    const version = await this.documents.findVersionToDownload(documentId, number, by.accountId);
+    if (!version) {
+      return { outcome: 'not_found' };
+    }
+    const file = await this.vault.open({
+      storageKey: version.storage_key,
+      sealedKey: { keyVersion: version.key_version, nonce: version.key_nonce, ciphertext: version.wrapped_key, authTag: version.key_tag },
+    });
+    await this.audit.record({
+      actor: by.actor,
+      action: 'document.downloaded',
+      outcome: 'success',
+      resource: { type: 'document', id: documentId },
+      metadata: { matterId: version.matter_id, version: number },
+      ...by.context,
+    });
+    return { outcome: 'ready', file, fileName: version.file_name, mediaType: version.media_type, sizeBytes: version.size_bytes };
   }
 
   /**
