@@ -25,6 +25,8 @@ export type OpenResult =
 
 export type ClearanceResult = 'cleared' | 'not_found' | 'not_supervisor' | 'not_awaiting_clearance';
 
+export type TeamChangeResult = 'changed' | 'unchanged' | 'not_found' | 'not_supervisor' | 'invalid_member' | 'is_supervisor';
+
 export type ConflictCheckResult = { outcome: 'checked'; check: ConflictCheck } | { outcome: 'client_not_found' | 'limited' };
 
 @Injectable()
@@ -94,7 +96,7 @@ export class MattersService {
   async clearConflict(matterId: string, reason: string, by: MatterActor): Promise<ClearanceResult> {
     const outcome = await this.matters.transaction(async (trx): Promise<{ result: ClearanceResult; reference?: string }> => {
       await this.matters.lockClearance(matterId, trx);
-      const state = await this.matters.clearanceState(matterId, by.accountId, trx);
+      const state = await this.matters.supervisionState(matterId, by.accountId, trx);
       if (!state) {
         return { result: 'not_found' };
       }
@@ -243,6 +245,106 @@ export class MattersService {
       }
       return { outcome: 'opened', ...matter };
     });
+  }
+
+  /** Adds a fee earner to the team. Joining gives access to the matter and its client, so it is recorded. */
+  addFeeEarner(matterId: string, accountId: string, by: MatterActor): Promise<TeamChangeResult> {
+    return this.matters.transaction(async (trx): Promise<TeamChangeResult> => {
+      const refusal = await this.refuseUnlessSupervisor(matterId, by, trx);
+      if (refusal) {
+        return refusal;
+      }
+      if (await this.matters.activeMembership(matterId, accountId, trx)) {
+        return 'unchanged';
+      }
+      const [candidate] = await this.matters.staffWithRoles([accountId], trx);
+      if (!candidate || !permissionsFor(candidate.roles).has('matters.view')) {
+        return 'invalid_member';
+      }
+
+      await this.matters.addTeamMember({ matterId, accountId, role: 'fee_earner', addedBy: by.accountId }, trx);
+      await this.recordTeamEvent('matter.team_member_added', matterId, { accountId, role: 'fee_earner' }, by, trx);
+      return 'changed';
+    });
+  }
+
+  /** Removes a fee earner, who loses access at once. The supervising partner leaves only by handing over. */
+  removeFeeEarner(matterId: string, accountId: string, by: MatterActor): Promise<TeamChangeResult> {
+    return this.matters.transaction(async (trx): Promise<TeamChangeResult> => {
+      const refusal = await this.refuseUnlessSupervisor(matterId, by, trx);
+      if (refusal) {
+        return refusal;
+      }
+      const membership = await this.matters.activeMembership(matterId, accountId, trx);
+      if (!membership) {
+        return 'unchanged';
+      }
+      if (membership.role === 'supervising_partner') {
+        return 'is_supervisor';
+      }
+
+      await this.matters.endMembership(membership.id, by.accountId, trx);
+      await this.recordTeamEvent('matter.team_member_removed', matterId, { accountId, role: membership.role }, by, trx);
+      return 'changed';
+    });
+  }
+
+  /**
+   * Hands supervision to another partner. The previous supervising partner
+   * stays on the team as a fee earner, so nobody loses access as a side
+   * effect; the new supervising partner can remove them.
+   */
+  handOverSupervision(matterId: string, partnerId: string, by: MatterActor): Promise<TeamChangeResult> {
+    return this.matters.transaction(async (trx): Promise<TeamChangeResult> => {
+      const refusal = await this.refuseUnlessSupervisor(matterId, by, trx);
+      if (refusal) {
+        return refusal;
+      }
+      if (partnerId === by.accountId) {
+        return 'unchanged';
+      }
+      const [candidate] = await this.matters.staffWithRoles([partnerId], trx);
+      if (!candidate?.roles.includes('partner')) {
+        return 'invalid_member';
+      }
+
+      const current = await this.matters.activeMembership(matterId, by.accountId, trx);
+      const incoming = await this.matters.activeMembership(matterId, partnerId, trx);
+      if (!current) {
+        throw new Error('Supervising partner has no membership');
+      }
+      await this.matters.endMembership(current.id, by.accountId, trx);
+      if (incoming) {
+        await this.matters.endMembership(incoming.id, by.accountId, trx);
+      }
+      await this.matters.addTeamMember({ matterId, accountId: partnerId, role: 'supervising_partner', addedBy: by.accountId }, trx);
+      await this.matters.addTeamMember({ matterId, accountId: by.accountId, role: 'fee_earner', addedBy: by.accountId }, trx);
+      await this.recordTeamEvent('matter.supervisor_changed', matterId, { from: by.accountId, to: partnerId }, by, trx);
+      return 'changed';
+    });
+  }
+
+  /** Under the team lock: the caller must be on the team (else not found) and its supervising partner. */
+  private async refuseUnlessSupervisor(matterId: string, by: MatterActor, trx: Kysely<Database>): Promise<TeamChangeResult | null> {
+    await this.matters.lockTeam(matterId, trx);
+    const state = await this.matters.supervisionState(matterId, by.accountId, trx);
+    if (!state) {
+      return 'not_found';
+    }
+    return state.is_supervisor ? null : 'not_supervisor';
+  }
+
+  private async recordTeamEvent(
+    action: 'matter.team_member_added' | 'matter.team_member_removed' | 'matter.supervisor_changed',
+    matterId: string,
+    metadata: Record<string, string>,
+    by: MatterActor,
+    trx: Kysely<Database>,
+  ): Promise<void> {
+    await this.audit.record(
+      { actor: by.actor, action, outcome: 'success', resource: { type: 'matter', id: matterId }, metadata, ...by.context },
+      trx,
+    );
   }
 
   find(matterId: string, viewerId: string): Promise<Matter | undefined> {

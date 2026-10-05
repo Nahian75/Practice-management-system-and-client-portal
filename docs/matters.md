@@ -1,9 +1,10 @@
 # Matters
 
-**Current state (2026-10-04):** Steps 8a to 8c built: matters and teams,
+**Current state (2026-10-05):** Steps 8a to 8d built: matters and teams,
 conflict checks required for opening, other parties, clearing a possible
-conflict, seeing your matters, and client visibility through matter teams.
-Team changes, editing, closing and compliance access are designed below.
+conflict, team changes and handing over supervision, seeing your matters, and
+client visibility through matter teams. Editing, closing and compliance access
+are designed below.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -111,6 +112,32 @@ enforced by the database as well as the API:
 While `awaiting_clearance`, the matter is visible to its team, but nothing can
 be added to it.
 
+## Team changes
+
+Built in 8d (migration `0019`). Only the matter's supervising partner changes
+its team:
+
+- **Add a fee earner** (active staff holding `partner` or `fee_earner`). They
+  can open the matter, and its client, at once.
+- **Remove a fee earner.** They lose the matter at once, and the client too
+  unless something else gives them access to it.
+- **Hand over supervision** to another partner. The previous supervising
+  partner stays on the team as a fee earner, so nobody loses access as a side
+  effect; the new one can remove them. The supervising partner cannot simply
+  be removed: 409, hand over instead.
+
+The database keeps the rules: ending a membership is the only change a row
+allows, once; and a matter always has an active supervising partner when a
+transaction commits, so a handover cannot leave it unsupervised. Changes to one
+matter's team queue on an advisory lock. Every change is audited:
+`matter.team_member_added`, `matter.team_member_removed` (account and role),
+`matter.supervisor_changed` (from and to).
+
+**Open question:** if the supervising partner is disabled or loses the partner
+role, nobody can change the team, clear a conflict, or (from 8e) close the
+matter. As for clients, a partner could take over supervision with a reason,
+or this could wait for compliance access (8f). Decide before 8e.
+
 ## Conflict checks
 
 Built in 8b (migration `0017`). A check compares each name given, plus the
@@ -192,7 +219,8 @@ unchanged.
 | POST/PATCH | `/matters/:id/parties` | `matters.edit` + team | Add or change other parties |
 | GET | `/matters/:id/conflict-check` | `matters.view` + team | The check the matter was opened on: names, the 50 strongest matches, the total count |
 | POST | `/matters/:id/conflict-clearance` | `matters.supervise` + supervising partner | `{reason}` |
-| PUT/DELETE | `/matters/:id/team/:accountId` | `matters.supervise` + supervising partner | Add or remove a fee earner; hand supervision to another partner |
+| PUT/DELETE | `/matters/:id/team/:accountId` | `matters.supervise` + supervising partner | Add or remove a fee earner. 204, also when nothing needed to change |
+| POST | `/matters/:id/supervisor` | `matters.supervise` + supervising partner | `{accountId}`: hand supervision to another partner |
 | POST | `/matters/:id/close` | `matters.supervise` + supervising partner | `{reason}` |
 | POST | `/matters/:id/access` | `matters.access_with_reason` | `{reason}`; opens the matter read-only for that request |
 | GET | `/clients/:id/matters` | `clients.view` + client visibility | The client's matters you can see |
@@ -224,7 +252,7 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **8b.** Other parties and conflict checks, now required for opening: matching,
   possible matches, `awaiting_clearance`. Done.
 - **8c.** Clearance by the supervising partner, email to compliance. Done.
-- **8d.** Team changes and handing over supervision.
+- **8d.** Team changes and handing over supervision. Done.
 - **8e.** Editing, closing.
 - **8f.** Compliance access with a reason.
 - Security review of the module.

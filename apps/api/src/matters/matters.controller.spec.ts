@@ -430,6 +430,132 @@ describe('Matters', () => {
     });
   });
 
+  describe('team changes (step 8d)', () => {
+    let matterId: string;
+    let partnerToken: string;
+
+    const teamOf = async (id: string, sessionToken: string) =>
+      ((await as(sessionToken).get(`/matters/${id}`)).body.team as { accountId: string; role: string }[]).map((m) => [m.accountId, m.role]);
+    const teamEvents = () =>
+      db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'action', 'metadata'])
+        .where('resource_id', '=', matterId)
+        .where('action', 'in', ['matter.team_member_added', 'matter.team_member_removed', 'matter.supervisor_changed'])
+        .orderBy('id')
+        .execute();
+    const put = (sessionToken: string, accountId: string) =>
+      request(app.getHttpServer()).put(`/matters/${matterId}/team/${accountId}`).set('Cookie', `__Host-session=${sessionToken}`);
+    const remove = (sessionToken: string, accountId: string) =>
+      request(app.getHttpServer()).delete(`/matters/${matterId}/team/${accountId}`).set('Cookie', `__Host-session=${sessionToken}`);
+
+    beforeEach(async () => {
+      matterId = (await open(token)).body.id;
+      partnerToken = await signedIn(partner);
+    });
+
+    it('adds a fee earner, who can then open the matter and its client', async () => {
+      const colleague = await staffWith('fee_earner');
+      const colleagueToken = await signedIn(colleague);
+      expect((await as(colleagueToken).get(`/matters/${matterId}`)).status).toBe(404);
+
+      expect((await put(partnerToken, colleague.id)).status).toBe(204);
+
+      expect((await as(colleagueToken).get(`/matters/${matterId}`)).status).toBe(200);
+      expect((await as(colleagueToken).get(`/clients/${client.id}`)).status).toBe(200);
+      expect(await teamEvents()).toContainEqual({
+        actor_id: partner.id,
+        action: 'matter.team_member_added',
+        metadata: { accountId: colleague.id, role: 'fee_earner' },
+      });
+    });
+
+    it('treats adding someone already on the team as done, without a second record', async () => {
+      const before = (await teamEvents()).length;
+
+      expect((await put(partnerToken, feeEarner.id)).status).toBe(204);
+      expect(await teamEvents()).toHaveLength(before);
+    });
+
+    it('removes a fee earner, who loses the matter and the client at once', async () => {
+      const colleague = await staffWith('fee_earner');
+      await put(partnerToken, colleague.id);
+      const colleagueToken = await signedIn(colleague);
+
+      expect((await remove(partnerToken, colleague.id)).status).toBe(204);
+
+      expect((await as(colleagueToken).get(`/matters/${matterId}`)).status).toBe(404);
+      expect((await as(colleagueToken).get(`/clients/${client.id}`)).status).toBe(404);
+      expect(await teamEvents()).toContainEqual({
+        actor_id: partner.id,
+        action: 'matter.team_member_removed',
+        metadata: { accountId: colleague.id, role: 'fee_earner' },
+      });
+    });
+
+    it('does not let the supervising partner be removed, only handed over', async () => {
+      const response = await remove(partnerToken, partner.id);
+
+      expect(response.status).toBe(409);
+      expect(await teamOf(matterId, partnerToken)).toContainEqual([partner.id, 'supervising_partner']);
+    });
+
+    it('hands supervision to another partner, keeping the previous one on the team as a fee earner', async () => {
+      const successor = await staffWith('partner');
+      const successorToken = await signedIn(successor);
+
+      const response = await as(partnerToken).post(`/matters/${matterId}/supervisor`, { accountId: successor.id });
+
+      expect(response.status).toBe(204);
+      expect(await teamOf(matterId, successorToken)).toEqual(
+        expect.arrayContaining([
+          [successor.id, 'supervising_partner'],
+          [partner.id, 'fee_earner'],
+          [feeEarner.id, 'fee_earner'],
+        ]),
+      );
+      expect((await put(partnerToken, (await staffWith('fee_earner')).id)).status).toBe(403);
+      expect((await remove(successorToken, partner.id)).status).toBe(204);
+      expect(await teamEvents()).toContainEqual({
+        actor_id: partner.id,
+        action: 'matter.supervisor_changed',
+        metadata: { from: partner.id, to: successor.id },
+      });
+    });
+
+    it('hands supervision to a partner already on the team as a fee earner', async () => {
+      const colleague = await staffWith('partner');
+      await put(partnerToken, colleague.id);
+
+      expect((await as(partnerToken).post(`/matters/${matterId}/supervisor`, { accountId: colleague.id })).status).toBe(204);
+      expect(await teamOf(matterId, partnerToken)).toContainEqual([colleague.id, 'supervising_partner']);
+    });
+
+    it.each<[string, () => Promise<{ status: number }>]>([
+      ['adding someone from accounts', async () => put(partnerToken, (await staffWith('accounts')).id)],
+      ['adding a client account', async () => put(partnerToken, (await createTestAccount(db, 'client')).id)],
+      ['handing over to a fee earner', async () =>
+        as(partnerToken).post(`/matters/${matterId}/supervisor`, { accountId: (await staffWith('fee_earner')).id })],
+    ])('refuses %s', async (_case, attempt) => {
+      expect((await attempt()).status).toBe(400);
+    });
+
+    it("refuses team changes by a partner on the team who is not its supervising partner", async () => {
+      const otherPartner = await staffWith('partner');
+      await put(partnerToken, otherPartner.id);
+
+      const response = await put(await signedIn(otherPartner), (await staffWith('fee_earner')).id);
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe("Only the matter's supervising partner can change its team");
+    });
+
+    it('is closed to fee earners, and not found by partners off the team', async () => {
+      expect((await put(token, (await staffWith('fee_earner')).id)).status).toBe(403);
+      expect((await put(await signedIn(await staffWith('partner')), feeEarner.id)).status).toBe(404);
+    });
+  });
+
   describe('seeing matters', () => {
     let matterId: string;
 

@@ -216,7 +216,7 @@ export class MattersRepository {
   }
 
   /** The matter's status and reference, and whether `viewerId` is its supervising partner; if they are on its team. */
-  clearanceState(matterId: string, viewerId: string, trx: Kysely<Database>) {
+  supervisionState(matterId: string, viewerId: string, trx: Kysely<Database>) {
     return trx
       .selectFrom('matters')
       .select(['matters.status', 'matters.reference'])
@@ -236,6 +236,31 @@ export class MattersRepository {
       .where('matters.id', '=', matterId)
       .where(visibleTo(viewerId))
       .executeTakeFirst();
+  }
+
+  /** Serialises team changes to one matter, so two arriving together cannot both act on what they read. */
+  async lockTeam(matterId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.matter_team:${matterId}`}, 0))`.execute(trx);
+  }
+
+  /** The person's current membership of the matter, if any. The caller has checked they may manage the team. */
+  activeMembership(matterId: string, accountId: string, trx: Kysely<Database>) {
+    return trx
+      .selectFrom('matter_team')
+      .select(['id', 'role'])
+      .where('matter_id', '=', matterId)
+      .where('account_id', '=', accountId)
+      .where('removed_at', 'is', null)
+      .executeTakeFirst();
+  }
+
+  /** Ends a membership. The database keeps it ended, and refuses to leave the matter without a supervising partner. */
+  async endMembership(membershipId: string, removedBy: string, trx: Kysely<Database>): Promise<void> {
+    await trx
+      .updateTable('matter_team')
+      .set({ removed_at: sql<Date>`clock_timestamp()`, removed_by: removedBy })
+      .where('id', '=', membershipId)
+      .execute();
   }
 
   /** Records the clearance. The database checks the rules and opens the matter. */

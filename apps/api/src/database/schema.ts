@@ -228,8 +228,8 @@ export interface MatterTeamTable {
   role: InsertOnly<MatterTeamRole>;
   added_by: InsertOnly<string>;
   added_at: DatabaseSet<Date>;
-  removed_by: DatabaseSet<string | null>;
-  removed_at: DatabaseSet<Date | null>;
+  removed_by: UpdateOnly<string | null>;
+  removed_at: UpdateOnly<Date | null>;
 }
 
 export type PartyRole = 'opponent' | 'opponent_solicitor' | 'other';

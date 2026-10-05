@@ -374,6 +374,63 @@ describe('matters tables', () => {
     });
   });
 
+  describe('team changes (step 8d)', () => {
+    let matterId: string;
+
+    const membership = (accountId: string) =>
+      db
+        .selectFrom('matter_team')
+        .select(['id', 'role'])
+        .where('matter_id', '=', matterId)
+        .where('account_id', '=', accountId)
+        .where('removed_at', 'is', null)
+        .executeTakeFirstOrThrow();
+    const end = (id: string, executor: Kysely<Database> = db) =>
+      executor.updateTable('matter_team').set({ removed_at: new Date(), removed_by: partner.id }).where('id', '=', id).execute();
+
+    beforeEach(async () => {
+      matterId = (
+        await openMatter([
+          [partner.id, 'supervising_partner'],
+          [feeEarner.id, 'fee_earner'],
+        ])
+      ).id;
+    });
+
+    it('ends a membership once, and keeps it ended', async () => {
+      const { id } = await membership(feeEarner.id);
+
+      await end(id);
+
+      await expect(end(id)).rejects.toThrow(/already ended/);
+      await expect(
+        db.updateTable('matter_team').set({ removed_at: null, removed_by: null }).where('id', '=', id).execute(),
+      ).rejects.toThrow(/already ended/);
+    });
+
+    it('refuses to leave a matter without a supervising partner, when the transaction commits', async () => {
+      const { id } = await membership(partner.id);
+
+      await expect(end(id)).rejects.toThrow(/would have no supervising partner/);
+      expect((await membership(partner.id)).role).toBe('supervising_partner');
+    });
+
+    it('lets supervision pass to another partner within one transaction', async () => {
+      const successor = await staffWith('partner');
+      const { id } = await membership(partner.id);
+
+      await db.transaction().execute(async (trx) => {
+        await end(id, trx);
+        await trx
+          .insertInto('matter_team')
+          .values({ matter_id: matterId, account_id: successor.id, role: 'supervising_partner', added_by: partner.id })
+          .execute();
+      });
+
+      expect((await membership(successor.id)).role).toBe('supervising_partner');
+    });
+  });
+
   describe('app role restrictions', () => {
     let matterId: string;
 

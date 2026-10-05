@@ -39,7 +39,7 @@ authorization decisions.
 | Auth | Built: sign-in with password and 2FA, sessions, route guard, invitations, password reset, notices, per-account and per-address limits |
 | Users / Roles | Built: roles, permissions, permission guard, staff-management endpoints (`apps/api/src/auth/permissions/`, `apps/api/src/staff/`) |
 | Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security-reviewed: C1–C4, C8 and C10 fixed; C5 with Matters, C6 before production ([review](reviews/2026-10-04-clients.md)) |
-| Matters | Steps 8a to 8c built: opening matters with teams and a required conflict check, other parties, conflict clearance, team visibility (`apps/api/src/matters/`). Team changes next ([matters.md](matters.md)) |
+| Matters | Steps 8a to 8d built: opening matters with teams and a required conflict check, other parties, conflict clearance, team changes, team visibility (`apps/api/src/matters/`). Editing and closing next ([matters.md](matters.md)) |
 | Documents | Not started |
 | Client portal | Not started |
 | Tasks | Not started |

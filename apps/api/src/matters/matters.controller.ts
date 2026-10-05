@@ -3,6 +3,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -11,6 +12,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -24,7 +26,7 @@ import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-sch
 import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from '../clients/search-quota.js';
 import { text } from '../common/validation/safe-text.js';
 import type { ConflictCheck } from './matter.js';
-import { MattersService, type MatterActor } from './matters.service.js';
+import { MattersService, type MatterActor, type TeamChangeResult } from './matters.service.js';
 
 const MATTER_TYPES = [
   'residential_property',
@@ -102,6 +104,7 @@ const conflictCheckSchema = z.object({
     .nullable(),
 });
 const clearanceRequestSchema = z.strictObject({ reason: text(500, 10) });
+const handOverSchema = z.strictObject({ accountId: z.uuid() });
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
@@ -114,6 +117,23 @@ const serialiseCheck = (check: ConflictCheck) => ({
   createdAt: check.createdAt.toISOString(),
   clearance: check.clearance && { ...check.clearance, clearedAt: check.clearance.clearedAt.toISOString() },
 });
+
+/** Every team change answers the same way; 204 also when nothing needed to change. */
+function answerTeamChange(result: TeamChangeResult): void {
+  switch (result) {
+    case 'not_found':
+      throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+    case 'not_supervisor':
+      throw new ForbiddenException("Only the matter's supervising partner can change its team");
+    case 'invalid_member':
+      throw new BadRequestException('Team members must be active staff who can work on matters; a supervising partner must be a partner');
+    case 'is_supervisor':
+      throw new ConflictException('The supervising partner leaves the team only by handing over to another partner');
+    case 'changed':
+    case 'unchanged':
+      return;
+  }
+}
 
 function actorFor(session: ResolvedSession, request: Request): MatterActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -224,6 +244,46 @@ export class MattersController {
       case 'cleared':
         return;
     }
+  }
+
+  @Put('matters/:matterId/team/:accountId')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async addFeeEarner(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('accountId', { schema: z.uuid() }) accountId: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    answerTeamChange(await this.matters.addFeeEarner(matterId, accountId, actorFor(session, request)));
+  }
+
+  @Delete('matters/:matterId/team/:accountId')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async removeFeeEarner(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('accountId', { schema: z.uuid() }) accountId: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    answerTeamChange(await this.matters.removeFeeEarner(matterId, accountId, actorFor(session, request)));
+  }
+
+  /** The previous supervising partner stays on the team as a fee earner. */
+  @Post('matters/:matterId/supervisor')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async handOverSupervision(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: handOverSchema }) body: z.infer<typeof handOverSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    answerTeamChange(await this.matters.handOverSupervision(matterId, body.accountId, actorFor(session, request)));
   }
 
   @Get('clients/:clientId/matters')
