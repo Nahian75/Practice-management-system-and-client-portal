@@ -13,7 +13,7 @@ The staff app, in the browser. The client portal comes later, in the same app.
 |---|---|---|
 | Framework | Next.js 16 (React 19, TypeScript strict), UI only: every rule stays in the API | ADR-004 |
 | Look | Minimal, UK law-firm style: calm, text-led, deep navy (`#1B2A41`) | Project owner |
-| Name shown | "reglify", from configuration (`APP_NAME`), not from code | Project owner |
+| Name shown | "Stass", from configuration (`APP_NAME`), not from code | Project owner |
 | Language and formats | British English; dates as "5 October 2026"; times in UK time | Proposed |
 | Accessibility | WCAG 2.2 AA | Proposed |
 | Third parties at runtime | None: no external fonts, scripts, analytics or CDNs | Proposed |
@@ -96,6 +96,23 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - Countries in address forms are the API's own list, copied; a test fails if
   the two lists differ.
 
+## Built in 9d-2
+
+- `/matters`: the matters you are on the team of, newest first.
+- `/clients/:id/matters/new`: opening a matter, in the order the API
+  requires. First the other parties (up to 20, each with a role and whether
+  it is a person or an organisation) are checked for conflicts; the client is
+  always checked too. Then the results are shown, and the matter is opened on
+  that check: title, type of work, supervising partner (from the partners in
+  `GET /colleagues`) and any other fee earners. Changing the parties means a
+  new check.
+- `/matters/:id`: details, team, other parties and the conflict check with its
+  possible matches, by reference only. A matter awaiting clearance says so at
+  the top; its supervising partner sees the form to record why the possible
+  matches are not a conflict, which opens the matter.
+- A matter someone is not on the team of shows "You cannot see this matter",
+  the same as one that does not exist.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
@@ -129,7 +146,7 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **9a** | App set-up, security headers, the pass-through to the API, the shared layout; **sign in** (password, then 2FA code or backup code), **sign out**, a signed-in home page |
 | **9b** | Accepting an invitation (password, 2FA set-up with a QR code, backup codes shown once); password reset |
 | **9c** | Clients: list, search, create (individual or organisation), view with contacts and matters, edit, contacts, takeover |
-| **9d** | Matters: conflict check and opening, list, view (team, parties, conflict check, clearance), editing, team changes, closing, supervision takeover, compliance access |
+| **9d** | Matters, in three parts. 9d-1: the colleagues list in the API. 9d-2: conflict check and opening, list, view (team, parties, conflict check, clearance). 9d-3: editing, team changes, closing, supervision takeover, compliance access |
 | **9e** | Staff (administrators): list, invite, roles, disable and re-enable |
 | | Security review of the web app |
 

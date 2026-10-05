@@ -52,7 +52,7 @@ export default defineConfig({
       command: 'npx next start --port 3100',
       url: `${E2E_WEB_URL}/sign-in`,
       reuseExistingServer: false,
-      env: { API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'reglify' },
+      env: { API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'Stass' },
     },
   ],
 });

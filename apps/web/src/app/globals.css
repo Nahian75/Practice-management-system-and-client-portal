@@ -364,6 +364,13 @@ a:hover {
   max-width: 100%;
 }
 
+/* Something the reader must not miss, such as a matter waiting for conflict clearance. */
+.notice {
+  border-left: 6px solid var(--colour-brand);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
 /* Groups a label and its value without adding a box of its own. */
 .summary-row {
   display: contents;

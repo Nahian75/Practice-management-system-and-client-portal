@@ -5,18 +5,10 @@ import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { clientName, type Client } from '@/lib/clients';
 import { CLIENT_KIND_LABELS, countryName, formatCalendarDate, formatDate, ORGANISATION_TYPE_LABELS } from '@/lib/format';
+import { MATTER_STATUS_LABELS, type MatterSummary } from '@/lib/matters';
 import { TakeOverForm } from './take-over-form';
 
 export const metadata: Metadata = { title: 'Client' };
-
-interface MatterSummary {
-  id: string;
-  reference: string;
-  title: string;
-  status: 'awaiting_clearance' | 'open' | 'closed';
-}
-
-const MATTER_STATUS_LABELS = { awaiting_clearance: 'Awaiting conflict clearance', open: 'Open', closed: 'Closed' } as const;
 
 export default async function ClientPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
@@ -69,6 +61,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
       <div className="actions">
         <Link href={`/clients/${client.id}/edit`}>Change details</Link>
         {client.kind === 'organisation' && <Link href={`/clients/${client.id}/contacts/new`}>Add a contact</Link>}
+        <Link href={`/clients/${client.id}/matters/new`}>Open a matter</Link>
       </div>
 
       <dl className="summary">
@@ -142,7 +135,9 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
             {matters.body.matters.map((matter) => (
               <tr key={matter.id}>
                 <td>{matter.reference}</td>
-                <td>{matter.title}</td>
+                <td>
+                  <Link href={`/matters/${matter.id}`}>{matter.title}</Link>
+                </td>
                 <td>{MATTER_STATUS_LABELS[matter.status]}</td>
               </tr>
             ))}

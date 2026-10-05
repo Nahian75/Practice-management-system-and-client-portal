@@ -1,25 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { COUNTRY_CODES as API_COUNTRY_CODES } from '../../api/src/common/validation/country-codes';
 import { COUNTRY_CODES as WEB_COUNTRY_CODES } from '../src/lib/country-codes';
+import { noAxeViolations, unique, watchForCspViolations } from './support/checks';
 import { apiSessionFor, signedInStaff } from './support/session';
-
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
-const noAxeViolations = async (page: Page) => expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-const unique = () => randomUUID().replaceAll('-', '').slice(0, 10);
-
-/** Collects every Content Security Policy violation on the pages the test visits. */
-async function watchForCspViolations(page: Page): Promise<string[]> {
-  const violations: string[] = [];
-  await page.exposeFunction('reportCspViolation', (directive: string) => violations.push(directive));
-  await page.addInitScript(() => {
-    document.addEventListener('securitypolicyviolation', (event) => {
-      (window as unknown as { reportCspViolation: (directive: string) => void }).reportCspViolation(event.violatedDirective);
-    });
-  });
-  return violations;
-}
 
 test('creates an individual client and shows the details in UK form', async ({ page, request }) => {
   const violations = await watchForCspViolations(page);

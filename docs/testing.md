@@ -95,6 +95,9 @@ npm run test:e2e -w @practice/web   # builds the web app, then runs the tests
   the sign-in page) and `apiSessionFor` (a second person, signed in through
   the API, to set up data such as someone else's client) from
   `e2e/support/session.ts`. Every test gets new people, so tests never share data.
+- Conflict checks match names loosely, so tests that expect no match use
+  `randomName()` from `e2e/support/checks.ts`: names made of random letters,
+  sharing no word with any other test's names.
 - Every screen is checked with axe against WCAG 2.2 AA.
 - Traces and screenshots of failures stay in the git-ignored `test-results/`.
 

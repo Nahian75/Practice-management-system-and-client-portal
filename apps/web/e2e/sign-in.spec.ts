@@ -18,7 +18,7 @@ test('sends someone who is not signed in to the sign-in page', async ({ page }) 
   await page.goto('/');
 
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page).toHaveTitle('Sign in – reglify');
+  await expect(page).toHaveTitle('Sign in – Stass');
 });
 
 test('signs in with a password and an authenticator code, and signs out', async ({ page, request }) => {

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/clients', label: 'Clients' },
+  { href: '/matters', label: 'Matters' },
 ] as const;
 
 /** The main sections. The current one is marked for screen readers as well as by sight. */

@@ -57,7 +57,8 @@ export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ e
 
 /** The token from a link to `path` in an email Mailpit caught for this address. */
 export async function emailedToken(email: string, path: string, context = ''): Promise<string> {
-  const deadline = Date.now() + 10_000;
+  // Emails leave through the API's outbox, which falls behind when every test worker is sending at once.
+  const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
     const { messages } = (await search.json()) as { messages: { ID: string }[] };
