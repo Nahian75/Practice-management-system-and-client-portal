@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { AuditService } from '../../audit/audit.service.js';
+import { SecretBox } from '../../common/crypto/secret-box.js';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
 import type { AccountKind } from '../../database/schema.js';
 import { auditActorFor } from '../sessions/authenticated-session.js';
-import { SecretBox } from './secret-box.js';
 import { TotpCredentialsRepository } from './totp-credentials.repository.js';
 import { matchTotp, otpauthUri, TOTP_SECRET_BYTES, toBase32 } from './totp.js';
 

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module.js';
+import { SecretBox } from '../common/crypto/secret-box.js';
 import { CLOCK, systemClock } from '../common/time/clock.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
@@ -28,7 +29,6 @@ import { SignInLimits } from './sign-in/sign-in-limits.js';
 import { SignInService } from './sign-in/sign-in.service.js';
 import { BackupCodesRepository } from './two-factor/backup-codes.repository.js';
 import { BackupCodesService } from './two-factor/backup-codes.service.js';
-import { SecretBox } from './two-factor/secret-box.js';
 import { TotpCredentialsRepository } from './two-factor/totp-credentials.repository.js';
 import { TwoFactorSignInController } from './two-factor/two-factor-sign-in.controller.js';
 import { TwoFactorSignInService } from './two-factor/two-factor-sign-in.service.js';

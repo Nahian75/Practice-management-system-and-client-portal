@@ -1,6 +1,6 @@
 # Documents
 
-**Current state (2026-10-05):** Designed and approved; step 10a next.
+**Current state (2026-10-05):** Step 10a built: local storage and scanner containers, and file encryption (`apps/api/src/documents/file-cipher.ts`). Not yet used by any route; step 10b next.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -10,7 +10,7 @@ see there.
 
 | Topic | Decision | Decided by |
 |---|---|---|
-| Where files are kept | Private S3-compatible object storage, never reachable from the internet; details (title, matter, versions) in PostgreSQL. Locally, MinIO in Docker. S3-compatible keeps the hosting choice open, including UK-only storage | Project owner |
+| Where files are kept | Private S3-compatible object storage, never reachable from the internet; details (title, matter, versions) in PostgreSQL. Locally, SeaweedFS in Docker (MinIO, first proposed, no longer publishes its community images). S3-compatible keeps the hosting choice open, including UK-only storage | Project owner |
 | Encryption | The API encrypts every file before storing it: AES-256-GCM, a new key for each file, that key itself encrypted with a master key the storage never holds. A copy of the storage alone reveals nothing. Closes review item C6 for documents | Project owner |
 | Malware | Every upload is scanned (ClamAV, run locally in Docker) before it is stored. An infected file is refused, never stored, and compliance is emailed. If the scanner cannot be reached, uploads are refused: no unscanned file is ever stored | Project owner |
 | Allowed files | PDF; Word, Excel, PowerPoint (current formats only, no macro-enabled ones); plain text; JPEG, PNG; emails (`.eml`). The type is read from the file's content, not its name. At most 50 MB | Project owner |
@@ -101,8 +101,13 @@ data.
 ## Local services
 
 Two more containers in `compose.yaml`, pinned by digest, bound to `127.0.0.1`:
-MinIO (storage) and ClamAV (scanner, with its virus definitions updated by the
-container itself). Tests use their own bucket.
+SeaweedFS 4.47 (storage, S3 on `127.0.0.1:8333`) and ClamAV 1.5.4 (scanner, on
+`127.0.0.1:3310`, with its virus definitions updated by the container itself).
+SeaweedFS requires the access key from `.env` and refuses anonymous requests
+(checked: 403). It creates one bucket per database: `pms-documents`,
+`pms-documents-test`, `pms-documents-e2e`. ClamAV was checked with the
+standard EICAR test file (found) and a clean file (passed). Both versions were
+at least seven days old when pinned, as for npm packages.
 
 ## Not in this module
 
@@ -116,8 +121,8 @@ container itself). Tests use their own bucket.
 
 Each step ships with positive and negative tests and is reviewed before the next.
 
-- **10a.** MinIO and ClamAV containers; file encryption and decryption, with
-  tests (no routes yet).
+- **10a.** SeaweedFS and ClamAV containers; file encryption and decryption, with
+  tests (no routes yet). Done.
 - **10b.** Uploading, listing and downloading documents on a matter, with
   scanning, type and size checks, and audit.
 - **10c.** Versions and withdrawal.

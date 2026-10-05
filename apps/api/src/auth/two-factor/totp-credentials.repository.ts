@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Kysely } from 'kysely';
+import type { SealedSecret } from '../../common/crypto/secret-box.js';
 import { DATABASE } from '../../database/database.module.js';
 import type { Database } from '../../database/schema.js';
-import type { SealedSecret } from './secret-box.js';
 
 export interface StoredTotpCredential {
   sealed: SealedSecret;
