@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { noAxeViolations, randomName, unique, watchForCspViolations } from './support/checks';
+import { openMatter } from './support/matters';
 import { apiSessionFor, signedInStaff } from './support/session';
 
 /** A new individual client of the person signed in on `page`. */
@@ -106,26 +107,12 @@ test('changing the other parties needs a new check, and the matter needs a title
 
 test('someone not on the team cannot see the matter, nor tell whether it exists', async ({ page, request }) => {
   const partner = await apiSessionFor(request, ['partner']);
-  const client = await partner.api.post('/api/clients', { data: { kind: 'individual', givenNames: 'Lee', familyName: `Private${unique()}` } });
-  const clientId = ((await client.json()) as { id: string }).id;
-  const check = await partner.api.post('/api/conflict-checks', { data: { clientId, names: [`Nobody ${unique()}`] } });
-  const session = (await (await partner.api.get('/api/auth/session')).json()) as { account: { id: string } };
-  const opened = await partner.api.post('/api/matters', {
-    data: {
-      clientId,
-      title: 'Private matter',
-      matterType: 'family',
-      supervisingPartnerId: session.account.id,
-      conflictCheckId: ((await check.json()) as { id: string }).id,
-    },
-  });
-  expect(opened.status()).toBe(201);
-  const { id } = (await opened.json()) as { id: string };
+  const { id, title } = await openMatter(partner.api, partner.accountId);
   await signedInStaff(page, request);
 
   await page.goto(`/matters/${id}`);
   await expect(page.getByRole('heading', { name: 'You cannot see this matter' })).toBeVisible();
-  await expect(page.getByText('Private matter')).toHaveCount(0);
+  await expect(page.getByText(title)).toHaveCount(0);
 
   await page.goto('/matters/00000000-0000-7000-8000-000000000000');
   await expect(page.getByRole('heading', { name: 'You cannot see this matter' })).toBeVisible();

@@ -113,6 +113,27 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - A matter someone is not on the team of shows "You cannot see this matter",
   the same as one that does not exist.
 
+## Built in 9d-3
+
+- `/matters/:id/edit`: anyone on the team changes the title or type of work.
+- `/matters/:id/team` (supervising partner): add a fee earner from the
+  colleagues list, remove one (they lose access at once), or hand supervision
+  to another partner, after which the previous partner is a fee earner.
+- `/matters/:id/close` (supervising partner): a reason and a tick to confirm,
+  because closing is final. A closed matter shows no change links, and the
+  change pages send the person back to the matter page.
+- The matter page shows its supervising partner every compliance access to the
+  matter: when, who and why.
+- `/matters/supervision-takeover` (partners): the matter's reference and a
+  reason. The API allows it only when the supervising partner can no longer act.
+- `/matters/compliance-access` (compliance): the matter's reference and a
+  reason, then the matter, read-only. It is shown only in the page's memory:
+  reloading forgets it, and each look is another record.
+- The API does not tell the web app a person's roles. Supervising-partner
+  actions appear only to the matter's supervising partner (known from the
+  team); takeover and compliance access are linked from the Matters page for
+  everyone, and the API refuses anyone else.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from

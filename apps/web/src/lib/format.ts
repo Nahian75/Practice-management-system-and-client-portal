@@ -4,11 +4,24 @@
  */
 
 const LONG_DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' });
+const DATE_AND_TIME = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/London',
+});
 const COUNTRY_NAMES = new Intl.DisplayNames(['en-GB'], { type: 'region' });
 
 /** An instant (when something happened), as a date in UK time. */
 export function formatDate(iso: string): string {
   return LONG_DATE.format(new Date(iso));
+}
+
+/** An instant with its time in UK time, such as "5 October 2026 at 15:44". */
+export function formatDateTime(iso: string): string {
+  return DATE_AND_TIME.format(new Date(iso));
 }
 
 /**

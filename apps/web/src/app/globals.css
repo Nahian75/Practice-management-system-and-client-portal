@@ -330,6 +330,12 @@ a:hover {
   color: var(--colour-brand);
 }
 
+/* For an action that cannot be undone, such as closing a matter. */
+.button-warning {
+  background: var(--colour-error);
+  border-color: var(--colour-error);
+}
+
 .fieldset {
   border: 0;
   padding: 0;

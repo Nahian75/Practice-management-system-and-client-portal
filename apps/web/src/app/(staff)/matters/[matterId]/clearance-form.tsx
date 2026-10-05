@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ErrorSummary } from '@/components/error-summary';
+import { isReason, REASON_MESSAGE } from '@/lib/matters';
 import { messagesOf, postJson } from '@/lib/requests';
 
 /**
@@ -18,8 +19,8 @@ export function ClearanceForm({ matterId }: { matterId: string }) {
   async function clear(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const reason = String(new FormData(event.currentTarget).get('reason')).trim();
-    if (reason.length < 10) {
-      setErrors(['Give a reason of 10 to 500 characters']);
+    if (!isReason(reason)) {
+      setErrors([REASON_MESSAGE]);
       return;
     }
     setSending(true);

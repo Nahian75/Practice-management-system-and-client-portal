@@ -2,17 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ConflictResults } from '@/components/conflict-results';
+import { MatterDetails } from '@/components/matter-details';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, currentAccount } from '@/lib/api';
-import { formatDate } from '@/lib/format';
-import {
-  MATTER_STATUS_LABELS,
-  MATTER_TYPE_LABELS,
-  PARTY_ROLE_LABELS,
-  TEAM_ROLE_LABELS,
-  type ConflictCheck,
-  type Matter,
-} from '@/lib/matters';
+import { formatDate, formatDateTime } from '@/lib/format';
+import { MATTER_STATUS_LABELS, type ComplianceAccess, type ConflictCheck, type Matter } from '@/lib/matters';
 import { ClearanceForm } from './clearance-form';
 
 export const metadata: Metadata = { title: 'Matter' };
@@ -42,6 +36,10 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
 
   const check = await apiGet<ConflictCheck>(`/matters/${encodeURIComponent(matter.id)}/conflict-check`);
   const isSupervisor = matter.team.some((member) => member.accountId === account.id && member.role === 'supervising_partner');
+  const accesses = isSupervisor
+    ? await apiGet<{ accesses: ComplianceAccess[] }>(`/matters/${encodeURIComponent(matter.id)}/compliance-accesses`)
+    : undefined;
+  const closed = matter.status === 'closed';
 
   return (
     <>
@@ -49,6 +47,13 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
         {matter.reference} · {MATTER_STATUS_LABELS[matter.status]}
       </span>
       <h1>{matter.title}</h1>
+      {!closed && (
+        <div className="actions">
+          <Link href={`/matters/${matter.id}/edit`}>Change details</Link>
+          {isSupervisor && <Link href={`/matters/${matter.id}/team`}>Change the team</Link>}
+          {isSupervisor && <Link href={`/matters/${matter.id}/close`}>Close the matter</Link>}
+        </div>
+      )}
 
       {matter.status === 'awaiting_clearance' && (
         <div className="notice">
@@ -58,63 +63,15 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
           </p>
         </div>
       )}
-
-      <dl className="summary">
-        {(
-          [
-            ['Client', <Link key="client" href={`/clients/${matter.client.id}`}>{`${matter.client.name} (${matter.client.reference})`}</Link>],
-            ['Type of work', MATTER_TYPE_LABELS[matter.matterType]],
-            ['Opened', formatDate(matter.openedAt)],
-          ] as const
-        ).map(([label, value]) => (
-          <div key={label} className="summary-row">
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <h2>Team</h2>
-      <table className="table">
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Role</th>
-          </tr>
-        </thead>
-        <tbody>
-          {matter.team.map((member) => (
-            <tr key={member.accountId}>
-              <td>{member.displayName}</td>
-              <td>{TEAM_ROLE_LABELS[member.role]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h2>Other parties</h2>
-      {matter.parties.length === 0 ? (
-        <p>None.</p>
-      ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Role</th>
-              <th scope="col">Person or organisation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {matter.parties.map((party) => (
-              <tr key={party.id}>
-                <td>{party.name}</td>
-                <td>{PARTY_ROLE_LABELS[party.role]}</td>
-                <td>{party.kind === 'individual' ? 'Person' : 'Organisation'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {closed && (
+        <div className="notice">
+          <p>
+            <strong>This matter is closed.</strong> It can no longer be changed.
+          </p>
+        </div>
       )}
+
+      <MatterDetails matter={matter} />
 
       <h2>Conflict check</h2>
       {check.body ? (
@@ -141,6 +98,35 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
       )}
 
       {matter.status === 'awaiting_clearance' && isSupervisor && <ClearanceForm matterId={matter.id} />}
+
+      {accesses?.body && (
+        <>
+          <h2>Compliance accesses</h2>
+          {accesses.body.accesses.length === 0 ? (
+            <p>Nobody from compliance has looked at this matter.</p>
+          ) : (
+            <table className="table">
+              <caption className="secondary">Shown to you as supervising partner. You are also emailed each time.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Who</th>
+                  <th scope="col">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accesses.body.accesses.map((access) => (
+                  <tr key={access.id}>
+                    <td>{formatDateTime(access.accessedAt)}</td>
+                    <td>{access.accessedBy.displayName}</td>
+                    <td>{access.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
     </>
   );
 }

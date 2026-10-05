@@ -65,3 +65,17 @@ export interface Colleague {
   displayName: string;
   isPartner: boolean;
 }
+
+export interface ComplianceAccess {
+  id: string;
+  accessedBy: { accountId: string; displayName: string };
+  reason: string;
+  accessedAt: string;
+}
+
+/** The API's form for a matter reference, such as C-000123/001; it reads lower case as upper. */
+export const MATTER_REFERENCE_PATTERN = /^C-[0-9]{6,}\/[0-9]{3,}$/i;
+
+/** Reasons the API records (closing, clearance, takeover, compliance access) are 10 to 500 characters. */
+export const isReason = (reason: string) => reason.length >= 10 && reason.length <= 500;
+export const REASON_MESSAGE = 'Give a reason of 10 to 500 characters';

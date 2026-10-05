@@ -13,7 +13,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     before: typeof before === 'string' ? before : undefined,
   });
   if (status === 403) {
-    return <NoAccess what="matters" />;
+    return (
+      <>
+        <NoAccess what="matters" />
+        <p>
+          Compliance can <Link href="/matters/compliance-access">look at a matter with a reason</Link>.
+        </p>
+      </>
+    );
   }
   if (status === 400) {
     redirect('/matters');
@@ -58,6 +65,18 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           <Link href={`/matters?before=${encodeURIComponent(body.next)}`}>Older matters</Link>
         </p>
       )}
+
+      <hr className="rule" />
+      <h2>Matters you are not on the team of</h2>
+      <ul>
+        <li>
+          Partners: <Link href="/matters/supervision-takeover">take over supervision</Link> from a supervising partner who
+          can no longer act
+        </li>
+        <li>
+          Compliance: <Link href="/matters/compliance-access">look at a matter with a reason</Link>
+        </li>
+      </ul>
     </>
   );
 }

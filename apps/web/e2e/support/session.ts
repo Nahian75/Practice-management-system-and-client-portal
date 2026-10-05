@@ -15,9 +15,8 @@ function nextBackupCode(staff: TestStaff): string {
   return code;
 }
 
-/** A new staff member with these roles, signed in in the browser through the sign-in page. */
-export async function signedInStaff(page: Page, request: APIRequestContext, roles: string[] = ['fee_earner']): Promise<TestStaff> {
-  const staff = await createStaff(request, roles);
+/** Signs this staff member in, in the browser, through the sign-in page. */
+export async function signIn(page: Page, staff: TestStaff): Promise<void> {
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(staff.email);
   await page.getByLabel('Password').fill(staff.password);
@@ -25,6 +24,12 @@ export async function signedInStaff(page: Page, request: APIRequestContext, role
   await page.getByLabel('Security code').fill(nextBackupCode(staff));
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+}
+
+/** A new staff member with these roles, signed in in the browser. */
+export async function signedInStaff(page: Page, request: APIRequestContext, roles: string[] = ['fee_earner']): Promise<TestStaff> {
+  const staff = await createStaff(request, roles);
+  await signIn(page, staff);
   return staff;
 }
 
@@ -38,5 +43,6 @@ export async function apiSessionFor(request: APIRequestContext, roles: string[] 
   await context.post('/api/auth/sign-in', { data: { email: staff.email, password: staff.password } });
   const signedIn = await context.post('/api/auth/two-factor', { data: { code: nextBackupCode(staff) } });
   expect(signedIn.status()).toBe(200);
-  return { staff, api: context };
+  const { account } = (await (await context.get('/api/auth/session')).json()) as { account: { id: string } };
+  return { staff, accountId: account.id, api: context };
 }
