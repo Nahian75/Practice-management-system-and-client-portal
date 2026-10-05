@@ -185,6 +185,38 @@ describe('matters tables', () => {
       expect(result.matches).toContainEqual(expect.objectContaining({ relation: 'opponent', clientId: client.id, matterId }));
     });
 
+    it('finds a short stored name inside a longer checked name, through the indexed search (review M1)', async () => {
+      const token = uniqueName();
+      const existing = await clientNamed(token, 'Ng');
+
+      const result = await check([`${token} Ng Trading International`]);
+
+      expect(result.matches).toContainEqual(expect.objectContaining({ relation: 'client', clientId: existing }));
+    });
+
+    // The indexed search must find exactly what comparing every name in full would (review M1).
+    it('finds the same number of matches as comparing every stored name in full', async () => {
+      const names = ['Jane Doe', 'Acme Trading Ltd'];
+
+      const indexed = (await check(names)).matches.length;
+      const { rows } = await sql<{ total: string }>`
+        select (app.find_possible_conflicts(${names}::text[], ${client.id}) ->> 'total') as total`.execute(db);
+      const { rows: full } = await sql<{ total: string }>`
+        select count(*) as total
+        from unnest(${names}::text[]) as checked
+        cross join lateral (
+          select i.client_id, i.given_names || ' ' || i.family_name as name, 'client' as relation from client_individuals i
+          union all select o.client_id, o.legal_name, 'client' from client_organisations o
+          union all select c.client_id, c.given_names || ' ' || c.family_name, 'contact' from client_contacts c
+          union all select m.client_id, p.name, 'party' from matter_parties p join matters m on m.id = p.matter_id
+        ) k
+        where app.name_likeness(app.normalise_name(checked), app.normalise_name(k.name)) >= 0.3
+          and not (k.client_id = ${client.id} and k.relation in ('client', 'contact'))`.execute(db);
+
+      expect(indexed).toBeGreaterThan(0);
+      expect(Number(rows[0]?.total)).toBe(Number(full[0]?.total));
+    });
+
     it('opens the matter as awaiting clearance when the check found a possible match', async () => {
       const token = uniqueName();
       await clientNamed(token, 'Existing');

@@ -214,8 +214,11 @@ A client's own record and contacts are not reported against that client.
   alarm costs less than a missed conflict. A first version also counted any
   shared word, and "X Holdings Ltd" matched hundreds of companies; the 0.8
   rule and leaving out legal-form words brought that to none.
-- Every name is compared in full each time, without an index. That is fast
-  enough at a firm's scale; an index can be added if it is not.
+- Candidates are found through trigram indexes (migration `0023`, review M1):
+  whole-name similarity of 0.1 or more, or the checked name 0.8 inside the
+  stored one; the rule above is then applied to them. A 20-name check takes
+  about 1.2 seconds against 10,000 individuals, with the same results as
+  comparing every name in full.
 
 **The database does the check itself.** The app gives the client and the
 names; a trigger adds the client's name, finds the matches, and stores the 50
@@ -287,6 +290,12 @@ unchanged.
 `matter.accessed_with_reason` (access id). Names, titles and reasons stay out
 of the audit log, as for clients.
 
+## Rules for later modules
+
+- Work on a matter (documents, tasks, time, bills) must be refused while it is
+  `awaiting_clearance` or `closed`, in the database as well as the API
+  (review M7).
+
 ## Not in this module
 
 - **AML:** opening a matter will require the client's identity checks to be
@@ -311,4 +320,4 @@ Each step ships with positive and negative tests and is reviewed before the next
   built: a new party needs a new conflict check, and possibly clearance again,
   on an open matter. To be designed with the project owner.
 - **8g.** Compliance access with a reason. Done.
-- Security review of the module.
+- Security review of the module. Done: [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md). M1 fixed (indexed conflict checks); M2 and M4 decided, to be built next.
