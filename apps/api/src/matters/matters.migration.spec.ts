@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
+import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
 import { permissionsFor, STAFF_ROLES } from '../auth/permissions/permissions.js';
 import { createDatabase } from '../database/database.js';
@@ -245,6 +245,71 @@ describe('matters tables', () => {
 
       await expect(addParty(`Someone ${uniqueName()}`)).rejects.toThrow(/was not in the matter's conflict check/);
       await expect(addParty(checked.toUpperCase().replace("'", ''))).resolves.toBeDefined();
+    });
+  });
+
+  describe('conflict clearance', () => {
+    let matterId: string;
+
+    const statusOf = async (id: string) =>
+      (await db.selectFrom('matters').select('status').where('id', '=', id).executeTakeFirstOrThrow()).status;
+    const clear = (clearedBy: string, reason = 'Different person: other date of birth and address') =>
+      db.insertInto('conflict_clearances').values({ matter_id: matterId, cleared_by: clearedBy, reason }).returning('id').executeTakeFirstOrThrow();
+
+    beforeEach(async () => {
+      const token = uniqueName();
+      await db.transaction().execute(async (trx) => {
+        const created = await trx.insertInto('clients').values({ kind: 'individual', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
+        await trx.insertInto('client_individuals').values({ client_id: created.id, given_names: token, family_name: 'Existing' }).execute();
+      });
+      const matter = await openMatter(
+        [
+          [partner.id, 'supervising_partner'],
+          [feeEarner.id, 'fee_earner'],
+        ],
+        { checkNames: [`${token} Existing`] },
+      );
+      matterId = matter.id;
+      expect(matter.status).toBe('awaiting_clearance');
+    });
+
+    it('opens the matter when its supervising partner records a clearance', async () => {
+      await clear(partner.id);
+
+      expect(await statusOf(matterId)).toBe('open');
+    });
+
+    it.each<[string, () => Promise<string>]>([
+      ['a fee earner on the team', async () => feeEarner.id],
+      ['a partner not on the team', async () => (await staffWith('partner')).id],
+      ['the supervising partner after losing the partner role', async () => {
+        await revokeTestRole(db, partner.id, 'partner');
+        return partner.id;
+      }],
+    ])('refuses a clearance by %s', async (_case, clearer) => {
+      await expect(clear(await clearer())).rejects.toThrow(/only by the matter's active supervising partner/);
+      expect(await statusOf(matterId)).toBe('awaiting_clearance');
+    });
+
+    it('refuses a second clearance, and one for a matter that is already open', async () => {
+      await clear(partner.id);
+
+      await expect(clear(partner.id)).rejects.toThrow(/not awaiting conflict clearance/);
+      const openMatterId = (await openMatter()).id;
+      await expect(
+        db.insertInto('conflict_clearances').values({ matter_id: openMatterId, cleared_by: partner.id, reason: 'Nothing to clear here' }).execute(),
+      ).rejects.toThrow(/not awaiting conflict clearance/);
+    });
+
+    it('refuses a short reason', async () => {
+      await expect(clear(partner.id, 'fine')).rejects.toThrow(/violates check constraint/);
+    });
+
+    it('keeps every clearance as it was', async () => {
+      const { id } = await clear(partner.id);
+
+      await expect(sql`update conflict_clearances set reason = 'Rewritten afterwards' where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
+      await expect(sql`delete from conflict_clearances where id = ${id}`.execute(db)).rejects.toThrow(/permission denied/);
     });
   });
 

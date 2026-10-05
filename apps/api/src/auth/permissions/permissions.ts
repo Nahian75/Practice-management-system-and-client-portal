@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   'clients.take_over',
   'matters.open',
   'matters.view',
+  'matters.supervise',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -50,6 +51,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'clients.take_over',
     'matters.open',
     'matters.view',
+    'matters.supervise',
   ],
   fee_earner: ['clients.create', 'clients.view', 'clients.search', 'clients.edit', 'matters.open', 'matters.view'],
   accounts: [],

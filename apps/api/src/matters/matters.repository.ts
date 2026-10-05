@@ -210,6 +210,56 @@ export class MattersRepository {
       .executeTakeFirst();
   }
 
+  /** Serialises clearances of one matter, so two arriving together are answered one after the other. */
+  async lockClearance(matterId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.conflict_clearance:${matterId}`}, 0))`.execute(trx);
+  }
+
+  /** The matter's status and reference, and whether `viewerId` is its supervising partner; if they are on its team. */
+  clearanceState(matterId: string, viewerId: string, trx: Kysely<Database>) {
+    return trx
+      .selectFrom('matters')
+      .select(['matters.status', 'matters.reference'])
+      .select((eb) =>
+        eb
+          .exists(
+            eb
+              .selectFrom('matter_team')
+              .select('matter_team.id')
+              .whereRef('matter_team.matter_id', '=', 'matters.id')
+              .where('matter_team.account_id', '=', viewerId)
+              .where('matter_team.role', '=', 'supervising_partner')
+              .where('matter_team.removed_at', 'is', null),
+          )
+          .as('is_supervisor'),
+      )
+      .where('matters.id', '=', matterId)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
+  }
+
+  /** Records the clearance. The database checks the rules and opens the matter. */
+  async recordClearance(clearance: { matterId: string; clearedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
+    const { id } = await trx
+      .insertInto('conflict_clearances')
+      .values({ matter_id: clearance.matterId, cleared_by: clearance.clearedBy, reason: clearance.reason })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return id;
+  }
+
+  /** The clearance of a matter, with who gave it, if `viewerId` is on its team. */
+  visibleClearance(matterId: string, viewerId: string) {
+    return this.db
+      .selectFrom('conflict_clearances')
+      .innerJoin('matters', 'matters.id', 'conflict_clearances.matter_id')
+      .innerJoin('accounts', 'accounts.id', 'conflict_clearances.cleared_by')
+      .select(['conflict_clearances.cleared_by', 'accounts.display_name', 'conflict_clearances.reason', 'conflict_clearances.cleared_at'])
+      .where('conflict_clearances.matter_id', '=', matterId)
+      .where(visibleTo(viewerId))
+      .executeTakeFirst();
+  }
+
   async addParty(party: NewParty & { matterId: string; addedBy: string }, trx: Kysely<Database>): Promise<string> {
     const { id } = await trx
       .insertInto('matter_parties')

@@ -109,6 +109,32 @@ export class SecurityNoticesService {
     }
   }
 
+  /**
+   * Tells every compliance holder, other than the partner who cleared it, that
+   * a possible conflict was cleared. The matter is named by reference only and
+   * the reason stays out, as for takeovers.
+   */
+  async conflictCleared(clearance: { matterReference: string; clearedBy: string }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const partner = await this.accounts.findById(clearance.clearedBy);
+    if (!partner) {
+      return;
+    }
+    for (const holderId of await this.roles.activeHolders('compliance')) {
+      if (holderId === clearance.clearedBy) {
+        continue;
+      }
+      await this.notify(holderId, `Possible conflict cleared on ${clearance.matterReference}`, (name) => [
+        `Hello ${name},`,
+        '',
+        `${partner.display_name} cleared a possible conflict on matter ${clearance.matterReference} on ${when}.`,
+        '',
+        'You are told because you hold the compliance role. The possible matches and',
+        'the reason given are recorded with the matter.',
+      ]);
+    }
+  }
+
   async roleRevoked(accountId: string, role: StaffRole, revokedBy: string | null): Promise<void> {
     const when = this.clock.now().toUTCString();
     const by = await this.changedBy(revokedBy);

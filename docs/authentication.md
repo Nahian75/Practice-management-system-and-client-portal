@@ -188,6 +188,7 @@ Sent in the background, never slowing or failing the action that caused them:
 | Password changed | A password reset completes |
 | Role granted / role removed | A role is granted to, or revoked from, the account |
 | Sensitive role granted | `administrator`, `compliance` or `accounts` is granted to someone else: sent to every active compliance holder |
+| Possible conflict cleared | A supervising partner clears a possible conflict: sent to every active compliance holder except that partner. Names the matter by reference only; the reason stays out |
 | Client taken over | A partner takes over a client: sent to every active compliance holder except that partner. Names the client by reference only; the reason stays out |
 
 Background email (`MailOutbox`) waits for anything still sending when the app

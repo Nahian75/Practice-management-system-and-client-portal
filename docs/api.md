@@ -31,7 +31,8 @@
 | PATCH | `/clients/:clientId/contacts/:contactId` | `clients.edit` + visibility | Fields to change, or `active` → 200 with the contact. 404 unless the contact belongs to this client and the caller may see it |
 | POST | `/matters` | `matters.open` | `{clientId, title, matterType, supervisingPartnerId, feeEarnerIds?, conflictCheckId, parties?}` → 201 `{id, reference, status}`; status is `awaiting_clearance` if the check found any possible match. The opener joins the team. 404 client not visible; 400 supervising partner or team member not allowed, check not usable (not yours, other client, over 24 hours old, already used), or a party not in the check |
 | POST | `/conflict-checks` | `matters.open` | `{clientId, names[1..20]}` → 201 `{id, names, matches, matchCount, createdAt}`. The client's own name is added; up to 50 strongest matches, each with name, relation and references only. 404 client not visible, 429 over the hourly allowance shared with client search |
-| GET | `/matters/:matterId/conflict-check` | `matters.view` + team | The check the matter was opened on |
+| GET | `/matters/:matterId/conflict-check` | `matters.view` + team | The check the matter was opened on, and its clearance if any |
+| POST | `/matters/:matterId/conflict-clearance` | `matters.supervise` + supervising partner | `{"reason"}` (10 to 500 characters) → 204: the matter opens. 403 not the supervising partner, 404 not on the team, 409 not awaiting clearance |
 | GET | `/matters` | `matters.view` | `{"matters": [...], "next"}`: matters you are on the team of, 50 at a time, newest first. `?before=<next>` |
 | GET | `/matters/:matterId` | `matters.view` + team | Details, client summary and team. 404 if not on the team |
 | GET | `/clients/:clientId/matters` | `matters.view` + client visibility | The client's matters you are on the team of |

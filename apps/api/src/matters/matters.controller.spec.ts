@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
+import { testAppDatabaseUrl } from '../../test/database.js';
+import { inbox } from '../../test/mailpit.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { ClientsModule } from '../clients/clients.module.js';
+import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
 import { MattersModule } from './matters.module.js';
@@ -315,6 +318,115 @@ describe('Matters', () => {
 
     it.each(['administrator', 'accounts', 'compliance'] as const)('is closed to %s', async (role) => {
       expect((await check([uniqueName()], await signedIn(await staffWith(role)))).status).toBe(403);
+    });
+  });
+
+  describe('POST /matters/:matterId/conflict-clearance (step 8c)', () => {
+    const REASON = { reason: 'Different company: other registration number and address' };
+    let matterId: string;
+    let reference: string;
+    let partnerToken: string;
+
+    const clear = (sessionToken: string, body: object = REASON) => as(sessionToken).post(`/matters/${matterId}/conflict-clearance`, body);
+
+    beforeEach(async () => {
+      const existing = uniqueName();
+      await as(token).post('/clients', { kind: 'organisation', legalName: `${existing} Holdings`, organisationType: 'company' });
+      const opened = await open(token, { parties: [{ role: 'opponent', kind: 'organisation', name: `${existing} Holdings Ltd` }] });
+      ({ id: matterId, reference } = opened.body);
+      expect(opened.body.status).toBe('awaiting_clearance');
+      partnerToken = await signedIn(partner);
+    });
+
+    it('opens the matter, and shows the team who cleared it and why', async () => {
+      expect((await clear(partnerToken)).status).toBe(204);
+
+      expect((await as(token).get(`/matters/${matterId}`)).body.status).toBe('open');
+      expect((await as(token).get(`/matters/${matterId}/conflict-check`)).body.clearance).toEqual({
+        clearedBy: { accountId: partner.id, displayName: expect.any(String) },
+        reason: REASON.reason,
+        clearedAt: expect.any(String),
+      });
+    });
+
+    it('records the clearance without its reason, and tells compliance by matter reference only', async () => {
+      const holder = await staffWith('compliance');
+
+      await clear(partnerToken);
+
+      const events = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'action', 'metadata'])
+        .where('resource_id', '=', matterId)
+        .where('action', '=', 'matter.conflict_cleared')
+        .execute();
+      expect(events).toEqual([{ actor_id: partner.id, action: 'matter.conflict_cleared', metadata: { clearanceId: expect.any(String) } }]);
+      expect(JSON.stringify(events)).not.toContain('registration number');
+      await expect
+        .poll(async () => (await inbox(holder.email)).filter((email) => email.subject.includes(reference)), { timeout: 15_000 })
+        .toHaveLength(1);
+      const [email] = (await inbox(holder.email)).filter((message) => message.subject.includes(reference));
+      expect(email?.subject).toBe(`Possible conflict cleared on ${reference}`);
+      expect(email?.text).not.toMatch(/registration number|Holdings/);
+    });
+
+    it('is refused to a partner on the team who is not its supervising partner', async () => {
+      const otherPartner = await staffWith('partner');
+      await db.insertInto('matter_team').values({ matter_id: matterId, account_id: otherPartner.id, role: 'fee_earner', added_by: feeEarner.id }).execute();
+
+      const response = await clear(await signedIn(otherPartner));
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe("Only the matter's supervising partner can clear a possible conflict");
+      expect((await as(token).get(`/matters/${matterId}`)).body.status).toBe('awaiting_clearance');
+    });
+
+    it('is closed to fee earners, even on the team', async () => {
+      expect((await clear(token)).status).toBe(403);
+    });
+
+    it('does not find a matter the partner is not on', async () => {
+      expect((await clear(await signedIn(await staffWith('partner')))).status).toBe(404);
+    });
+
+    it('refuses a matter that is not awaiting clearance', async () => {
+      await clear(partnerToken);
+
+      expect((await clear(partnerToken)).status).toBe(409);
+    });
+
+    it.each<[string, object]>([
+      ['a short reason', { reason: 'fine' }],
+      ['a reason with a line break', { reason: 'Different company\nother address' }],
+      ['an extra field', { ...REASON, status: 'open' }],
+    ])('refuses %s', async (_case, body) => {
+      expect((await clear(partnerToken, body)).status).toBe(400);
+    });
+
+    /*
+     * Holding the clearance lock from another connection makes both requests
+     * queue on it every time; the second then finds the matter already open.
+     */
+    it('answers two clearances sent at once with 204 and 409', async () => {
+      const holder = createDatabase<Database>(testAppDatabaseUrl(), 1);
+      const lockKey = sql`hashtextextended(${`app.conflict_clearance:${matterId}`}, 0)`;
+      try {
+        await sql`select pg_advisory_lock(${lockKey})`.execute(holder);
+        const { rows } = await sql<{ pid: number }>`select pg_backend_pid() as pid`.execute(holder);
+        const responses = Promise.all([clear(partnerToken).then((r) => r), clear(partnerToken).then((r) => r)]);
+        await expect
+          .poll(async () => {
+            const blocked = await sql<{ count: string }>`
+              select count(*) from pg_stat_activity where ${rows[0]?.pid}::int = any(pg_blocking_pids(pid))`.execute(db);
+            return Number(blocked.rows[0]?.count);
+          })
+          .toBe(2);
+        await sql`select pg_advisory_unlock(${lockKey})`.execute(holder);
+
+        expect((await responses).map((response) => response.status).sort()).toEqual([204, 409]);
+      } finally {
+        await holder.destroy();
+      }
     });
   });
 

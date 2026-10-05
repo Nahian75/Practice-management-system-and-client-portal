@@ -93,12 +93,13 @@ describe('Invitations', () => {
     it('records who sent the invitation', async () => {
       await invite('staff');
 
+      // This account's event: other test files send invitations at the same time.
+      const { id } = await db.selectFrom('accounts').select('id').where('email', '=', email).executeTakeFirstOrThrow();
       const event = await db
         .selectFrom('audit_events')
         .select(['actor_type', 'action', 'metadata'])
         .where('action', '=', 'account.invited')
-        .orderBy('occurred_at', 'desc')
-        .limit(1)
+        .where('resource_id', '=', id)
         .executeTakeFirstOrThrow();
       expect(event).toEqual({ actor_type: 'system', action: 'account.invited', metadata: { kind: 'staff' } });
     });

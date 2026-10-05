@@ -38,6 +38,8 @@ export interface ConflictCheck {
   /** How many possible matches there were in all. */
   matchCount: number;
   createdAt: Date;
+  /** Present once the supervising partner has cleared the possible matches. */
+  clearance: { clearedBy: { accountId: string; displayName: string }; reason: string; clearedAt: Date } | null;
 }
 
 export interface MatterSummary {

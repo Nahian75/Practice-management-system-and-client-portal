@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Kysely } from 'kysely';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
+import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
 import { permissionsFor } from '../auth/permissions/permissions.js';
 import { SearchQuota } from '../clients/search-quota.js';
 import type { RequestContext } from '../common/http/request-context.js';
@@ -22,6 +23,8 @@ export type OpenResult =
   | { outcome: 'opened'; id: string; reference: string; status: MatterStatus }
   | { outcome: 'client_not_found' | 'invalid_supervisor' | 'invalid_team_member' | 'invalid_conflict_check' | 'party_not_checked' };
 
+export type ClearanceResult = 'cleared' | 'not_found' | 'not_supervisor' | 'not_awaiting_clearance';
+
 export type ConflictCheckResult = { outcome: 'checked'; check: ConflictCheck } | { outcome: 'client_not_found' | 'limited' };
 
 @Injectable()
@@ -30,6 +33,7 @@ export class MattersService {
     private readonly matters: MattersRepository,
     private readonly audit: AuditService,
     private readonly quota: SearchQuota,
+    private readonly notices: SecurityNoticesService,
   ) {}
 
   /**
@@ -59,21 +63,74 @@ export class MattersService {
         },
         trx,
       );
-      return { outcome: 'checked', check: await this.describe(check, trx) };
+      return { outcome: 'checked', check: { ...(await this.describe(check, trx)), clearance: null } };
     });
   }
 
   /** The check a matter was opened on, for its team. */
   async conflictCheckOf(matterId: string, viewerId: string): Promise<ConflictCheck | undefined> {
     const check = await this.matters.visibleConflictCheck(matterId, viewerId);
-    return check && this.describe(check);
+    if (!check) {
+      return undefined;
+    }
+    const clearance = await this.matters.visibleClearance(matterId, viewerId);
+    return {
+      ...(await this.describe(check)),
+      clearance: clearance
+        ? {
+            clearedBy: { accountId: clearance.cleared_by, displayName: clearance.display_name },
+            reason: clearance.reason,
+            clearedAt: clearance.cleared_at,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * The supervising partner records why a possible conflict is not one, which
+   * opens the matter. The reason is kept with the clearance; the audit log
+   * points to it. Compliance holders are told once the change has committed.
+   */
+  async clearConflict(matterId: string, reason: string, by: MatterActor): Promise<ClearanceResult> {
+    const outcome = await this.matters.transaction(async (trx): Promise<{ result: ClearanceResult; reference?: string }> => {
+      await this.matters.lockClearance(matterId, trx);
+      const state = await this.matters.clearanceState(matterId, by.accountId, trx);
+      if (!state) {
+        return { result: 'not_found' };
+      }
+      if (!state.is_supervisor) {
+        return { result: 'not_supervisor' };
+      }
+      if (state.status !== 'awaiting_clearance') {
+        return { result: 'not_awaiting_clearance' };
+      }
+
+      const clearanceId = await this.matters.recordClearance({ matterId, clearedBy: by.accountId, reason }, trx);
+      await this.audit.record(
+        {
+          actor: by.actor,
+          action: 'matter.conflict_cleared',
+          outcome: 'success',
+          resource: { type: 'matter', id: matterId },
+          metadata: { clearanceId },
+          ...by.context,
+        },
+        trx,
+      );
+      return { result: 'cleared', reference: state.reference };
+    });
+
+    if (outcome.reference) {
+      await this.notices.conflictCleared({ matterReference: outcome.reference, clearedBy: by.accountId });
+    }
+    return outcome.result;
   }
 
   /** Replaces the ids in a check's matches with references, which is all a reader needs. */
   private async describe(
     check: { id: string; names: string[]; matches: ConflictMatchRow[]; match_count: number; created_at: Date },
     executor?: Kysely<Database>,
-  ): Promise<ConflictCheck> {
+  ): Promise<Omit<ConflictCheck, 'clearance'>> {
     const references = await this.matters.references(
       [...new Set(check.matches.map((match) => match.clientId))],
       [...new Set(check.matches.flatMap((match) => (match.matterId ? [match.matterId] : [])))],

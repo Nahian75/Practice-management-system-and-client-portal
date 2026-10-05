@@ -1,9 +1,9 @@
 # Matters
 
-**Current state (2026-10-04):** Steps 8a and 8b built: matters and teams,
-conflict checks required for opening, other parties, seeing your matters, and
-client visibility through matter teams. Clearing a possible conflict is next;
-until then a matter that needs clearance stays `awaiting_clearance`.
+**Current state (2026-10-04):** Steps 8a to 8c built: matters and teams,
+conflict checks required for opening, other parties, clearing a possible
+conflict, seeing your matters, and client visibility through matter teams.
+Team changes, editing, closing and compliance access are designed below.
 
 A matter is one piece of work the firm does for a client: a house purchase, a
 divorce, a claim. Almost everything later hangs off a matter: documents, tasks,
@@ -95,8 +95,18 @@ enforced by the database as well as the API:
      `awaiting_clearance`.
 3. **Clear a possible conflict:** `POST /matters/:id/conflict-clearance` with a
    reason (10 to 500 characters), by the supervising partner only. Status
-   becomes `open`, and every compliance holder is emailed (matter reference
-   only, as for takeovers).
+   becomes `open`, and every compliance holder except that partner is emailed
+   (matter reference only, as for takeovers). Built in 8c (migration `0018`):
+   - The app has no right to change a matter's status. Recording a row in
+     `conflict_clearances` is what opens the matter: a `SECURITY DEFINER`
+     trigger checks the matter is awaiting clearance and that the clearer is
+     its active supervising partner holding the partner role. With the
+     service's own check removed, the database still refuses.
+   - One clearance per matter, never changed or deleted. The reason is kept
+     there; `matter.conflict_cleared` records only the clearance id.
+   - Clearances of one matter queue on an advisory lock, so two at once get
+     204 and 409; a test forces that race.
+   - `GET /matters/:id/conflict-check` shows the team who cleared it, when and why.
 
 While `awaiting_clearance`, the matter is visible to its team, but nothing can
 be added to it.
@@ -213,7 +223,7 @@ Each step ships with positive and negative tests and is reviewed before the next
   check in this step; nothing reaches production before 8b. Done.
 - **8b.** Other parties and conflict checks, now required for opening: matching,
   possible matches, `awaiting_clearance`. Done.
-- **8c.** Clearance by the supervising partner, email to compliance.
+- **8c.** Clearance by the supervising partner, email to compliance. Done.
 - **8d.** Team changes and handing over supervision.
 - **8e.** Editing, closing.
 - **8f.** Compliance access with a reason.

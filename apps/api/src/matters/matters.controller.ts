@@ -1,8 +1,11 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  ForbiddenException,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   NotFoundException,
@@ -17,9 +20,10 @@ import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-schema.decorator.js';
 import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from '../clients/search-quota.js';
 import { text } from '../common/validation/safe-text.js';
+import type { ConflictCheck } from './matter.js';
 import { MattersService, type MatterActor } from './matters.service.js';
 
 const MATTER_TYPES = [
@@ -89,13 +93,27 @@ const conflictCheckSchema = z.object({
       matterReference: z.string().nullable(),
     }),
   ),
+  clearance: z
+    .object({
+      clearedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+      reason: z.string(),
+      clearedAt: z.iso.datetime(),
+    })
+    .nullable(),
 });
+const clearanceRequestSchema = z.strictObject({ reason: text(500, 10) });
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
 
 export const MATTER_NOT_FOUND_MESSAGE = 'No matter with this id';
 const CLIENT_NOT_FOUND_MESSAGE = 'No client with this id';
+
+const serialiseCheck = (check: ConflictCheck) => ({
+  ...check,
+  createdAt: check.createdAt.toISOString(),
+  clearance: check.clearance && { ...check.clearance, clearedAt: check.clearance.clearedAt.toISOString() },
+});
 
 function actorFor(session: ResolvedSession, request: Request): MatterActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -150,7 +168,7 @@ export class MattersController {
         response.setHeader('Retry-After', String(SEARCH_WINDOW_SECONDS));
         throw new HttpException(SEARCH_LIMIT_MESSAGE, HttpStatus.TOO_MANY_REQUESTS);
       case 'checked':
-        return { ...result.check, createdAt: result.check.createdAt.toISOString() };
+        return serialiseCheck(result.check);
     }
   }
 
@@ -182,7 +200,30 @@ export class MattersController {
     if (!check) {
       throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
     }
-    return { ...check, createdAt: check.createdAt.toISOString() };
+    return serialiseCheck(check);
+  }
+
+  /** The supervising partner records why the possible matches are not a conflict, which opens the matter. */
+  @Post('matters/:matterId/conflict-clearance')
+  @RequirePermission('matters.supervise')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async clearConflict(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: clearanceRequestSchema }) body: z.infer<typeof clearanceRequestSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    switch (await this.matters.clearConflict(matterId, body.reason, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(MATTER_NOT_FOUND_MESSAGE);
+      case 'not_supervisor':
+        throw new ForbiddenException("Only the matter's supervising partner can clear a possible conflict");
+      case 'not_awaiting_clearance':
+        throw new ConflictException('This matter is not awaiting conflict clearance');
+      case 'cleared':
+        return;
+    }
   }
 
   @Get('clients/:clientId/matters')
