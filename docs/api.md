@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-05):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, and documents (upload, list, download, versions, withdrawal).
+**Current state (2026-10-06):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, documents (upload, list, download, versions, withdrawal and client sharing), and portal access for clients' people.
 
 ## Endpoints
 
@@ -45,10 +45,12 @@
 | GET | `/matters/:matterId/compliance-accesses` | `matters.supervise` + supervising partner | `{"accesses": [{id, accessedBy, reason, accessedAt}]}`. 403 not the supervising partner |
 | GET | `/clients/:clientId/matters` | `matters.view` + client visibility | The client's matters you are on the team of |
 | GET | `/matters/:matterId/documents` | `documents.view` + team | `{documents, next}`: 100 at a time, newest first, with each one's latest version. `?before=<next>` |
-| GET | `/documents/:documentId` | `documents.view` + team | The document and every version |
+| GET | `/documents/:documentId` | `documents.view` + team | The document, its client-sharing setting and every version |
 | GET | `/documents/:documentId/versions/:number/content` | `documents.view` + team | The file, as a download; recorded. See [documents.md](documents.md#api) |
 | POST | `/documents/:documentId/versions` | `documents.add` + team, open matter | Multipart `file` → 201 with the new version, checked as a first upload |
 | POST | `/documents/:documentId/withdrawal` | `documents.withdraw` + uploader or supervising partner | `{reason}` → 204. Final; the document is no longer listed or downloaded |
+| PUT | `/documents/:documentId/client-sharing` | `documents.share` + team | Shares the document with the client → 204 |
+| DELETE | `/documents/:documentId/client-sharing` | `documents.share` + team | Stops sharing the document → 204 |
 | POST | `/matters/:matterId/documents` | `documents.add` + team, open matter | Multipart `title`, `category`, then `file` (PDF, Word, Excel, PowerPoint, text, email, JPEG, PNG; up to 50 MB) → 201. Scanned for malware and stored encrypted; see [documents.md](documents.md#api) for every refusal |
 | POST | `/clients/:clientId/portal-access` | `portal.invite` + client visible | `{contactId?}` → 201: invites the client's person to the portal at the address on record. See [portal.md](portal.md#api) |
 | GET | `/clients/:clientId/portal-access` | `portal.invite` + client visible | Who can see the client in the portal now |

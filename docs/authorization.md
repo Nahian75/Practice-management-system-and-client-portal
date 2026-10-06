@@ -71,6 +71,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `documents.view` — list and download the documents of matters you are on the team of | | ✓ | ✓ | | |
 | `documents.add` — add documents to open matters you are on the team of ([rules](documents.md#who-can-do-what)) | | ✓ | ✓ | | |
 | `documents.withdraw` — withdraw a document you added, or any on a matter you supervise, with a reason | | ✓ | ✓ | | |
+| `documents.share` — share a document with the client, or stop sharing it | | ✓ | ✓ | | |
 | `portal.invite` — invite a client's person to the portal, at the address on record, and end their access ([rules](portal.md)) | | ✓ | ✓ | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
 

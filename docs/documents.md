@@ -1,9 +1,10 @@
 # Documents
 
-**Current state (2026-10-06):** Steps 10a to 10d built: encrypted storage,
+**Current state (2026-10-06):** Steps 10a to 10d and portal step 11b built: encrypted storage,
 scanning, file inspection, uploading, listing, downloading, new versions and
 withdrawal in the API (`apps/api/src/documents/`, migrations `0024` and
-`0025`), and the screens in the staff web app (see [web.md](web.md)). The
+`0025`); sharing with the client (migration `0027`); and the screens in the
+staff web app (see [web.md](web.md)). The
 module's security review is next. Compliance access to documents, through the
 matter's compliance access, is not built yet.
 
@@ -37,11 +38,18 @@ see there.
   only as text, never used as a path), type, size, a SHA-256 fingerprint of
   the file, who uploaded it and when.
 - **Withdrawn:** when, by whom and why, if it was.
+- **Shared with the client:** yes or no; starts no. Every real change is kept.
 
 ## Tables
 
 - `documents`: `id`, `matter_id`, `title`, `category`, `created_by`,
-  `created_at`.
+  `created_at`, `shared_with_client`. The app cannot change the sharing
+  setting directly.
+- `document_sharing_changes` (migration `0027`): `document_id`, `shared`,
+  `changed_by`, `changed_at`. Insert only, and the database applies each real
+  change to the document. It refuses anyone not active on the matter's team,
+  refuses sharing a withdrawn document, drops repeats of the current setting,
+  and records an unshare when a shared document is withdrawn.
 - `document_withdrawals` (migration `0025`): `document_id` (one each),
   `withdrawn_by`, `reason` (10 to 500 characters), `withdrawn_at`. Insert only,
   like matter closures: the record is the only way a document becomes
@@ -145,6 +153,7 @@ recorded as `document.upload_limited` and emailed to every administrator.
 | `documents.view` — list and download documents of your matters | | ✓ | ✓ | | |
 | `documents.add` — add documents and versions to your open matters | | ✓ | ✓ | | |
 | `documents.withdraw` — withdraw your own upload, or any on a matter you supervise | | ✓ | ✓ | | |
+| `documents.share` — share a document with the client, or stop sharing it | | ✓ | ✓ | | |
 
 As for matters, a permission is never enough on its own: every query filters by
 the matter's team, and a document you may not see answers 404.
@@ -155,16 +164,18 @@ the matter's team, and a document you may not see answers 404.
 |---|---|---|---|
 | POST | `/matters/:id/documents` | `documents.add` + team, open matter | Multipart: `title`, `category`, then `file` → 201 with the document and its version 1. 400 form, title, category, empty file, file name, or interrupted; 404 not on the team; 409 matter not open; 413 over 50 MB; 415 type not accepted, or macros; 422 malware (compliance told); 503 scanner unavailable (nothing unscanned is stored) |
 | GET | `/matters/:id/documents` | `documents.view` + team | `{documents, next}`: 100 at a time, newest first, each with its latest version; `?before=<next>` for the next page. 404 if not on the team |
-| GET | `/documents/:id` | `documents.view` + team | The document and every version, with who uploaded each. 404 if not on the team |
+| GET | `/documents/:id` | `documents.view` + team | The document, `sharedWithClient`, and every version, with who uploaded each. 404 if not on the team |
 | POST | `/documents/:id/versions` | `documents.add` + team, open matter | Multipart with only `file` → 201 `{number, fileName, mediaType, sizeBytes, uploadedAt}`. Checked and stored exactly as a first upload, with the same refusals; earlier versions are kept. 404 not on the team, 409 matter not open or document withdrawn |
 | GET | `/documents/:id/versions/:number/content` | `documents.view` + team | The file, decrypted as it is sent. Always `Content-Disposition: attachment` (the exact name encoded, and a plain fallback), its `Content-Length`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`. Recorded before it is sent. If the stored file fails its integrity check part-way, the connection is cut, so the browser reports a failed download rather than saving altered content. 404 if not on the team |
 | POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204. Final. 403 neither the uploader nor the supervising partner, 404 not on the team, 409 already withdrawn, matter closed, or changed meanwhile. Afterwards the document is not listed, its versions answer 410, and `GET /documents/:id` shows who withdrew it, when and why |
+| PUT | `/documents/:id/client-sharing` | `documents.share` + team | Shares it with the client → 204. Repeating it records nothing. 404 not on the team; 409 withdrawn or changed meanwhile |
+| DELETE | `/documents/:id/client-sharing` | `documents.share` + team | Stops sharing it → 204, with the same idempotence and refusals. A closed matter is allowed because clients can see closed matters |
 
 ## Audit
 
 `document.added` (document id, version, type, size), `document.version_added`,
 `document.downloaded` (document id, version), `document.withdrawn`,
-`document.refused` (reason: too large, type, macros, active content, unscannable,
+`document.shared`, `document.unshared`, `document.refused` (reason: too large, type, macros, active content, unscannable,
 malware, scanner unavailable, over the allowance, and so on), `document.upload_limited`.
 Never file names, titles or contents: like client names, they can be personal
 data.

@@ -1,8 +1,9 @@
 # Client portal
 
-**Current state (2026-10-06):** Step 11a built: portal links in the API
-(`apps/api/src/portal/`, migration `0026`) and on the client page. Sharing
-documents with the client (11b) next.
+**Current state (2026-10-06):** Steps 11a and 11b built: portal links in the
+API (`apps/api/src/portal/`, migration `0026`) and on the client page; and
+document sharing in the documents API, migration `0027` and the document
+page. The portal API for clients (11c) is next.
 
 Where the firm's clients sign in to follow their matters and receive the
 documents the firm shares with them.
@@ -40,7 +41,9 @@ documents the firm shares with them.
 - `documents.shared_with_client`, set and cleared by the matter's team, with
   each change kept in an insert-only `document_sharing_changes` table.
 
-## The database's own checks (migration 0026)
+## The database's own checks
+
+Migration `0026`:
 
 - A link joins a **client** account that is not disabled to the individual
   client themself, or to one **active** contact of an organisation client.
@@ -48,6 +51,17 @@ documents the firm shares with them.
   can only go to the address the firm holds, whatever the app sends.
 - Links are made and ended by staff; one active link per person and client;
   ended once, never changed back or deleted.
+
+Migration `0027`:
+
+- Documents start private. The app cannot change `shared_with_client`
+  directly: it inserts a `document_sharing_changes` row, and the database
+  changes the setting.
+- Only active staff still on the matter's team can record a change. A
+  withdrawn document cannot be shared.
+- Repeating the current setting records nothing. A real change is kept for
+  good: even the table owner cannot alter or remove it.
+- Withdrawing a shared document records an unshare in the same transaction.
 
 ## Who can do what
 
@@ -67,8 +81,12 @@ from their links alone, in every query.
 | POST | `/clients/:id/portal-access` | `portal.invite` + client visible | `{contactId?}` (an organisation's contact; none for an individual) → 201 `{id, accountId, invited}`. A new login is invited at the address on record; someone already using the portal is linked and emailed, without naming the client. 400 not a current contact of this client; 404 client not visible; 409 no email on record, already has access, address used by a staff account, or portal account disabled |
 | GET | `/clients/:id/portal-access` | `portal.invite` + client visible | `{"people": [{id, accountId, contactId, name, email, accountStatus, linkedAt}]}`: who can see the client in the portal now |
 | DELETE | `/clients/:id/portal-access/:linkId` | `portal.invite` + client visible | Ends that person's access at once → 204. 404 not a current link of this client |
+| PUT | `/documents/:id/client-sharing` | `documents.share` + matter team | Shares the document with the client → 204. Repeating it is harmless and records no duplicate. 404 not on the team; 409 withdrawn or changed meanwhile |
+| DELETE | `/documents/:id/client-sharing` | `documents.share` + matter team | Stops sharing the document → 204, with the same idempotence and refusals |
 
-Recorded as `portal.access_granted` and `portal.access_ended`, by ids only.
+Portal access is recorded as `portal.access_granted` and
+`portal.access_ended`. Sharing is recorded as `document.shared` and
+`document.unshared`. All use ids only.
 
 ## Build order
 
@@ -81,7 +99,7 @@ Each step ships with positive and negative tests and is reviewed before the next
   each current contact, showing the address on record it goes to; a person
   without one gets a link to add it. Done.
 - **11b.** Sharing documents with the client, in the API and on the document
-  page.
+  page. Done.
 - **11c.** The portal API for clients: their matters, the documents shared on
   each, downloads; access re-checked on every request.
 - **11d.** The portal screens; the sign-in page sends clients to them.

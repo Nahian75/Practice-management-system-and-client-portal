@@ -2,12 +2,13 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { sql, type Insertable, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
-import { testAppDatabaseUrl } from '../../test/database.js';
+import { testAppDatabaseUrl, testOwnerDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
 import type { Database, DocumentVersionsTable, StaffRole } from '../database/schema.js';
 
 describe('documents tables', () => {
   let db: Kysely<Database>;
+  let ownerDb: Kysely<Database>;
   let partner: TestAccount;
   let feeEarner: TestAccount;
   let matterId: string;
@@ -94,9 +95,11 @@ describe('documents tables', () => {
 
   beforeAll(async () => {
     db = createDatabase<Database>(testAppDatabaseUrl(), 1);
+    ownerDb = createDatabase<Database>(testOwnerDatabaseUrl(), 1);
   });
 
   afterAll(async () => {
+    await ownerDb.destroy();
     await db.destroy();
   });
 
@@ -261,6 +264,103 @@ describe('documents tables', () => {
       await withdraw(document.id, feeEarner.id);
 
       await expect(statement(document.id).execute(db)).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  describe('sharing with the client', () => {
+    const changeSharing = (documentId: string, shared: boolean, by: string, connection = db) =>
+      sql`insert into document_sharing_changes (document_id, shared, changed_by)
+          values (${documentId}, ${shared}, ${by})`.execute(connection);
+    const sharingState = async (documentId: string) =>
+      (
+        await sql<{ shared_with_client: boolean }>`select shared_with_client from documents where id = ${documentId}`.execute(db)
+      ).rows[0]?.shared_with_client;
+    const changesFor = (documentId: string, connection = db) =>
+      sql<{ shared: boolean; changed_by: string }>`select shared, changed_by from document_sharing_changes
+          where document_id = ${documentId} order by changed_at, id`.execute(connection);
+
+    it('starts private, then records each share and unshare', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+
+      expect(await sharingState(document.id)).toBe(false);
+      await changeSharing(document.id, true, feeEarner.id);
+      expect(await sharingState(document.id)).toBe(true);
+      await changeSharing(document.id, false, partner.id);
+
+      expect(await sharingState(document.id)).toBe(false);
+      expect((await changesFor(document.id)).rows).toEqual([
+        { shared: true, changed_by: feeEarner.id },
+        { shared: false, changed_by: partner.id },
+      ]);
+    });
+
+    it('does not record a request that leaves the setting unchanged', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await changeSharing(document.id, false, feeEarner.id);
+      await changeSharing(document.id, true, feeEarner.id);
+      await changeSharing(document.id, true, partner.id);
+
+      expect((await changesFor(document.id)).rows).toEqual([{ shared: true, changed_by: feeEarner.id }]);
+    });
+
+    it('refuses someone outside the active matter team', async () => {
+      const outsider = await staffWith('fee_earner');
+      const document = await addDocument(matterId, feeEarner.id);
+
+      await expect(changeSharing(document.id, true, outsider.id)).rejects.toThrow(/active matter team/);
+      await db
+        .updateTable('matter_team')
+        .set({ removed_at: new Date(), removed_by: partner.id })
+        .where('matter_id', '=', matterId)
+        .where('account_id', '=', feeEarner.id)
+        .execute();
+      await expect(changeSharing(document.id, true, feeEarner.id)).rejects.toThrow(/active matter team/);
+    });
+
+    it('refuses a disabled member of the matter team', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await db.updateTable('accounts').set({ status: 'disabled' }).where('id', '=', feeEarner.id).execute();
+
+      await expect(changeSharing(document.id, true, feeEarner.id)).rejects.toThrow(/active matter team/);
+    });
+
+    it('stops sharing when a document is withdrawn, and will not share it again', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await changeSharing(document.id, true, feeEarner.id);
+
+      await db
+        .insertInto('document_withdrawals')
+        .values({ document_id: document.id, withdrawn_by: feeEarner.id, reason: 'Uploaded to the wrong matter by mistake' })
+        .execute();
+
+      expect(await sharingState(document.id)).toBe(false);
+      expect((await changesFor(document.id)).rows).toEqual([
+        { shared: true, changed_by: feeEarner.id },
+        { shared: false, changed_by: feeEarner.id },
+      ]);
+      await expect(changeSharing(document.id, true, feeEarner.id)).rejects.toThrow(/withdrawn document/);
+    });
+
+    it('does not let the app bypass the history or alter it', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await changeSharing(document.id, true, feeEarner.id);
+
+      await expect(sql`update documents set shared_with_client = false where id = ${document.id}`.execute(db)).rejects.toThrow(/permission denied/);
+      await expect(sql`update document_sharing_changes set shared = false where document_id = ${document.id}`.execute(db)).rejects.toThrow(/permission denied/);
+      await expect(sql`delete from document_sharing_changes where document_id = ${document.id}`.execute(db)).rejects.toThrow(/permission denied/);
+    });
+
+    it('does not let the table owner alter or remove the history', async () => {
+      const document = await addDocument(matterId, feeEarner.id);
+      await changeSharing(document.id, true, feeEarner.id);
+
+      await expect(sql`update document_sharing_changes set shared = false where document_id = ${document.id}`.execute(ownerDb)).rejects.toThrow(
+        /sharing changes cannot be altered or removed/,
+      );
+      await expect(sql`delete from document_sharing_changes where document_id = ${document.id}`.execute(ownerDb)).rejects.toThrow(
+        /sharing changes cannot be altered or removed/,
+      );
     });
   });
 });

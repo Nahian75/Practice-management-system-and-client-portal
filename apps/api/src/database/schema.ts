@@ -318,6 +318,8 @@ export interface DocumentsTable {
   category: InsertOnly<DocumentCategory>;
   created_by: InsertOnly<string>;
   created_at: DatabaseSet<Date>;
+  /** Changed only by inserting a document_sharing_changes row. */
+  shared_with_client: DatabaseSet<boolean>;
 }
 
 export interface DocumentVersionsTable {
@@ -346,6 +348,14 @@ export interface DocumentWithdrawalsTable {
   withdrawn_at: DatabaseSet<Date>;
 }
 
+export interface DocumentSharingChangesTable {
+  id: DatabaseSet<string>;
+  document_id: InsertOnly<string>;
+  shared: InsertOnly<boolean>;
+  changed_by: InsertOnly<string>;
+  changed_at: DatabaseSet<Date>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -370,6 +380,7 @@ export interface Database {
   conflict_clearances: ConflictClearancesTable;
   clients: ClientsTable;
   document_versions: DocumentVersionsTable;
+  document_sharing_changes: DocumentSharingChangesTable;
   document_withdrawals: DocumentWithdrawalsTable;
   documents: DocumentsTable;
   invitations: InvitationsTable;

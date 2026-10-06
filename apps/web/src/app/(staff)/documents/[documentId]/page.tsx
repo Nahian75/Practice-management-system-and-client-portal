@@ -7,6 +7,7 @@ import { CATEGORY_LABELS, contentPath, formatSize, type DocumentDetails } from '
 import { formatDateTime } from '@/lib/format';
 import type { Matter } from '@/lib/matters';
 import { NewVersionForm } from './new-version-form';
+import { SharingToggle } from './sharing-toggle';
 import { WithdrawForm } from './withdraw-form';
 
 export const metadata: Metadata = { title: 'Document' };
@@ -60,6 +61,13 @@ export default async function DocumentPage({ params }: { params: Promise<{ docum
           </p>
           <p>Reason: {document.withdrawal.reason}</p>
         </div>
+      )}
+
+      {!withdrawn && (
+        <>
+          <SharingToggle documentId={document.id} shared={document.sharedWithClient} />
+          <hr className="rule" />
+        </>
       )}
 
       <h2>Versions</h2>

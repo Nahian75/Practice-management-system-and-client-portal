@@ -499,6 +499,7 @@ describe('hourly upload allowance (review D4)', () => {
         title: 'Signed lease',
         category: 'contract',
         createdAt: expect.any(String),
+        sharedWithClient: false,
         versions: [
           {
             number: 1,
@@ -518,6 +519,108 @@ describe('hourly upload allowance (review D4)', () => {
       const outsider = await signedIn(await staffWith('partner'));
 
       expect((await request(app.getHttpServer()).get(`/documents/${added.body.id}`).set('Cookie', cookie(outsider))).status).toBe(404);
+    });
+  });
+
+  describe('PUT and DELETE /documents/:id/client-sharing', () => {
+    const changeSharing = (sessionToken: string, documentId: string, shared: boolean) =>
+      request(app.getHttpServer())[shared ? 'put' : 'delete'](`/documents/${documentId}/client-sharing`).set('Cookie', cookie(sessionToken));
+
+    it('shares and stops sharing, recording each change and audit event by ids only', async () => {
+      const added = await upload(token, PDF, 'Client name must not reach the audit log.pdf');
+
+      expect((await changeSharing(token, added.body.id, true)).status).toBe(204);
+      expect((await request(app.getHttpServer()).get(`/documents/${added.body.id}`).set('Cookie', cookie(token))).body.sharedWithClient).toBe(true);
+      expect((await changeSharing(await signedIn(partner), added.body.id, false)).status).toBe(204);
+
+      const changes = await sql<{ shared: boolean; changed_by: string }>`select shared, changed_by from document_sharing_changes
+        where document_id = ${added.body.id} order by changed_at, id`.execute(db);
+      expect(changes.rows).toEqual([
+        { shared: true, changed_by: feeEarner.id },
+        { shared: false, changed_by: partner.id },
+      ]);
+      const events = await db
+        .selectFrom('audit_events')
+        .select(['actor_id', 'action', 'metadata'])
+        .where('resource_id', '=', added.body.id)
+        .where('action', 'in', ['document.shared', 'document.unshared'])
+        .orderBy('occurred_at')
+        .execute();
+      expect(events).toEqual([
+        { actor_id: feeEarner.id, action: 'document.shared', metadata: { matterId } },
+        { actor_id: partner.id, action: 'document.unshared', metadata: { matterId } },
+      ]);
+    });
+
+    it('is idempotent, without duplicate history or audit records', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      expect((await changeSharing(token, added.body.id, true)).status).toBe(204);
+      expect((await changeSharing(token, added.body.id, true)).status).toBe(204);
+
+      const changes = await sql<{ count: string }>`select count(*)::text as count from document_sharing_changes where document_id = ${added.body.id}`.execute(db);
+      const events = await db
+        .selectFrom('audit_events')
+        .select('id')
+        .where('resource_id', '=', added.body.id)
+        .where('action', '=', 'document.shared')
+        .execute();
+      expect(changes.rows[0]?.count).toBe('1');
+      expect(events).toHaveLength(1);
+    });
+
+    it('can share a document after its matter has closed', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await request(app.getHttpServer())
+        .post(`/matters/${matterId}/close`)
+        .set('Cookie', cookie(await signedIn(partner)))
+        .send({ reason: 'Lease renewed and signed' })
+        .expect(204);
+
+      expect((await changeSharing(token, added.body.id, true)).status).toBe(204);
+    });
+
+    it('answers 404 off the team, and 403 without the new permission', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const outsider = await signedIn(await staffWith('fee_earner'));
+      const accounts = await signedIn(await staffWith('accounts'));
+
+      expect((await changeSharing(outsider, added.body.id, true)).status).toBe(404);
+      expect((await changeSharing(accounts, added.body.id, true)).status).toBe(403);
+    });
+
+    it('will not share or unshare a withdrawn document', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await request(app.getHttpServer())
+        .post(`/documents/${added.body.id}/withdrawal`)
+        .set('Cookie', cookie(token))
+        .send({ reason: 'Uploaded to the wrong matter by mistake' })
+        .expect(204);
+
+      expect((await changeSharing(token, added.body.id, true)).status).toBe(409);
+      expect((await changeSharing(token, added.body.id, false)).status).toBe(409);
+    });
+
+    it('stops sharing on withdrawal and records both events', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await changeSharing(token, added.body.id, true).expect(204);
+
+      await request(app.getHttpServer())
+        .post(`/documents/${added.body.id}/withdrawal`)
+        .set('Cookie', cookie(token))
+        .send({ reason: 'Uploaded to the wrong matter by mistake' })
+        .expect(204);
+
+      const found = await request(app.getHttpServer()).get(`/documents/${added.body.id}`).set('Cookie', cookie(token));
+      expect(found.body.sharedWithClient).toBe(false);
+      const events = await db
+        .selectFrom('audit_events')
+        .select('action')
+        .where('resource_id', '=', added.body.id)
+        .where('action', 'in', ['document.shared', 'document.unshared', 'document.withdrawn'])
+        .orderBy('occurred_at')
+        .execute();
+      expect(events).toEqual([{ action: 'document.shared' }, { action: 'document.unshared' }, { action: 'document.withdrawn' }]);
     });
   });
 

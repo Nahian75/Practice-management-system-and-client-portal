@@ -27,6 +27,7 @@ export interface DocumentDetails {
   title: string;
   category: DocumentCategory;
   createdAt: Date;
+  sharedWithClient: boolean;
   versions: (VersionSummary & { uploadedBy: { accountId: string; displayName: string } })[];
   withdrawal: { withdrawnBy: { accountId: string; displayName: string }; reason: string; withdrawnAt: Date } | null;
 }
@@ -38,6 +39,7 @@ export interface DocumentForChange {
   matterReference: string;
   createdBy: string;
   withdrawn: boolean;
+  sharedWithClient: boolean;
   viewerSupervises: boolean;
 }
 
@@ -134,7 +136,7 @@ export class DocumentsRepository {
     const document = await this.db
       .selectFrom('documents')
       .innerJoin('matters', 'matters.id', 'documents.matter_id')
-      .select(['documents.id', 'documents.matter_id', 'documents.title', 'documents.category', 'documents.created_at'])
+      .select(['documents.id', 'documents.matter_id', 'documents.title', 'documents.category', 'documents.created_at', 'documents.shared_with_client'])
       .where('documents.id', '=', documentId)
       .where(visibleTo(viewerId))
       .executeTakeFirst();
@@ -168,6 +170,7 @@ export class DocumentsRepository {
       title: document.title,
       category: document.category,
       createdAt: document.created_at,
+      sharedWithClient: document.shared_with_client,
       withdrawal: withdrawal
         ? {
             withdrawnBy: { accountId: withdrawal.withdrawn_by, displayName: withdrawal.display_name },
@@ -194,6 +197,7 @@ export class DocumentsRepository {
       .select(({ exists, selectFrom }) => [
         'documents.matter_id',
         'documents.created_by',
+        'documents.shared_with_client',
         'matters.status',
         'matters.reference',
         exists(selectFrom('document_withdrawals').select('document_withdrawals.id').whereRef('document_withdrawals.document_id', '=', 'documents.id')).as(
@@ -218,6 +222,7 @@ export class DocumentsRepository {
           matterReference: row.reference,
           createdBy: row.created_by,
           withdrawn: Boolean(row.withdrawn),
+          sharedWithClient: row.shared_with_client,
           viewerSupervises: Boolean(row.supervises),
         }
       : undefined;
@@ -247,6 +252,16 @@ export class DocumentsRepository {
   /** Records a withdrawal. The database checks who may, that the matter is open, and that it happens once. */
   async withdraw(documentId: string, withdrawnBy: string, reason: string, trx: Kysely<Database>): Promise<void> {
     await trx.insertInto('document_withdrawals').values({ document_id: documentId, withdrawn_by: withdrawnBy, reason }).execute();
+  }
+
+  /** Records a real change; the database updates the setting and drops repeats. */
+  async changeSharing(documentId: string, shared: boolean, changedBy: string, trx: Kysely<Database>): Promise<boolean> {
+    const change = await trx
+      .insertInto('document_sharing_changes')
+      .values({ document_id: documentId, shared, changed_by: changedBy })
+      .returning('id')
+      .executeTakeFirst();
+    return change !== undefined;
   }
 
   /** What is needed to send one version as a download, if `viewerId` is on its matter's team. */

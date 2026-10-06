@@ -4,6 +4,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -13,6 +14,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -83,6 +85,7 @@ const detailsSchema = z.object({
   title: z.string(),
   category: z.enum(CATEGORIES),
   createdAt: z.iso.datetime(),
+  sharedWithClient: z.boolean(),
   versions: z.array(versionSchema.extend({ uploadedBy: z.object({ accountId: z.uuid(), displayName: z.string() }) })),
   withdrawal: z
     .object({ withdrawnBy: z.object({ accountId: z.uuid(), displayName: z.string() }), reason: z.string(), withdrawnAt: z.iso.datetime() })
@@ -294,6 +297,44 @@ export class DocumentsController {
       versions: document.versions.map((version) => ({ ...version, uploadedAt: version.uploadedAt.toISOString() })),
       withdrawal: document.withdrawal && { ...document.withdrawal, withdrawnAt: document.withdrawal.withdrawnAt.toISOString() },
     };
+  }
+
+  @Put('documents/:documentId/client-sharing')
+  @RequirePermission('documents.share')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async shareWithClient(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.changeSharing(documentId, true, session, request);
+  }
+
+  @Delete('documents/:documentId/client-sharing')
+  @RequirePermission('documents.share')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ResponseSchema(NO_CONTENT)
+  async stopSharingWithClient(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.changeSharing(documentId, false, session, request);
+  }
+
+  private async changeSharing(documentId: string, shared: boolean, session: ResolvedSession, request: Request): Promise<void> {
+    switch (await this.documents.changeSharing(documentId, shared, actorFor(session, request))) {
+      case 'not_found':
+        throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+      case 'withdrawn':
+        throw new ConflictException('A withdrawn document cannot be shared or unshared');
+      case 'changed_meanwhile':
+        throw new ConflictException('The document or its matter team changed meanwhile. Reload and try again');
+      case 'changed':
+      case 'unchanged':
+        return;
+    }
   }
 
   /**

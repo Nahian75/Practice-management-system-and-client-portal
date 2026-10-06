@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   'documents.view',
   'documents.add',
   'documents.withdraw',
+  'documents.share',
   'portal.invite',
 ] as const;
 
@@ -62,6 +63,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'documents.view',
     'documents.add',
     'documents.withdraw',
+    'documents.share',
     'portal.invite',
   ],
   fee_earner: [
@@ -75,6 +77,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'documents.view',
     'documents.add',
     'documents.withdraw',
+    'documents.share',
     'portal.invite',
   ],
   accounts: [],

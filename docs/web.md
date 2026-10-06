@@ -182,6 +182,14 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   current contact, naming the address on record the invitation goes to.
   Someone without an address on record gets a link to add one instead.
 
+## Built in 11b
+
+- The document page says whether the document is shared with the client and
+  lets the matter team share it or stop sharing it. It explains that the
+  portal will show only the latest version.
+- A withdrawn document has no sharing control. Withdrawing one that was
+  shared stops sharing it in the same transaction.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from

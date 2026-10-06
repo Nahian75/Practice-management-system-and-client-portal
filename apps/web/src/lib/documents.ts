@@ -40,6 +40,7 @@ export interface DocumentDetails {
   title: string;
   category: DocumentCategory;
   createdAt: string;
+  sharedWithClient: boolean;
   versions: (VersionSummary & { uploadedBy: { accountId: string; displayName: string } })[];
   withdrawal: { withdrawnBy: { accountId: string; displayName: string }; reason: string; withdrawnAt: string } | null;
 }

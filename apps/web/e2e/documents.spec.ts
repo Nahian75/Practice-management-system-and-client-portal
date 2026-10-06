@@ -104,6 +104,24 @@ test('adds a new version, then withdraws the document: kept, but no longer liste
   await expect(page.getByText('No documents yet.')).toBeVisible();
 });
 
+test('shares a document with the client, then stops sharing it', async ({ page, request }) => {
+  await onNewMatter(page, request);
+  await addDocument(page, 'Advice letter', { name: 'advice.pdf', buffer: PDF });
+  await follow(page, page.getByRole('link', { name: 'Advice letter', exact: true }));
+
+  await expect(page.getByText('Not shared with the client')).toBeVisible();
+  await page.getByRole('button', { name: 'Share with the client' }).click();
+  await expect(page.getByRole('status')).toContainText('Shared with the client.');
+  await expect(page.getByText('Shared with the client', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Shared with the client', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Stop sharing with the client' }).click();
+  await expect(page.getByRole('status')).toContainText('No longer shared with the client.');
+  await expect(page.getByText('Not shared with the client')).toBeVisible();
+  await noAxeViolations(page);
+});
+
 test('only whoever added a document, or the supervising partner, is offered withdrawal', async ({ page, request }) => {
   const colleague = await apiSessionFor(request);
   const partner = await apiSessionFor(request, ['partner']);

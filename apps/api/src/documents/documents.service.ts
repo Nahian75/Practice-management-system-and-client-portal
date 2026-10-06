@@ -41,6 +41,7 @@ export type AddVersionResult =
   | { outcome: 'refused'; reason: UploadRefusal };
 
 export type WithdrawResult = 'withdrawn' | 'not_found' | 'not_open' | 'already_withdrawn' | 'not_allowed' | 'changed';
+export type ChangeSharingResult = 'changed' | 'unchanged' | 'not_found' | 'withdrawn' | 'changed_meanwhile';
 
 interface AcceptedFile {
   fileName: string;
@@ -171,6 +172,19 @@ export class DocumentsService {
     try {
       await this.documents.transaction(async (trx) => {
         await this.documents.withdraw(documentId, by.accountId, reason, trx);
+        if (document.sharedWithClient) {
+          await this.audit.record(
+            {
+              actor: by.actor,
+              action: 'document.unshared',
+              outcome: 'success',
+              resource: { type: 'document', id: documentId },
+              metadata: { matterId: document.matterId },
+              ...by.context,
+            },
+            trx,
+          );
+        }
         await this.audit.record(
           {
             actor: by.actor,
@@ -191,6 +205,45 @@ export class DocumentsService {
       // The matter closed, or the person left its team, a moment earlier.
       if (isCheckViolation(error)) {
         return 'changed';
+      }
+      throw error;
+    }
+  }
+
+  /** Shares or unshares a document, if the caller is on its matter's team. */
+  async changeSharing(documentId: string, shared: boolean, by: DocumentActor): Promise<ChangeSharingResult> {
+    const document = await this.documents.findForChange(documentId, by.accountId);
+    if (!document) {
+      return 'not_found';
+    }
+    if (document.withdrawn) {
+      return 'withdrawn';
+    }
+    if (document.sharedWithClient === shared) {
+      return 'unchanged';
+    }
+    try {
+      const changed = await this.documents.transaction(async (trx) => {
+        const recorded = await this.documents.changeSharing(documentId, shared, by.accountId, trx);
+        if (recorded) {
+          await this.audit.record(
+            {
+              actor: by.actor,
+              action: shared ? 'document.shared' : 'document.unshared',
+              outcome: 'success',
+              resource: { type: 'document', id: documentId },
+              metadata: { matterId: document.matterId },
+              ...by.context,
+            },
+            trx,
+          );
+        }
+        return recorded;
+      });
+      return changed ? 'changed' : 'unchanged';
+    } catch (error) {
+      if (isCheckViolation(error)) {
+        return 'changed_meanwhile';
       }
       throw error;
     }
