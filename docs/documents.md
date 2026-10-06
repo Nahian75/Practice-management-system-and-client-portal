@@ -130,6 +130,14 @@ see there.
 5. A refused upload is answered with `Connection: close`, so the rest of a
    large upload is not read.
 
+## Upload allowance
+
+At most 200 files or 2 GB an hour per person (documents and new versions),
+far beyond normal work (review D4). Checked before a file is read, and again
+when it is recorded, under a per-person lock. Past it, uploads are refused
+(429, `Retry-After`) until the hour moves on; the first refusal in an hour is
+recorded as `document.upload_limited` and emailed to every administrator.
+
 ## Who can do what
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
@@ -156,7 +164,8 @@ the matter's team, and a document you may not see answers 404.
 
 `document.added` (document id, version, type, size), `document.version_added`,
 `document.downloaded` (document id, version), `document.withdrawn`,
-`document.refused` (reason: too large, type, malware, scanner unavailable).
+`document.refused` (reason: too large, type, macros, active content, unscannable,
+malware, scanner unavailable, over the allowance, and so on), `document.upload_limited`.
 Never file names, titles or contents: like client names, they can be personal
 data.
 

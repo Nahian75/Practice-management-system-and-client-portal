@@ -26,6 +26,14 @@ export class AuditService {
     return this.repository.sumUnitsRecent(query, transaction);
   }
 
+  /** How many of these events this actor had in the last `seconds`, and the total of `field` in their metadata. */
+  recentTotals(
+    query: { actorId: string; actions: readonly string[]; seconds: number; field: string },
+    transaction?: Kysely<Database>,
+  ): Promise<{ count: number; total: number }> {
+    return this.repository.recentTotals(query, transaction);
+  }
+
   /** How often this actor did this in the last `seconds`. Lets a limit use the audit record as its count. */
   countRecent(query: { actorId: string; action: string; seconds: number }, transaction?: Kysely<Database>): Promise<number> {
     return this.repository.countRecent(query, transaction);

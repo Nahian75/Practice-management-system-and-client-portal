@@ -3,22 +3,26 @@ import { Readable } from 'node:stream';
 import { buffer } from 'node:stream/consumers';
 import { Module } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
+import { testAppDatabaseUrl } from '../../test/database.js';
 import { eicarTestFile } from '../../test/eicar.js';
 import { waitForEmailWithSubject } from '../../test/mailpit.js';
 import { officeFile, relationships, withDeclaredSizes } from '../../test/zip.js';
+import { AuditService } from '../audit/audit.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { ClientsModule } from '../clients/clients.module.js';
+import { createDatabase } from '../database/database.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
 import { MailOutbox } from '../mail/mail-outbox.js';
 import { MattersModule } from '../matters/matters.module.js';
 import { DocumentVault } from './document-vault.js';
 import { DocumentsModule } from './documents.module.js';
+import { UPLOAD_BYTES_PER_HOUR, UPLOAD_WINDOW_SECONDS, UPLOADS_PER_HOUR } from './documents.service.js';
 import { MAX_DOCUMENT_BYTES } from './file-inspection.js';
 import { ObjectStorage } from './object-storage.js';
 
@@ -344,6 +348,102 @@ describe('Documents', () => {
         expect(noFile.status).toBe(400);
         expect(json.status).toBe(400);
       });
+    });
+  });
+
+describe('hourly upload allowance (review D4)', () => {
+    /** Records that `account` added `files` documents this hour, of `sizeBytes` each, as uploads would. */
+    async function alreadyAdded(account: TestAccount, files: number, sizeBytes = 1000) {
+      const audit = app.get(AuditService);
+      for (let index = 0; index < files; index++) {
+        await audit.record({
+          actor: { type: 'user', id: account.id },
+          action: 'document.added',
+          outcome: 'success',
+          resource: { type: 'document', id: randomUUID() },
+          metadata: { matterId, version: 1, mediaType: 'application/pdf', sizeBytes },
+        });
+      }
+    }
+    const limitedRecords = (account: TestAccount) =>
+      db.selectFrom('audit_events').select('id').where('actor_id', '=', account.id).where('action', '=', 'document.upload_limited').execute();
+
+    it('refuses the 201st file in an hour before reading it, records the limit once, and tells the administrators', async () => {
+      const administrator = await staffWith('administrator');
+      await alreadyAdded(feeEarner, UPLOADS_PER_HOUR);
+
+      let first: request.Response | undefined;
+      const { stored } = await storageDuring(async () => {
+        first = await upload(token, PDF, 'lease.pdf');
+      });
+      const second = await upload(token, PDF, 'lease.pdf');
+      await app.get(MailOutbox).drain();
+
+      expect(first?.status).toBe(429);
+      expect(first?.headers['retry-after']).toBe(String(UPLOAD_WINDOW_SECONDS));
+      expect(first?.body.message).toContain('most documents allowed in an hour');
+      expect(stored).toEqual([]);
+      expect(second.status).toBe(429);
+      expect(await limitedRecords(feeEarner)).toHaveLength(1);
+      expect(await documentsOf(matterId)).toEqual([]);
+      expect(await waitForEmailWithSubject(administrator.email, 'Document upload limit reached')).toBeDefined();
+    });
+
+    it('refuses a file that would take the hour past 2 GB, removing what was stored', async () => {
+      await alreadyAdded(feeEarner, 1, UPLOAD_BYTES_PER_HOUR - 10);
+
+      let response: request.Response | undefined;
+      const { stored, removed } = await storageDuring(async () => {
+        response = await upload(token, PDF, 'lease.pdf');
+      });
+
+      expect(response?.status).toBe(429);
+      expect(stored).toHaveLength(1);
+      expect(removed).toEqual(stored);
+      expect(await documentsOf(matterId)).toEqual([]);
+    });
+
+    /*
+     * Holding the person's upload lock from another connection makes the race
+     * happen every time: both uploads pass the check made before reading, are
+     * stored, then queue on the lock, and are counted one after the other once
+     * it is released.
+     */
+    it('lets exactly one of two uploads at once take the last place', async () => {
+      await alreadyAdded(feeEarner, UPLOADS_PER_HOUR - 1);
+      const holder = createDatabase<Database>(testAppDatabaseUrl(), 1);
+      try {
+        const lockKey = sql`hashtextextended(${`app.document_uploads:${feeEarner.id}`}, 0)`;
+        await sql`select pg_advisory_lock(${lockKey})`.execute(holder);
+
+        const first = upload(token, PDF, 'one.pdf').then((response) => response.status);
+        const second = upload(token, PDF, 'two.pdf').then((response) => response.status);
+        // Waiting on this person's upload lock only: other tests use advisory locks at the same time.
+        await expect
+          .poll(
+            async () => {
+              const { rows } = await sql<{ waiting: string }>`
+                select count(*) as waiting from pg_locks
+                where locktype = 'advisory' and not granted
+                  and ((classid::bigint << 32) | objid::bigint) = ${lockKey}`.execute(holder);
+              return Number(rows[0]?.waiting);
+            },
+            { timeout: 20_000 },
+          )
+          .toBe(2);
+        await sql`select pg_advisory_unlock(${lockKey})`.execute(holder);
+
+        expect([await first, await second].sort()).toEqual([201, 429]);
+        expect(await documentsOf(matterId)).toHaveLength(1);
+      } finally {
+        await holder.destroy();
+      }
+    }, 30_000);
+
+    it("counts each person's uploads separately", async () => {
+      await alreadyAdded(feeEarner, UPLOADS_PER_HOUR);
+
+      expect((await upload(await signedIn(partner), PDF, 'lease.pdf')).status).toBe(201);
     });
   });
 

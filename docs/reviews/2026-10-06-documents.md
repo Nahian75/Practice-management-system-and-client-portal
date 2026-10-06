@@ -54,7 +54,8 @@ effective configuration read from the container.
 | Location | `POST /matters/:id/documents`, `POST /documents/:id/versions` |
 | Problem | Nothing limits the number or size of uploads per person. |
 | Impact | A misused or taken-over staff account could fill the storage (50 MB at a time); every upload is audited, so it would be seen afterwards, not stopped. |
-| Fix | Proposed: an hourly allowance per person (for example 200 files or 2 GB), counted from the audit records as for compliance access (review M4), with administrators alerted once when it is reached. |
+| Fix | **Fixed after the review.** At most 200 files or 2 GB an hour per person, counting documents and new versions, from their audit records. Checked before a file is read (so nobody over it uploads 50 MB to be refused), and again when it is recorded, under a per-person lock and with this file counted, so uploads at once cannot all slip under it. Over it: 429 with `Retry-After`; the first refusal in an hour is recorded as `document.upload_limited` and emailed to the administrators. |
+| Test | `documents.controller.spec.ts`, "hourly upload allowance": the 201st file refused before anything is stored, recorded and reported once; a file taking the hour past 2 GB refused and its bytes removed; two uploads at once for the last place, made to race every time by holding the lock from another connection, exactly one accepted; each person counted separately. Removing the lock, the check before reading, or this file's size from the check each fails a test. |
 
 ### D5 — Stored bytes can be left behind
 

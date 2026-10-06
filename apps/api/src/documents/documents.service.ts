@@ -5,7 +5,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import { text } from '../common/validation/safe-text.js';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database, DocumentCategory, DocumentMediaType } from '../database/schema.js';
 import { DocumentVault, type StoredFile } from './document-vault.js';
 import { DocumentsRepository, type DocumentDetails, type DocumentSummary } from './documents.repository.js';
@@ -20,7 +20,7 @@ export interface DocumentActor {
   context?: RequestContext;
 }
 
-export type UploadRefusal = RefusalReason | 'malware' | 'scanner_unavailable' | 'file_name' | 'form' | 'interrupted';
+export type UploadRefusal = RefusalReason | 'malware' | 'scanner_unavailable' | 'file_name' | 'form' | 'interrupted' | 'over_allowance';
 
 export interface AddedDocument {
   id: string;
@@ -49,6 +49,15 @@ interface AcceptedFile {
 }
 
 export const DOCUMENTS_PAGE_SIZE = 100;
+
+/** Far beyond what one person adds in an hour of normal work (review D4). */
+export const UPLOADS_PER_HOUR = 200;
+export const UPLOAD_BYTES_PER_HOUR = 2 * 1024 ** 3;
+export const UPLOAD_WINDOW_SECONDS = 60 * 60;
+
+class OverAllowanceError extends Error {
+  override readonly name = 'OverAllowanceError';
+}
 
 export type DownloadResult =
   | { outcome: 'ready'; file: Readable; fileName: string; mediaType: DocumentMediaType; sizeBytes: number }
@@ -203,6 +212,11 @@ export class DocumentsService {
       discardUpload(upload.file);
       return this.refuse(target.matterId, by, 'file_name');
     }
+    // Checked before the file is read, so nobody over the allowance sends 50 MB to be refused.
+    if (!(await this.withinAllowance(by.accountId, 0))) {
+      discardUpload(upload.file);
+      return this.refuseOverAllowance(target.matterId, by);
+    }
 
     const received = await this.receive(fileName.data, upload.file);
     if ('refusal' in received) {
@@ -214,16 +228,58 @@ export class DocumentsService {
 
     const file = { fileName: fileName.data, ...received };
     try {
-      const value = await this.documents.transaction((trx) => record(file, trx));
+      const value = await this.documents.transaction(async (trx) => {
+        // Again under a per-person lock, with this file counted, so uploads at once cannot all slip under it.
+        await sql`select pg_advisory_xact_lock(hashtextextended(${`app.document_uploads:${by.accountId}`}, 0))`.execute(trx);
+        if (!(await this.withinAllowance(by.accountId, file.inspected.sizeBytes, trx))) {
+          throw new OverAllowanceError();
+        }
+        return record(file, trx);
+      });
       return { outcome: 'accepted', value, file };
     } catch (error) {
       await this.vault.discard(received.stored.storageKey);
+      if (error instanceof OverAllowanceError) {
+        return this.refuseOverAllowance(target.matterId, by);
+      }
       // The matter was closed, the person removed from its team, or the document withdrawn, while the file arrived.
       if (isCheckViolation(error)) {
         return { outcome: 'not_open' };
       }
       throw error;
     }
+  }
+
+  /**
+   * Whether `accountId` may record one more file of `sizeBytes` this hour
+   * (review D4), counted from the audit records of what they added.
+   */
+  private async withinAllowance(accountId: string, sizeBytes: number, trx?: Kysely<Database>): Promise<boolean> {
+    const { count, total } = await this.audit.recentTotals(
+      { actorId: accountId, actions: ['document.added', 'document.version_added'], seconds: UPLOAD_WINDOW_SECONDS, field: 'sizeBytes' },
+      trx,
+    );
+    return count + 1 <= UPLOADS_PER_HOUR && total + sizeBytes <= UPLOAD_BYTES_PER_HOUR;
+  }
+
+  /**
+   * Refuses an upload over the allowance. The first refusal in an hour is
+   * also recorded as `document.upload_limited` and reported to the
+   * administrators; later ones are only refused.
+   */
+  private async refuseOverAllowance(matterId: string, by: DocumentActor): Promise<{ outcome: 'refused'; reason: UploadRefusal }> {
+    const alreadyLimited = await this.audit.countRecent({ actorId: by.accountId, action: 'document.upload_limited', seconds: UPLOAD_WINDOW_SECONDS });
+    if (alreadyLimited === 0) {
+      await this.audit.record({
+        actor: by.actor,
+        action: 'document.upload_limited',
+        outcome: 'denied',
+        metadata: { files: UPLOADS_PER_HOUR, bytes: UPLOAD_BYTES_PER_HOUR },
+        ...by.context,
+      });
+      await this.notices.uploadLimitReached({ accountId: by.accountId, files: UPLOADS_PER_HOUR, gigabytes: UPLOAD_BYTES_PER_HOUR / 1024 ** 3 });
+    }
+    return this.refuse(matterId, by, 'over_allowance');
   }
 
   private recordVersion(

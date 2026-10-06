@@ -29,6 +29,27 @@ export class AuditRepository {
     return Number(units);
   }
 
+  /**
+   * How many of these events this actor had in the last `seconds`, and the
+   * total of the whole number `field` in their metadata (0 where absent).
+   */
+  async recentTotals(
+    query: { actorId: string; actions: readonly string[]; seconds: number; field: string },
+    executor: Kysely<Database> = this.db,
+  ): Promise<{ count: number; total: number }> {
+    const row = await executor
+      .selectFrom('audit_events')
+      .select((eb) => [
+        eb.fn.countAll<string>().as('count'),
+        sql<string>`coalesce(sum(coalesce((metadata ->> ${query.field})::bigint, 0)), 0)`.as('total'),
+      ])
+      .where('actor_id', '=', query.actorId)
+      .where('action', 'in', query.actions)
+      .where('occurred_at', '>', sql<Date>`clock_timestamp() - make_interval(secs => ${query.seconds})`)
+      .executeTakeFirstOrThrow();
+    return { count: Number(row.count), total: Number(row.total) };
+  }
+
   /** Events with this action by this actor in the last `seconds`, by the database's clock. */
   async countRecent(
     query: { actorId: string; action: string; seconds: number },

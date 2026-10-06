@@ -26,7 +26,14 @@ import { requestContext } from '../common/http/request-context.js';
 import { NO_CONTENT, ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from './content-disposition.js';
-import { DocumentsService, type DocumentActor, type UploadRefusal } from './documents.service.js';
+import {
+  DocumentsService,
+  UPLOAD_BYTES_PER_HOUR,
+  UPLOAD_WINDOW_SECONDS,
+  UPLOADS_PER_HOUR,
+  type DocumentActor,
+  type UploadRefusal,
+} from './documents.service.js';
 import { discardUpload, readUpload, UploadFormError } from './upload-request.js';
 
 const CATEGORIES = ['correspondence', 'contract', 'evidence', 'identity', 'court', 'other'] as const;
@@ -111,6 +118,11 @@ const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
   file_name: () => new BadRequestException('The file name is not accepted: up to 255 characters, with no control characters'),
   form: () => new BadRequestException('Send the title and category, then one file, and nothing else'),
   interrupted: () => new BadRequestException('The upload was interrupted'),
+  over_allowance: () =>
+    new HttpException(
+      `You have added the most documents allowed in an hour (${UPLOADS_PER_HOUR} files or ${UPLOAD_BYTES_PER_HOUR / 1024 ** 3} GB). Try again later`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    ),
 };
 
 function actorFor(session: ResolvedSession, request: Request): DocumentActor {
@@ -173,6 +185,9 @@ export class DocumentsController {
       case 'not_open':
         throw refused(new ConflictException('Documents are added only to open matters'));
       case 'refused':
+        if (result.reason === 'over_allowance') {
+          response.setHeader('Retry-After', String(UPLOAD_WINDOW_SECONDS));
+        }
         throw refused(REFUSALS[result.reason]());
       case 'added': {
         const { document } = result;
@@ -206,6 +221,9 @@ export class DocumentsController {
       case 'withdrawn':
         throw refused(new ConflictException(WITHDRAWN_MESSAGE));
       case 'refused':
+        if (result.reason === 'over_allowance') {
+          response.setHeader('Retry-After', String(UPLOAD_WINDOW_SECONDS));
+        }
         throw refused(REFUSALS[result.reason]());
       case 'added':
         return { ...result.version, uploadedAt: result.version.uploadedAt.toISOString() };

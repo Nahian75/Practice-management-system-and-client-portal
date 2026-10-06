@@ -220,6 +220,32 @@ export class SecurityNoticesService {
   }
 
   /**
+   * Tells every administrator that someone reached the hourly upload
+   * allowance (review D4): far beyond normal use, so possibly a misused
+   * account. Names the person only; no matter or file.
+   */
+  async uploadLimitReached(reached: { accountId: string; files: number; gigabytes: number }): Promise<void> {
+    const when = this.clock.now().toUTCString();
+    const person = await this.accounts.findById(reached.accountId);
+    if (!person) {
+      return;
+    }
+    for (const recipientId of await this.roles.activeHolders('administrator')) {
+      if (recipientId === reached.accountId) {
+        continue;
+      }
+      await this.notify(recipientId, 'Document upload limit reached', (name) => [
+        `Hello ${name},`,
+        '',
+        `${person.display_name} reached the most documents allowed in an hour (${reached.files} files or ${reached.gigabytes} GB)`,
+        `on ${when}. Further uploads are refused until the hour has passed.`,
+        '',
+        'If this was not expected, check their recent uploads in the audit log, and their account.',
+      ]);
+    }
+  }
+
+  /**
    * Tells every compliance holder that an upload carried malware. It was
    * refused and nothing was stored, but the uploader's computer may be
    * infected. The matter is named by reference; the file's name stays out.
