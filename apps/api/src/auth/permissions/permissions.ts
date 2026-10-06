@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   'documents.view',
   'documents.add',
   'documents.withdraw',
+  'portal.invite',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -61,6 +62,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'documents.view',
     'documents.add',
     'documents.withdraw',
+    'portal.invite',
   ],
   fee_earner: [
     'clients.create',
@@ -73,6 +75,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'documents.view',
     'documents.add',
     'documents.withdraw',
+    'portal.invite',
   ],
   accounts: [],
   compliance: ['staff.view', 'audit.view', 'matters.access_with_reason'],

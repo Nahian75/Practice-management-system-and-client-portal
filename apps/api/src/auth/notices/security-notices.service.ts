@@ -220,6 +220,21 @@ export class SecurityNoticesService {
   }
 
   /**
+   * Tells someone who already uses the portal that they can now see another
+   * client's matters there. Naming no client: the email could be read by
+   * someone else.
+   */
+  async portalAccessAdded(accountId: string): Promise<void> {
+    await this.notify(accountId, 'More matters in your client portal', (name) => [
+      `Hello ${name},`,
+      '',
+      'You have been given access to another client in the portal, so you will see more matters when you next sign in.',
+      '',
+      'If you did not expect this, tell the firm.',
+    ]);
+  }
+
+  /**
    * Tells every administrator that someone reached the hourly upload
    * allowance (review D4): far beyond normal use, so possibly a misused
    * account. Names the person only; no matter or file.

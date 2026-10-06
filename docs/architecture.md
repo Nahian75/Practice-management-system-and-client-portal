@@ -41,7 +41,7 @@ authorization decisions.
 | Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security-reviewed: C1–C4, C8 and C10 fixed; C5 with Matters, C6 before production ([review](reviews/2026-10-04-clients.md)) |
 | Matters | Built: opening matters with teams and a required conflict check, other parties, conflict clearance, team changes, supervision takeover, editing and closing, compliance access with a reason, team visibility (`apps/api/src/matters/`). Security-reviewed: M1, M2 and M4 fixed; M5 open for design ([review](reviews/2026-10-05-matters.md)) |
 | Documents | Built (10a to 10d): API and staff screens; security review next ([documents.md](documents.md)) |
-| Client portal | Designed and approved; building from step 11a ([portal.md](portal.md)) |
+| Client portal | Step 11a-1 built: portal links in the API; staff screens next ([portal.md](portal.md)) |
 | Tasks | Not started |
 | Notifications | Not started |
 | Finance | Not started |

@@ -346,6 +346,17 @@ export interface DocumentWithdrawalsTable {
   withdrawn_at: DatabaseSet<Date>;
 }
 
+export interface PortalLinksTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  client_id: InsertOnly<string>;
+  contact_id: InsertOnly<string | null>;
+  linked_by: InsertOnly<string>;
+  linked_at: DatabaseSet<Date>;
+  ended_by: UpdateOnly<string | null>;
+  ended_at: UpdateOnly<Date | null>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -369,6 +380,7 @@ export interface Database {
   matter_team: MatterTeamTable;
   matters: MattersTable;
   password_resets: PasswordResetsTable;
+  portal_links: PortalLinksTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
   totp_credentials: TotpCredentialsTable;

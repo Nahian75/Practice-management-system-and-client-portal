@@ -50,6 +50,9 @@
 | POST | `/documents/:documentId/versions` | `documents.add` + team, open matter | Multipart `file` → 201 with the new version, checked as a first upload |
 | POST | `/documents/:documentId/withdrawal` | `documents.withdraw` + uploader or supervising partner | `{reason}` → 204. Final; the document is no longer listed or downloaded |
 | POST | `/matters/:matterId/documents` | `documents.add` + team, open matter | Multipart `title`, `category`, then `file` (PDF, Word, Excel, PowerPoint, text, email, JPEG, PNG; up to 50 MB) → 201. Scanned for malware and stored encrypted; see [documents.md](documents.md#api) for every refusal |
+| POST | `/clients/:clientId/portal-access` | `portal.invite` + client visible | `{contactId?}` → 201: invites the client's person to the portal at the address on record. See [portal.md](portal.md#api) |
+| GET | `/clients/:clientId/portal-access` | `portal.invite` + client visible | Who can see the client in the portal now |
+| DELETE | `/clients/:clientId/portal-access/:linkId` | `portal.invite` + client visible | Ends that person's access → 204 |
 | GET | `/colleagues` | `matters.open` | `{"colleagues": [{id, displayName, isPartner}]}`: active staff who can be put on a matter's team (partner or fee earner), by name. No email addresses or other roles |
 | POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person can still see the client (active and holding `clients.view`) |
 
