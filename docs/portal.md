@@ -1,9 +1,10 @@
 # Client portal
 
-**Current state (2026-10-06):** Steps 11a and 11b built: portal links in the
-API (`apps/api/src/portal/`, migration `0026`) and on the client page; and
+**Current state (2026-10-06):** Steps 11a to 11c built: portal links in the
+API (`apps/api/src/portal/`, migration `0026`) and on the client page;
 document sharing in the documents API, migration `0027` and the document
-page. The portal API for clients (11c) is next.
+page; and the read-only client API for matters and shared documents. The
+portal screens (11d) are next.
 
 Where the firm's clients sign in to follow their matters and receive the
 documents the firm shares with them.
@@ -83,10 +84,20 @@ from their links alone, in every query.
 | DELETE | `/clients/:id/portal-access/:linkId` | `portal.invite` + client visible | Ends that person's access at once → 204. 404 not a current link of this client |
 | PUT | `/documents/:id/client-sharing` | `documents.share` + matter team | Shares the document with the client → 204. Repeating it is harmless and records no duplicate. 404 not on the team; 409 withdrawn or changed meanwhile |
 | DELETE | `/documents/:id/client-sharing` | `documents.share` + matter team | Stops sharing the document → 204, with the same idempotence and refusals |
+| GET | `/portal/matters` | Client account + live portal link | `{matters, next}`: 50 at a time, newest first. Open and closed matters only; each has the reference, title, type, status, opened date and team names |
+| GET | `/portal/matters/:id` | Client account + live portal link | The same client-safe matter fields. 404 if the account cannot reach it |
+| GET | `/portal/matters/:id/documents` | Client account + live portal link | `{documents, next}`: 100 at a time, newest first. Shared, unwithdrawn documents only, with metadata for the latest version only |
+| GET | `/portal/documents/:id/content` | Client account + live portal link | The latest shared version as a download. There is no version parameter, so a client cannot ask for an earlier version. 404 if it is private, withdrawn or outside the account's clients |
 
 Portal access is recorded as `portal.access_granted` and
 `portal.access_ended`. Sharing is recorded as `document.shared` and
-`document.unshared`. All use ids only.
+`document.unshared`. Every client download is recorded as
+`document.downloaded`, with the client account as the actor. All use ids only.
+
+Every client query checks the account's active link in the query itself. For
+an organisation it also checks that the named contact is still active. An
+ended link, inactive contact, disabled account or unshared document therefore
+takes effect on the next request.
 
 ## Build order
 
@@ -101,6 +112,6 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **11b.** Sharing documents with the client, in the API and on the document
   page. Done.
 - **11c.** The portal API for clients: their matters, the documents shared on
-  each, downloads; access re-checked on every request.
+  each, downloads; access re-checked on every request. Done.
 - **11d.** The portal screens; the sign-in page sends clients to them.
 - Security review of the portal.

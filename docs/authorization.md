@@ -1,8 +1,8 @@
 # Authorization
 
-**Current state (2026-10-04):** Layers 1 and 2 built, including the
-staff-management endpoints. Layer 3 (records) built for clients, matter teams, and compliance access with
-a reason.
+**Current state (2026-10-06):** Layers 1 and 2 built, including the
+staff-management endpoints. Layer 3 (records) built for clients, matter teams,
+compliance access with a reason, and client portal links.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -162,7 +162,7 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters and clients (built)
+## Layer 3: matters, clients and portal links (built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 
@@ -173,5 +173,10 @@ Decided by the project owner: **only people assigned to a matter can open it.**
   which is audited and visible to the matter's supervising partner.
 - Clients see only their own matters, and only what is marked as shared with
   them. Internal notes, internal documents and AML records are never shared.
+- Every portal query checks the client account's live link. Organisation links
+  also require the named contact to remain active. Matter lists exclude work
+  awaiting conflict clearance; document lists and downloads require the
+  document to remain shared and not withdrawn, and expose only its latest
+  version.
 - Every query for records filters by these rules in the database query
   itself, so a forgotten check cannot return another matter's data.

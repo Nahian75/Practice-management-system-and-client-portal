@@ -1,10 +1,12 @@
 # Documents
 
-**Current state (2026-10-06):** Steps 10a to 10d and portal step 11b built: encrypted storage,
-scanning, file inspection, uploading, listing, downloading, new versions and
+**Current state (2026-10-06):** Steps 10a to 10d and portal steps 11b and 11c
+built: encrypted storage, scanning, file inspection, uploading, listing,
+downloading, new versions and
 withdrawal in the API (`apps/api/src/documents/`, migrations `0024` and
 `0025`); sharing with the client (migration `0027`); and the screens in the
-staff web app (see [web.md](web.md)). The
+staff web app (see [web.md](web.md)). The client portal API now lists and
+downloads only the latest versions of shared documents. The
 module's security review is next. Compliance access to documents, through the
 matter's compliance access, is not built yet.
 
@@ -27,7 +29,7 @@ see there.
 | Who withdraws | Whoever uploaded it, or the matter's supervising partner | Project owner |
 | Closed matters | Documents stay readable; nothing can be added, versioned or withdrawn | Project owner (follows Matters) |
 | Downloads | Through the API only, always as a download, never displayed in the browser (a file cannot then run script on the app's site). Every download is audited | Project owner |
-| Sharing with the client | Every document is staff-only. A team member can mark one "shared with the client"; the portal later shows only those. Built with the portal | Project owner |
+| Sharing with the client | Every document starts staff-only. A team member can mark one "shared with the client"; the portal shows only those. Built with the portal | Project owner |
 
 ## What a document holds
 
@@ -170,6 +172,8 @@ the matter's team, and a document you may not see answers 404.
 | POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204. Final. 403 neither the uploader nor the supervising partner, 404 not on the team, 409 already withdrawn, matter closed, or changed meanwhile. Afterwards the document is not listed, its versions answer 410, and `GET /documents/:id` shows who withdrew it, when and why |
 | PUT | `/documents/:id/client-sharing` | `documents.share` + team | Shares it with the client → 204. Repeating it records nothing. 404 not on the team; 409 withdrawn or changed meanwhile |
 | DELETE | `/documents/:id/client-sharing` | `documents.share` + team | Stops sharing it → 204, with the same idempotence and refusals. A closed matter is allowed because clients can see closed matters |
+| GET | `/portal/matters/:id/documents` | Client account + live portal link | Shared and unwithdrawn documents only, with the latest version's metadata; earlier versions and staff identities are not returned |
+| GET | `/portal/documents/:id/content` | Client account + live portal link | The latest shared version only, as an attachment. Recorded as `document.downloaded` with the client account as actor |
 
 ## Audit
 
@@ -196,7 +200,7 @@ at least seven days old when pinned, as for npm packages.
 
 ## Not in this module
 
-- Showing documents to clients: the portal.
+- The client portal screens: portal step 11d. The client API is built.
 - Previews in the browser, text search inside documents, and editing: later,
   each with its own security review (they mean opening untrusted files on the
   server).

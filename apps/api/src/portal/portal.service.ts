@@ -1,12 +1,23 @@
 import { Injectable } from '@nestjs/common';
+import type { Readable } from 'node:stream';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
 import { InvitationsService } from '../auth/invitations/invitations.service.js';
 import { SecurityNoticesService } from '../auth/notices/security-notices.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
-import { PortalRepository, type PersonOnRecord, type PortalPerson } from './portal.repository.js';
+import { DocumentVault } from '../documents/document-vault.js';
+import {
+  PortalRepository,
+  type ClientPortalDocument,
+  type ClientPortalMatter,
+  type PersonOnRecord,
+  type PortalPerson,
+} from './portal.repository.js';
 
-/** The signed-in staff member acting, and the request it came from. */
+const MATTERS_PAGE_SIZE = 50;
+const DOCUMENTS_PAGE_SIZE = 100;
+
+/** The signed-in account acting, and the request it came from. */
 export interface PortalActor {
   actor: AuditActor;
   accountId: string;
@@ -25,6 +36,10 @@ export type GrantResult =
         | 'account_disabled';
     };
 
+export type ClientDownloadResult =
+  | { outcome: 'not_found' }
+  | { outcome: 'ready'; file: Readable; fileName: string; mediaType: string; sizeBytes: number };
+
 /**
  * Giving a client's person access to the portal, and ending it. Access goes
  * only to the email address on the client's record: a new login is invited
@@ -37,6 +52,7 @@ export class PortalService {
     private readonly invitations: InvitationsService,
     private readonly notices: SecurityNoticesService,
     private readonly audit: AuditService,
+    private readonly vault: DocumentVault,
   ) {}
 
   /** `contactId` names the contact, for an organisation client; none for an individual client themself. */
@@ -136,5 +152,44 @@ export class PortalService {
       return contactId ? Promise.resolve(undefined) : this.portal.individual(clientId);
     }
     return contactId ? this.portal.activeContact(clientId, contactId) : Promise.resolve(undefined);
+  }
+
+  async clientMatters(accountId: string, before?: string): Promise<{ matters: ClientPortalMatter[]; next: string | null }> {
+    const matters = await this.portal.clientMatters(accountId, { before, limit: MATTERS_PAGE_SIZE });
+    return { matters, next: matters.length === MATTERS_PAGE_SIZE ? (matters.at(-1)?.id ?? null) : null };
+  }
+
+  clientMatter(matterId: string, accountId: string): Promise<ClientPortalMatter | undefined> {
+    return this.portal.clientMatter(matterId, accountId);
+  }
+
+  async clientDocuments(
+    matterId: string,
+    accountId: string,
+    before?: string,
+  ): Promise<{ documents: ClientPortalDocument[]; next: string | null } | undefined> {
+    const documents = await this.portal.clientDocuments(matterId, accountId, { before, limit: DOCUMENTS_PAGE_SIZE });
+    if (!documents) {
+      return undefined;
+    }
+    return { documents, next: documents.length === DOCUMENTS_PAGE_SIZE ? (documents.at(-1)?.id ?? null) : null };
+  }
+
+  /** Opens only the current shared version, recording the client download before any bytes are sent. */
+  async clientDownload(documentId: string, by: PortalActor): Promise<ClientDownloadResult> {
+    const version = await this.portal.clientDownload(documentId, by.accountId);
+    if (!version) {
+      return { outcome: 'not_found' };
+    }
+    const file = await this.vault.open({ storageKey: version.storageKey, sealedKey: version.sealedKey });
+    await this.audit.record({
+      actor: by.actor,
+      action: 'document.downloaded',
+      outcome: 'success',
+      resource: { type: 'document', id: documentId },
+      metadata: { matterId: version.matterId, version: version.number },
+      ...by.context,
+    });
+    return { outcome: 'ready', file, fileName: version.fileName, mediaType: version.mediaType, sizeBytes: version.sizeBytes };
   }
 }

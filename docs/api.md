@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-06):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, documents (upload, list, download, versions, withdrawal and client sharing), and portal access for clients' people.
+**Current state (2026-10-06):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, documents (upload, list, download, versions, withdrawal and client sharing), portal access for clients' people, and the read-only client portal API.
 
 ## Endpoints
 
@@ -55,6 +55,10 @@
 | POST | `/clients/:clientId/portal-access` | `portal.invite` + client visible | `{contactId?}` → 201: invites the client's person to the portal at the address on record. See [portal.md](portal.md#api) |
 | GET | `/clients/:clientId/portal-access` | `portal.invite` + client visible | Who can see the client in the portal now |
 | DELETE | `/clients/:clientId/portal-access/:linkId` | `portal.invite` + client visible | Ends that person's access → 204 |
+| GET | `/portal/matters` | Client account + live portal link | Client-safe open and closed matters, 50 at a time; no matters awaiting conflict clearance |
+| GET | `/portal/matters/:matterId` | Client account + live portal link | Reference, title, type, status, opened date and team names only. 404 outside the account's linked clients |
+| GET | `/portal/matters/:matterId/documents` | Client account + live portal link | Shared, unwithdrawn documents, 100 at a time, with the latest version's metadata only |
+| GET | `/portal/documents/:documentId/content` | Client account + live portal link | The latest shared version as a download; recorded with the client actor. No route exposes an earlier version |
 | GET | `/colleagues` | `matters.open` | `{"colleagues": [{id, displayName, isPartner}]}`: active staff who can be put on a matter's team (partner or fee earner), by name. No email addresses or other roles |
 | POST | `/clients/:clientId/take-over` | `clients.take_over` | `{"reason"}` (10 to 500 characters) → 204: the caller becomes responsible for the client. Works for clients the caller cannot see yet. 404 no such client, 409 the responsible person can still see the client (active and holding `clients.view`) |
 

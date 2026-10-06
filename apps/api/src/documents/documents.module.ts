@@ -13,5 +13,6 @@ import { VirusScanner } from './virus-scanner.js';
   imports: [DatabaseModule, AuditModule, AuthModule],
   controllers: [DocumentsController],
   providers: [DocumentsRepository, DocumentsService, DocumentVault, ObjectStorage, VirusScanner],
+  exports: [DocumentVault],
 })
 export class DocumentsModule {}
