@@ -35,7 +35,9 @@ export function matchTotp(
   at: Date,
   lastUsedStep: number | null,
 ): number | undefined {
-  if (!/^\d{6}$/.test(code)) {
+  // Authenticator apps show a code as "123 456", and people type it so.
+  const digits = code.replace(/\s/g, '');
+  if (!/^\d{6}$/.test(digits)) {
     return undefined;
   }
 
@@ -44,7 +46,7 @@ export function matchTotp(
     if (lastUsedStep !== null && step <= lastUsedStep) {
       continue;
     }
-    if (timingSafeEqual(Buffer.from(hotp(secret, step)), Buffer.from(code))) {
+    if (timingSafeEqual(Buffer.from(hotp(secret, step)), Buffer.from(digits))) {
       return step;
     }
   }

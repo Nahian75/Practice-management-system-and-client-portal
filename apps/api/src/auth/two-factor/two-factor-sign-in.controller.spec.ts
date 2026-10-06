@@ -95,6 +95,15 @@ describe('POST /auth/two-factor', () => {
       expect(response.body).toEqual({ account: { id: account.id, kind: 'staff', displayName: 'Test staff' } });
     });
 
+    it('accepts the code typed as an authenticator app shows it, "123 456"', async () => {
+      const pending = await passwordStep();
+      const code = currentCode();
+
+      const response = await codeStep(pending, `${code.slice(0, 3)} ${code.slice(3)}`);
+
+      expect(response.status).toBe(200);
+    });
+
     it('issues a new token, and the token from the password step stops working', async () => {
       const pending = await passwordStep();
 

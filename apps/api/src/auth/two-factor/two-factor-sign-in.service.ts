@@ -56,7 +56,8 @@ export class TwoFactorSignInService {
       return { outcome: 'sign_in_again' };
     }
 
-    const code = input.trim();
+    // Spaces are ignored, as authenticator apps show a code as "123 456"; backup codes ignore them too.
+    const code = input.replace(/\s/g, '');
     const method = TOTP_CODE.test(code) ? 'authenticator' : 'backup_code';
     const accepted =
       method === 'authenticator'

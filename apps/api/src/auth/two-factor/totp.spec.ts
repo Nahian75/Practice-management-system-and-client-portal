@@ -43,6 +43,13 @@ describe('matchTotp', () => {
     expect(matchTotp(RFC_SECRET, codeAt(step), now, null)).toBe(step);
   });
 
+  it('accepts the code typed as an authenticator app shows it, with a space, or with spaces around it', () => {
+    const code = codeAt(step);
+
+    expect(matchTotp(RFC_SECRET, `${code.slice(0, 3)} ${code.slice(3)}`, now, null)).toBe(step);
+    expect(matchTotp(RFC_SECRET, ` ${code} `, now, null)).toBe(step);
+  });
+
   it('accepts one step either side for clock drift', () => {
     expect(matchTotp(RFC_SECRET, codeAt(step - 1), now, null)).toBe(step - 1);
     expect(matchTotp(RFC_SECRET, codeAt(step + 1), now, null)).toBe(step + 1);
