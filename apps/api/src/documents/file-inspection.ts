@@ -2,19 +2,13 @@ import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DocumentMediaType } from '../database/schema.js';
+import { FileRefusedError } from './file-refusal.js';
+import { checkOfficeContent, RelationshipPartCapture, type ZipEntry } from './office-content.js';
 
 /** 50 MB, as the database's own check (migration 0024). */
 export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 
-export type RefusalReason = 'empty' | 'too_large' | 'type' | 'macros';
-
-export class FileRefusedError extends Error {
-  override readonly name = 'FileRefusedError';
-
-  constructor(readonly reason: RefusalReason) {
-    super(`File refused: ${reason}`);
-  }
-}
+export { FileRefusedError, type RefusalReason } from './file-refusal.js';
 
 export interface InspectedFile {
   mediaType: DocumentMediaType;
@@ -84,6 +78,7 @@ export class FileInspection extends Transform {
   private head = Buffer.alloc(0);
   private tail: Buffer[] = [];
   private tailBytes = 0;
+  private readonly relationshipParts = new RelationshipPartCapture();
   private size = 0;
   private inspected: InspectedFile | undefined;
 
@@ -112,7 +107,7 @@ export class FileInspection extends Transform {
       this.hash.update(chunk);
       this.checkStart(chunk);
       this.checkContent(chunk);
-      this.keepTail(chunk);
+      this.keepTail(chunk, this.size - chunk.length);
       done(null, chunk);
     } catch (error) {
       done(error as Error);
@@ -139,7 +134,13 @@ export class FileInspection extends Transform {
       }
       const mainPart = MAIN_PARTS[this.kind];
       if (mainPart) {
-        checkOfficeFile(zipEntryNames(Buffer.concat(this.tail), this.size), mainPart);
+        this.relationshipParts.finish();
+        const entries = zipEntries(Buffer.concat(this.tail), this.size);
+        const names = entries.map((entry) => entry.name);
+        if (!names.includes('[Content_Types].xml') || !names.includes(mainPart)) {
+          throw new FileRefusedError('type');
+        }
+        checkOfficeContent(entries, this.relationshipParts);
       }
       this.inspected = { mediaType: MEDIA_TYPES[this.kind], sizeBytes: this.size, sha256: this.hash.digest() };
       done();
@@ -188,11 +189,15 @@ export class FileInspection extends Transform {
     }
   }
 
-  /** Keeps only the last bytes of an Office file, where its table of contents is. */
-  private keepTail(chunk: Buffer): void {
+  /**
+   * Keeps the last bytes of an Office file, where its table of contents is,
+   * and a copy of its relationships parts, wherever they are.
+   */
+  private keepTail(chunk: Buffer, offset: number): void {
     if (!this.kind || !MAIN_PARTS[this.kind]) {
       return;
     }
+    this.relationshipParts.push(chunk, offset);
     this.tail.push(chunk);
     this.tailBytes += chunk.length;
     while (this.tail.length > 1 && this.tailBytes - (this.tail[0]?.length ?? 0) >= ZIP_TAIL_BYTES) {
@@ -201,21 +206,12 @@ export class FileInspection extends Transform {
   }
 }
 
-function checkOfficeFile(names: string[], mainPart: string): void {
-  if (names.some((name) => name.toLowerCase().endsWith('vbaproject.bin'))) {
-    throw new FileRefusedError('macros');
-  }
-  if (!names.includes('[Content_Types].xml') || !names.includes(mainPart)) {
-    throw new FileRefusedError('type');
-  }
-}
-
 /**
- * The names in a ZIP file's central directory, read from the file's last
+ * The entries in a ZIP file's central directory, read from the file's last
  * bytes (`tail`) given its full size. Anything malformed, too large, or ZIP64
  * (never needed under 50 MB) is refused as the wrong type.
  */
-function zipEntryNames(tail: Buffer, fileSize: number): string[] {
+function zipEntries(tail: Buffer, fileSize: number): ZipEntry[] {
   const END_RECORD = 0x06054b50;
   const DIRECTORY_ENTRY = 0x02014b50;
   const refuse = () => new FileRefusedError('type');
@@ -241,7 +237,7 @@ function zipEntryNames(tail: Buffer, fileSize: number): string[] {
     throw refuse();
   }
 
-  const names: string[] = [];
+  const found: ZipEntry[] = [];
   let at = start;
   for (let entry = 0; entry < entries; entry++) {
     if (at + 46 > end || tail.readUInt32LE(at) !== DIRECTORY_ENTRY) {
@@ -252,8 +248,14 @@ function zipEntryNames(tail: Buffer, fileSize: number): string[] {
     if (next > end) {
       throw refuse();
     }
-    names.push(tail.toString('utf8', at + 46, at + 46 + nameLength));
+    found.push({
+      name: tail.toString('utf8', at + 46, at + 46 + nameLength),
+      flags: tail.readUInt16LE(at + 8),
+      method: tail.readUInt16LE(at + 10),
+      compressedSize: tail.readUInt32LE(at + 20),
+      offset: tail.readUInt32LE(at + 42),
+    });
     at = next;
   }
-  return names;
+  return found;
 }

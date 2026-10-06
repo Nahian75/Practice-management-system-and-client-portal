@@ -96,6 +96,11 @@ const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
       HttpStatus.UNSUPPORTED_MEDIA_TYPE,
     ),
   macros: () => new HttpException('Office files containing macros are not accepted', HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+  active_content: () =>
+    new HttpException(
+      'Office files that fetch content from elsewhere when opened, or carry embedded objects or controls, are not accepted. Save a copy without them, or as PDF',
+      HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+    ),
   malware: () => new HttpException('The file contains malware and was not stored. Compliance has been told', HttpStatus.UNPROCESSABLE_ENTITY),
   scanner_unavailable: () => new ServiceUnavailableException('Files cannot be checked for malware at the moment, so uploads are paused. Try again later'),
   file_name: () => new BadRequestException('The file name is not accepted: up to 255 characters, with no control characters'),

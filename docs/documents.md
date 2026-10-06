@@ -90,7 +90,11 @@ see there.
   and PowerPoint files are ZIP files: their table of contents, at the end of
   the file, must list `[Content_Types].xml` and the right main part
   (`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`), and no
-  `vbaProject.bin` (macros). Text and emails must be valid UTF-8 with no null
+  `vbaProject.bin` (macros). They must not bring in active content either
+  (review D1): no relationship to macros, however named; no link that makes
+  Office fetch content from outside the file (only hyperlinks, and templates on
+  the local disk); no embedded objects that can hold programs, and no ActiveX
+  controls. Text and emails must be valid UTF-8 with no null
   bytes; an email must start with a header line.
 - **A file that disagrees is refused, never relabelled.** The stored type comes
   from the name only once the content has confirmed it.
