@@ -1,8 +1,7 @@
 # Security
 
-**Current state (2026-10-07):** Core API and staff-web controls are built and
-reviewed. The client portal is built through step 11d; its security review is
-next.
+**Current state (2026-10-07):** Core API, staff-web and client-portal controls
+are built and reviewed.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning
@@ -179,6 +178,7 @@ process before it accepts any request.
 | 2026-10-05 | Matters module | [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md) |
 | 2026-10-05 | Staff web app | [reviews/2026-10-05-web.md](reviews/2026-10-05-web.md) |
 | 2026-10-06 | Documents module | [reviews/2026-10-06-documents.md](reviews/2026-10-06-documents.md) |
+| 2026-10-07 | Client portal | [reviews/2026-10-07-portal.md](reviews/2026-10-07-portal.md) |
 
 Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), F5 (persistent email outbox), C6 (encrypted storage and

@@ -1,12 +1,13 @@
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestAccount, setAccountStatus, type TestAccount } from '../../test/accounts.js';
-import { testAppDatabaseUrl } from '../../test/database.js';
+import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
+import { testAppDatabaseUrl, testOwnerDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
 import type { Database } from '../database/schema.js';
 
 describe('portal links table', () => {
   let db: Kysely<Database>;
+  let ownerDb: Kysely<Database>;
   let staff: TestAccount;
   let person: TestAccount;
 
@@ -43,9 +44,11 @@ describe('portal links table', () => {
 
   beforeAll(() => {
     db = createDatabase<Database>(testAppDatabaseUrl(), 1);
+    ownerDb = createDatabase<Database>(testOwnerDatabaseUrl(), 1);
   });
 
   afterAll(async () => {
+    await ownerDb.destroy();
     await db.destroy();
   });
 
@@ -99,9 +102,49 @@ describe('portal links table', () => {
       const otherClient = await createTestAccount(db, 'client');
 
       await expect(link({ accountId: otherStaff.id, clientId })).rejects.toThrow(/client accounts that are not disabled/);
-      await expect(link({ clientId, linkedBy: otherClient.id })).rejects.toThrow(/made by staff/);
+      await expect(link({ clientId, linkedBy: otherClient.id })).rejects.toThrow(/active staff who can see the client/);
       await setAccountStatus(db, person.id, 'disabled');
       await expect(link({ clientId })).rejects.toThrow(/client accounts that are not disabled/);
+    });
+
+    it('refuses a link recorded by disabled staff or staff who cannot see the client', async () => {
+      const clientId = await individualClient(person.email);
+      const outsider = await createTestAccount(db, 'staff');
+
+      await expect(link({ clientId, linkedBy: outsider.id })).rejects.toThrow(/active staff who can see the client/);
+      await setAccountStatus(db, staff.id, 'disabled');
+      await expect(link({ clientId })).rejects.toThrow(/active staff who can see the client/);
+    });
+
+    it("lets an active member of one of the client's matter teams add and end a link", async () => {
+      const clientId = await individualClient(person.email);
+      const teamMember = await createTestAccount(db, 'staff');
+      await grantTestRole(db, staff.id, 'partner');
+      await grantTestRole(db, teamMember.id, 'fee_earner');
+      await db.transaction().execute(async (trx) => {
+        const check = await trx
+          .insertInto('conflict_checks')
+          .values({ client_id: clientId, requested_by: staff.id, names: [person.email] })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        const matter = await trx
+          .insertInto('matters')
+          .values({ client_id: clientId, title: 'Portal advice', matter_type: 'other', opened_by: staff.id, conflict_check_id: check.id })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await trx
+          .insertInto('matter_team')
+          .values({ matter_id: matter.id, account_id: staff.id, role: 'supervising_partner', added_by: staff.id })
+          .execute();
+        await trx
+          .insertInto('matter_team')
+          .values({ matter_id: matter.id, account_id: teamMember.id, role: 'fee_earner', added_by: staff.id })
+          .execute();
+      });
+
+      const created = await link({ clientId, linkedBy: teamMember.id });
+
+      await expect(end(created.id, teamMember.id)).resolves.toBeDefined();
     });
   });
 
@@ -119,10 +162,37 @@ describe('portal links table', () => {
       const clientId = await individualClient(person.email);
       const { id } = await link({ clientId });
 
-      await expect(end(id, person.id)).rejects.toThrow(/ended by staff/);
+      await expect(end(id, person.id)).rejects.toThrow(/active staff who can see the client/);
       await end(id);
       await expect(end(id)).rejects.toThrow(/already ended/);
       await expect(db.updateTable('portal_links').set({ ended_at: null, ended_by: null }).where('id', '=', id).execute()).rejects.toThrow(/already ended/);
+    });
+
+    it('refuses an end recorded by disabled staff or staff who cannot see the client', async () => {
+      const clientId = await individualClient(person.email);
+      const outsider = await createTestAccount(db, 'staff');
+      const first = await link({ clientId });
+
+      await expect(end(first.id, outsider.id)).rejects.toThrow(/active staff who can see the client/);
+      await setAccountStatus(db, staff.id, 'disabled');
+      await expect(end(first.id)).rejects.toThrow(/active staff who can see the client/);
+    });
+
+    it('does not let the table owner remove a link', async () => {
+      const removed = await link({ clientId: await individualClient(person.email) });
+
+      await expect(sql`delete from portal_links where id = ${removed.id}`.execute(ownerDb)).rejects.toThrow(/portal links cannot be removed/);
+    });
+
+    it('does not let the table owner rewrite a link while ending it', async () => {
+      const rewritten = await link({ clientId: await individualClient(person.email) });
+
+      await expect(
+        sql`update portal_links
+              set linked_at = timestamp with time zone '2000-01-01 00:00:00+00',
+                  ended_at = clock_timestamp(), ended_by = ${staff.id}
+              where id = ${rewritten.id}`.execute(ownerDb),
+      ).rejects.toThrow(/only a portal link's end can be recorded/);
     });
 
     it.each([

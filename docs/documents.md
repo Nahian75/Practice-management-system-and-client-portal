@@ -7,7 +7,9 @@ withdrawal in the API (`apps/api/src/documents/`, migrations `0024` and
 `0025`); sharing with the client (migration `0027`); and the screens in the
 staff web app (see [web.md](web.md)). The client portal now lists and
 downloads only the latest versions of shared documents. The
-module's security review is next. Compliance access to documents, through the
+documents and portal security reviews are complete. Portal review P4 made the
+automatic unshare and its audit event agree during a simultaneous share and
+withdrawal. Compliance access to documents, through the
 matter's compliance access, is not built yet.
 
 The files of a matter: letters, contracts, evidence, identity documents,
@@ -58,7 +60,9 @@ see there.
   withdrawn, and it cannot be undone or changed. The database checks the
   person added the document or supervises the matter, is on its team, and the
   matter is open. Withdrawal and new versions take the same per-document lock,
-  and a withdrawn document takes no new versions.
+  and a withdrawn document takes no new versions. Sharing uses that lock too;
+  withdrawal reads the current setting only after taking it, so its automatic
+  unshare and audit record cannot disagree (portal review P4).
 - `document_versions`: `id`, `document_id`, `number`, `file_name`,
   `media_type`, `size_bytes`, `sha256`, `storage_key`, and the sealed file
   key (`key_version`, `key_nonce`, `wrapped_key`, `key_tag`), `uploaded_by`,
@@ -220,4 +224,6 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **10b-4.** Listing and downloading documents. Done.
 - **10c.** Versions and withdrawal. Done.
 - **10d.** The document screens in the staff web app. Done.
-- Security review of the module.
+- Security review of the module. Done
+  ([report](reviews/2026-10-06-documents.md)); portal sharing checked again in
+  [the portal review](reviews/2026-10-07-portal.md).

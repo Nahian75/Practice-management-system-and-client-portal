@@ -622,6 +622,62 @@ describe('hourly upload allowance (review D4)', () => {
         .execute();
       expect(events).toEqual([{ action: 'document.shared' }, { action: 'document.unshared' }, { action: 'document.withdrawn' }]);
     });
+
+    it('records the unshare when sharing and withdrawal happen at the same time', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const holder = createDatabase<Database>(testAppDatabaseUrl(), 1);
+      const lockKey = sql`hashtextextended(${`app.document_version:${added.body.id}`}, 0)`;
+      try {
+        await sql`select pg_advisory_lock(${lockKey})`.execute(holder);
+        const sharing = changeSharing(token, added.body.id, true).then((response) => response.status);
+        await expect
+          .poll(
+            async () => {
+              const { rows } = await sql<{ waiting: string }>`
+                select count(*) as waiting from pg_locks
+                where locktype = 'advisory' and not granted
+                  and ((classid::bigint << 32) | objid::bigint) = ${lockKey}`.execute(holder);
+              return Number(rows[0]?.waiting);
+            },
+            { timeout: 20_000 },
+          )
+          .toBe(1);
+        const withdrawal = request(app.getHttpServer())
+          .post(`/documents/${added.body.id}/withdrawal`)
+          .set('Cookie', cookie(token))
+          .send({ reason: 'Uploaded to the wrong matter by mistake' })
+          .then((response) => response.status);
+        await expect
+          .poll(
+            async () => {
+              const { rows } = await sql<{ waiting: string }>`
+                select count(*) as waiting from pg_locks
+                where locktype = 'advisory' and not granted
+                  and ((classid::bigint << 32) | objid::bigint) = ${lockKey}`.execute(holder);
+              return Number(rows[0]?.waiting);
+            },
+            { timeout: 20_000 },
+          )
+          .toBe(2);
+        await sql`select pg_advisory_unlock(${lockKey})`.execute(holder);
+
+        expect(await sharing).toBe(204);
+        expect(await withdrawal).toBe(204);
+        const changes = await sql<{ shared: boolean }>`select shared from document_sharing_changes
+          where document_id = ${added.body.id} order by changed_at, id`.execute(db);
+        expect(changes.rows).toEqual([{ shared: true }, { shared: false }]);
+        const events = await db
+          .selectFrom('audit_events')
+          .select('action')
+          .where('resource_id', '=', added.body.id)
+          .where('action', 'in', ['document.shared', 'document.unshared', 'document.withdrawn'])
+          .orderBy('occurred_at')
+          .execute();
+        expect(events).toEqual([{ action: 'document.shared' }, { action: 'document.unshared' }, { action: 'document.withdrawn' }]);
+      } finally {
+        await holder.destroy();
+      }
+    }, 30_000);
   });
 
   describe('GET /documents/:id/versions/:number/content', () => {

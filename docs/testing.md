@@ -118,6 +118,10 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   emailed link, password and two-factor flow. They check the staff/client
   boundary, client-safe fields, exact latest-version downloads and access
   ending on the next page request.
+- Portal review tests also change the address on the client record, write link
+  attacks directly as both database roles, and force a share and withdrawal
+  to race by holding their PostgreSQL advisory lock. That makes the narrow
+  audit race repeat every time instead of hoping timing exposes it.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

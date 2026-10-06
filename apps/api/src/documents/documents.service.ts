@@ -171,8 +171,8 @@ export class DocumentsService {
     }
     try {
       await this.documents.transaction(async (trx) => {
-        await this.documents.withdraw(documentId, by.accountId, reason, trx);
-        if (document.sharedWithClient) {
+        const stoppedSharing = await this.documents.withdraw(documentId, by.accountId, reason, trx);
+        if (stoppedSharing) {
           await this.audit.record(
             {
               actor: by.actor,

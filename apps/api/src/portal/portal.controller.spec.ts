@@ -369,6 +369,35 @@ describe('Client portal', () => {
       expect((await portalGet('/portal/matters')).body.matters.map((row: { id: string }) => row.id)).not.toContain(organisationMatter.id);
     });
 
+    it('loses an individual client as soon as the address on their record changes', async () => {
+      const document = await addDocument(matter.id, 'Advice');
+      await share(document.body.id).expect(204);
+      await db.updateTable('client_individuals').set({ email: `${uniqueName()}@example.com` }).where('client_id', '=', clientId).execute();
+
+      expect((await portalGet(`/portal/matters/${matter.id}`)).status).toBe(404);
+      expect((await portalGet(`/portal/matters/${matter.id}/documents`)).status).toBe(404);
+      expect((await download(document.body.id)).status).toBe(404);
+      expect((await portalGet('/portal/matters')).body.matters.map((row: { id: string }) => row.id)).not.toContain(matter.id);
+    });
+
+    it('loses an organisation as soon as the address on its contact record changes', async () => {
+      const organisationClient = await organisation(person.email);
+      await link(organisationClient.clientId, organisationClient.contactId);
+      const organisationMatter = await openMatter(organisationClient.clientId);
+      const document = await addDocument(organisationMatter.id, 'Company advice');
+      await share(document.body.id).expect(204);
+      await db
+        .updateTable('client_contacts')
+        .set({ email: `${uniqueName()}@example.com` })
+        .where('id', '=', organisationClient.contactId)
+        .execute();
+
+      expect((await portalGet(`/portal/matters/${organisationMatter.id}`)).status).toBe(404);
+      expect((await portalGet(`/portal/matters/${organisationMatter.id}/documents`)).status).toBe(404);
+      expect((await download(document.body.id)).status).toBe(404);
+      expect((await portalGet('/portal/matters')).body.matters.map((row: { id: string }) => row.id)).not.toContain(organisationMatter.id);
+    });
+
     it('loses the session on the next request when the client account is disabled', async () => {
       await db.updateTable('accounts').set({ status: 'disabled' }).where('id', '=', person.id).execute();
 

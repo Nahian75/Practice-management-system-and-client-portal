@@ -79,7 +79,17 @@ export function visibleInPortal(accountId: string): PortalMatterFilter {
         .where('accounts.status', '=', 'active')
         .where((link) =>
           link.or([
-            link.and([link('clients.kind', '=', 'individual'), link('portal_links.contact_id', 'is', null)]),
+            link.and([
+              link('clients.kind', '=', 'individual'),
+              link('portal_links.contact_id', 'is', null),
+              link.exists(
+                link
+                  .selectFrom('client_individuals')
+                  .select('client_individuals.client_id')
+                  .whereRef('client_individuals.client_id', '=', 'portal_links.client_id')
+                  .whereRef('client_individuals.email', '=', 'accounts.email'),
+              ),
+            ]),
             link.and([
               link('clients.kind', '=', 'organisation'),
               link.exists(
@@ -88,6 +98,7 @@ export function visibleInPortal(accountId: string): PortalMatterFilter {
                   .select('client_contacts.id')
                   .whereRef('client_contacts.id', '=', 'portal_links.contact_id')
                   .whereRef('client_contacts.client_id', '=', 'portal_links.client_id')
+                  .whereRef('client_contacts.email', '=', 'accounts.email')
                   .where('client_contacts.active', '=', true),
               ),
             ]),

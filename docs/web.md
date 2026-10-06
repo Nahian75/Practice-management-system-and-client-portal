@@ -3,6 +3,7 @@
 **Current state (2026-10-07):** The staff app screens through Documents and
 portal administration are built. Portal step 11d adds the read-only client
 screens, using the same secure pass-through and a separate client layout.
+Both sides are security-reviewed.
 
 The staff app and client portal, in the same browser app with separate layouts.
 

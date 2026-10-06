@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, DocumentCategory, DocumentMediaType, MatterStatus } from '../database/schema.js';
@@ -250,8 +250,13 @@ export class DocumentsRepository {
   }
 
   /** Records a withdrawal. The database checks who may, that the matter is open, and that it happens once. */
-  async withdraw(documentId: string, withdrawnBy: string, reason: string, trx: Kysely<Database>): Promise<void> {
+  async withdraw(documentId: string, withdrawnBy: string, reason: string, trx: Kysely<Database>): Promise<boolean> {
+    // Sharing and withdrawal use this same lock. Read the setting only after
+    // taking it, so the audit record describes the change the trigger makes.
+    await sql`select pg_advisory_xact_lock(hashtextextended(${`app.document_version:${documentId}`}, 0))`.execute(trx);
+    const document = await trx.selectFrom('documents').select('shared_with_client').where('id', '=', documentId).executeTakeFirstOrThrow();
     await trx.insertInto('document_withdrawals').values({ document_id: documentId, withdrawn_by: withdrawnBy, reason }).execute();
+    return document.shared_with_client;
   }
 
   /** Records a real change; the database updates the setting and drops repeats. */

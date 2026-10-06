@@ -1,10 +1,12 @@
 # Client portal
 
-**Current state (2026-10-07):** Steps 11a to 11d built: portal links in the
+**Current state (2026-10-07):** Steps 11a to 11d are built and
+security-reviewed: portal links in the
 API (`apps/api/src/portal/`, migration `0026`) and on the client page;
 document sharing in the documents API, migration `0027` and the document
 page; the read-only client API for matters and shared documents; and the
-client screens under `/portal`. The portal security review is next.
+client screens under `/portal`. Review fixes are in migration `0028` and the
+API repositories ([report](reviews/2026-10-07-portal.md)).
 
 Where the firm's clients sign in to follow their matters and receive the
 documents the firm shares with them.
@@ -30,7 +32,7 @@ documents the firm shares with them.
 | Which matters | Every matter of the clients the login is linked to, open or closed; not those awaiting conflict clearance (no work has started) | Project owner |
 | Which documents | Only those a team member has marked "shared with the client", latest version only; never withdrawn ones. Sharing and unsharing are audited | Project owner |
 | Clients sending documents | Not in the first version: the portal is read-only for clients. Uploads by clients come later, with the same checks as staff uploads, into a "from the client" area the team reviews | Project owner |
-| When access ends | At once, without anyone having to remember: when the contact is marked as no longer a contact, when the link is removed by staff, or when the account is disabled. Checked on every request, not only at sign-in | Project owner |
+| When access ends | At once, without anyone having to remember: when the address on the client or contact record no longer matches the login, when the contact is marked as no longer a contact, when the link is removed by staff, or when the account is disabled. Checked on every request, not only at sign-in | Project owner; address check added by review P1 |
 | What is recorded | Invitations, links and their removal, sign-ins, every document a client downloads (actor: the client), every share and unshare | Project owner |
 | Where it lives | The same web app, under `/portal`, with its own layout; the sign-in page sends each person to their side by the kind of account. Staff pages refuse client sessions, and portal pages staff sessions | Project owner |
 
@@ -64,6 +66,13 @@ Migration `0027`:
   good: even the table owner cannot alter or remove it.
 - Withdrawing a shared document records an unshare in the same transaction.
 
+Migration `0028` (review P2 and P3):
+
+- Adding or ending a link is accepted only from active staff who can currently
+  see the client as its responsible person or through a matter team.
+- A link cannot be deleted, even by the table owner. Ending it cannot change
+  who or what it linked, who created it, or when it was created.
+
 ## Who can do what
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
@@ -94,10 +103,12 @@ Portal access is recorded as `portal.access_granted` and
 `document.unshared`. Every client download is recorded as
 `document.downloaded`, with the client account as the actor. All use ids only.
 
-Every client query checks the account's active link in the query itself. For
-an organisation it also checks that the named contact is still active. An
-ended link, inactive contact, disabled account or unshared document therefore
-takes effect on the next request.
+Every client query checks the account's active link in the query itself. It
+also checks that the account address is still the address on the individual
+client or organisation contact record; for an organisation, the named contact
+must still be active. An address change, ended link, inactive contact,
+disabled account or unshared document therefore takes effect on the next
+request.
 
 ## Screens
 
@@ -131,4 +142,5 @@ Each step ships with positive and negative tests and is reviewed before the next
 - **11c.** The portal API for clients: their matters, the documents shared on
   each, downloads; access re-checked on every request. Done.
 - **11d.** The portal screens; the sign-in page sends clients to them. Done.
-- Security review of the portal.
+- Security review of the portal. Done
+  ([report](reviews/2026-10-07-portal.md)).
