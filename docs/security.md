@@ -176,6 +176,7 @@ process before it accepts any request.
 | 2026-10-04 | Clients module | [reviews/2026-10-04-clients.md](reviews/2026-10-04-clients.md) |
 | 2026-10-05 | Matters module | [reviews/2026-10-05-matters.md](reviews/2026-10-05-matters.md) |
 | 2026-10-05 | Staff web app | [reviews/2026-10-05-web.md](reviews/2026-10-05-web.md) |
+| 2026-10-06 | Documents module | [reviews/2026-10-06-documents.md](reviews/2026-10-06-documents.md) |
 
 Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), F5 (persistent email outbox), C6 (encrypted storage and
