@@ -29,7 +29,7 @@ test('creates an individual client and shows the details in UK form', async ({ p
   await expect(page.getByRole('heading', { name: `Jane ${family}` })).toBeVisible();
   await expect(page.getByText(/^C-\d{6,} · Individual$/)).toBeVisible();
   await expect(page.getByText('29 February 1980')).toBeVisible();
-  await expect(page.getByText('jane@example.com')).toBeVisible();
+  await expect(page.getByText('jane@example.com', { exact: true })).toBeVisible();
   await expect(page.getByText('1 High Street, Leeds, LS1 1AA, United Kingdom')).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: `Jane ${family}` })).toBeVisible();

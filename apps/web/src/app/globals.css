@@ -370,6 +370,17 @@ a:hover {
   max-width: 100%;
 }
 
+/* A list of actions, one per line, without bullets. */
+.plain-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+
+.plain-list li {
+  margin-bottom: var(--space-3);
+}
+
 /* Something the reader must not miss, such as a matter waiting for conflict clearance. */
 .notice {
   border-left: 6px solid var(--colour-brand);

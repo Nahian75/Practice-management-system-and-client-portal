@@ -6,6 +6,7 @@ import { apiGet } from '@/lib/api';
 import { clientName, type Client } from '@/lib/clients';
 import { CLIENT_KIND_LABELS, countryName, formatCalendarDate, formatDate, ORGANISATION_TYPE_LABELS } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type MatterSummary } from '@/lib/matters';
+import { PortalAccess, type PortalCandidate, type PortalPerson } from './portal-access';
 import { TakeOverForm } from './take-over-form';
 
 export const metadata: Metadata = { title: 'Client' };
@@ -33,6 +34,14 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   }
 
   const matters = await apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`);
+  // Only for roles that manage portal access; for others the API refuses and the section is left out.
+  const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
+  const portalCandidates: PortalCandidate[] =
+    client.kind === 'individual'
+      ? [{ contactId: null, name: clientName(client), email: client.email }]
+      : client.contacts
+          .filter((contact) => contact.active)
+          .map((contact) => ({ contactId: contact.id, name: `${contact.givenNames} ${contact.familyName}`, email: contact.email }));
   const rows: [string, string | null][] =
     client.kind === 'individual'
       ? [
@@ -118,6 +127,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
           )}
         </>
       )}
+
+      {portal.body && <PortalAccess clientId={client.id} people={portal.body.people} candidates={portalCandidates} />}
 
       <h2>Matters</h2>
       {matters.status !== 200 || !matters.body || matters.body.matters.length === 0 ? (

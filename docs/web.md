@@ -174,6 +174,14 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   ([deployment.md](deployment.md), review D2); the pass-through serves
   development and the tests.
 
+## Built in 11a-2
+
+- The client page has a "Portal access" section, for those who manage it:
+  who can see the client in the portal, their status and since when, with
+  "End access"; and an invite button for the individual client, or for each
+  current contact, naming the address on record the invitation goes to.
+  Someone without an address on record gets a link to add one instead.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from

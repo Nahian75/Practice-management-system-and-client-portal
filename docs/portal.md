@@ -1,7 +1,8 @@
 # Client portal
 
-**Current state (2026-10-06):** Step 11a-1 built: portal links in the API
-(`apps/api/src/portal/`, migration `0026`). The staff screens for it (11a-2) next.
+**Current state (2026-10-06):** Step 11a built: portal links in the API
+(`apps/api/src/portal/`, migration `0026`) and on the client page. Sharing
+documents with the client (11b) next.
 
 Where the firm's clients sign in to follow their matters and receive the
 documents the firm shares with them.
@@ -75,7 +76,10 @@ Each step ships with positive and negative tests and is reviewed before the next
 
 - **11a-1.** Portal links in the API: inviting an individual client or a
   contact (to the address on record), listing and ending access. Done.
-- **11a-2.** The staff screens for it, on the client page.
+- **11a-2.** The staff screens for it, on the client page: who has access and
+  since when, "End access", and an invite button for the individual client or
+  each current contact, showing the address on record it goes to; a person
+  without one gets a link to add it. Done.
 - **11b.** Sharing documents with the client, in the API and on the document
   page.
 - **11c.** The portal API for clients: their matters, the documents shared on
