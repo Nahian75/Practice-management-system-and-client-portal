@@ -44,3 +44,6 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local demo login details: this computer only, never committed.
+DEMO-LOGIN.txt

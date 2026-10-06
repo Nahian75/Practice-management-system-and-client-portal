@@ -182,6 +182,17 @@ Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), F5 (persistent email outbox), C6 (encrypted storage and
 backups).
 
+Local demo conveniences that must not reach production (to fix before
+deploying): `code.bat` and `scripts/demo-code.mjs`, which show the current
+security code of the demo login from its setup key, so they would defeat
+two-factor for any account whose key they could read; the git-ignored
+`DEMO-LOGIN.txt`; and the demo account itself (`demo@practice.test`), which
+exists only in the local database. A production build and deployment must
+leave all of them out. **To fix later, by decision of the project owner:**
+remove `code.bat` and its script, and go back to the default, codes from a
+third-party authenticator app (Microsoft Authenticator, Google Authenticator
+and the like), for the demo login too.
+
 ## Client addresses
 
 `TRUSTED_PROXIES` (comma-separated IPs, CIDR ranges, or `loopback`,
