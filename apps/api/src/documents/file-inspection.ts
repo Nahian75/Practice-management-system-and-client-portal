@@ -253,6 +253,7 @@ function zipEntries(tail: Buffer, fileSize: number): ZipEntry[] {
       flags: tail.readUInt16LE(at + 8),
       method: tail.readUInt16LE(at + 10),
       compressedSize: tail.readUInt32LE(at + 20),
+      uncompressedSize: tail.readUInt32LE(at + 24),
       offset: tail.readUInt32LE(at + 42),
     });
     at = next;

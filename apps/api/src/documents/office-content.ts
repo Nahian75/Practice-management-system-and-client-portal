@@ -7,6 +7,8 @@ export interface ZipEntry {
   flags: number;
   method: number;
   compressedSize: number;
+  /** As the file declares it; ClamAV counts what it actually unpacks. */
+  uncompressedSize: number;
   /** Where the entry's local header starts in the file. */
   offset: number;
 }
@@ -18,6 +20,14 @@ const MAX_NAME_BYTES = 1024;
 const MAX_RELS_BYTES = 256 * 1024;
 const MAX_CAPTURED_BYTES = 4 * 1024 * 1024;
 const MAX_RELS_XML_BYTES = 1024 * 1024;
+
+/**
+ * ClamAV's own limits (its defaults): it skips, and reports clean, an archive
+ * entry larger than this unpacked, even with AlertExceedsMax on; past the total
+ * it does report the file. A file declaring more is refused before scanning (review D3).
+ */
+const MAX_SCANNED_ENTRY_BYTES = 100 * 1024 * 1024;
+const MAX_SCANNED_TOTAL_BYTES = 400 * 1024 * 1024;
 
 const isRelationshipsPart = (name: string) => name.toLowerCase().endsWith('.rels');
 
@@ -117,6 +127,10 @@ const ACTIVE_PART = /\/activex\/|\/embeddings\/.*\.(bin|docm|dotm|xlsm|xltm|xlsb
  * open when clicked, and a template on the local disk are allowed.
  */
 export function checkOfficeContent(entries: ZipEntry[], capture: RelationshipPartCapture): void {
+  const unpacked = entries.reduce((total, entry) => total + entry.uncompressedSize, 0);
+  if (unpacked > MAX_SCANNED_TOTAL_BYTES || entries.some((entry) => entry.uncompressedSize > MAX_SCANNED_ENTRY_BYTES)) {
+    throw new FileRefusedError('unscannable');
+  }
   for (const entry of entries) {
     const name = entry.name.toLowerCase();
     if (name.endsWith('vbaproject.bin')) {

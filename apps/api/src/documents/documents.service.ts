@@ -11,7 +11,7 @@ import { DocumentVault, type StoredFile } from './document-vault.js';
 import { DocumentsRepository, type DocumentDetails, type DocumentSummary } from './documents.repository.js';
 import { FileInspection, FileRefusedError, type InspectedFile, type RefusalReason } from './file-inspection.js';
 import { discardUpload, UploadFormError } from './upload-request.js';
-import { VirusScanner, type ScanResult } from './virus-scanner.js';
+import { isLimitsAlert, VirusScanner, type ScanResult } from './virus-scanner.js';
 
 /** The signed-in staff member acting, and the request it came from. */
 export interface DocumentActor {
@@ -374,7 +374,7 @@ function refusalFor(
     return { refusal: 'scanner_unavailable' };
   }
   if (!first && scan.status === 'fulfilled' && !scan.value.clean) {
-    return { refusal: 'malware', signature: scan.value.signature };
+    return { refusal: isLimitsAlert(scan.value.signature) ? 'unscannable' : 'malware', signature: scan.value.signature };
   }
   return undefined;
 }

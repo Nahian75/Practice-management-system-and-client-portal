@@ -229,6 +229,14 @@ describe('file inspection', () => {
       expect(await refusal('letter.docx', word(extra))).toBeUndefined();
     });
 
+    it('refuses a file declaring more than the virus scanner checks once unpacked (review D3)', async () => {
+      const zeros = Buffer.alloc(90 * 1024 * 1024);
+
+      expect(await refusal('letter.docx', word({ 'word/media/big.bin': Buffer.alloc(101 * 1024 * 1024) }))).toBe('unscannable');
+      const fiveParts = Object.fromEntries(Array.from({ length: 5 }, (_, index) => [`word/media/part${index}.bin`, zeros]));
+      expect(await refusal('letter.docx', word(fiveParts))).toBe('unscannable');
+    }, 60_000);
+
     it("accepts Excel's printer settings, which are binary parts too", async () => {
       expect(await refusal('accounts.xlsx', officeFile('xl/workbook.xml', { 'xl/printerSettings/printerSettings1.bin': randomBytes(100) }, { deflate: true }))).toBeUndefined();
     });

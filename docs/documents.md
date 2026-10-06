@@ -94,7 +94,12 @@ see there.
   (review D1): no relationship to macros, however named; no link that makes
   Office fetch content from outside the file (only hyperlinks, and templates on
   the local disk); no embedded objects that can hold programs, and no ActiveX
-  controls. Text and emails must be valid UTF-8 with no null
+  controls. Nor may they declare more than the virus scanner checks once
+  unpacked: 100 MB for one part, 400 MB in all (review D3).
+- **Scanning:** ClamAV runs with `AlertExceedsMax yes`, so a file past its
+  limits is reported, not called clean; such a file is refused as "could not be
+  fully checked for viruses", not as malware. Production must use the same
+  setting. Text and emails must be valid UTF-8 with no null
   bytes; an email must start with a header line.
 - **A file that disagrees is refused, never relabelled.** The stored type comes
   from the name only once the content has confirmed it.

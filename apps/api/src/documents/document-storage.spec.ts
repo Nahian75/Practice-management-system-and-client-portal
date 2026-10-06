@@ -4,10 +4,11 @@ import { buffer } from 'node:stream/consumers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testEnv } from '../../test/database.js';
 import { eicarTestFile } from '../../test/eicar.js';
+import { officeFile } from '../../test/zip.js';
 import { DocumentVault } from './document-vault.js';
 import { FileCipherError } from './file-cipher.js';
 import { ObjectNotFoundError, ObjectStorage } from './object-storage.js';
-import { ScannerUnavailableError, VirusScanner } from './virus-scanner.js';
+import { isLimitsAlert, ScannerUnavailableError, VirusScanner } from './virus-scanner.js';
 
 // Against the SeaweedFS and ClamAV containers from docker compose (docs/documents.md).
 describe('document storage', () => {
@@ -139,6 +140,21 @@ describe('document storage', () => {
 
       expect(await scanner().scan(Readable.from(pieces))).toEqual({ clean: true });
     });
+
+    it('reports a file it could not fully scan, rather than calling it clean (review D3)', async () => {
+      // Past ClamAV's limit of 10,000 files in an archive; with AlertExceedsMax off it said "clean".
+      const tooManyFiles = officeFile(
+        'word/document.xml',
+        Object.fromEntries(Array.from({ length: 10_050 }, (_, index) => [`word/media/p${index}.txt`, 'x'])),
+        { deflate: true },
+      );
+
+      const result = await scanner().scan(Readable.from([tooManyFiles]));
+
+      expect(result).toEqual({ clean: false, signature: 'Heuristics.Limits.Exceeded.MaxFiles' });
+      expect(isLimitsAlert('Heuristics.Limits.Exceeded.MaxFiles')).toBe(true);
+      expect(isLimitsAlert('Eicar-Test-Signature')).toBe(false);
+    }, 60_000);
 
     it('fails closed when the scanner cannot be reached', async () => {
       const unreachable = new VirusScanner(testEnv({ CLAMAV_PORT: 3109 }));

@@ -10,7 +10,7 @@ import { createTestAccount, grantTestRole, type TestAccount } from '../../test/a
 import { createTestApp } from '../../test/create-test-app.js';
 import { eicarTestFile } from '../../test/eicar.js';
 import { waitForEmailWithSubject } from '../../test/mailpit.js';
-import { officeFile, relationships } from '../../test/zip.js';
+import { officeFile, relationships, withDeclaredSizes } from '../../test/zip.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { ClientsModule } from '../clients/clients.module.js';
 import { DATABASE } from '../database/database.module.js';
@@ -196,6 +196,25 @@ describe('Documents', () => {
         expect(response.status).toBe(400);
         expect(await documentsOf(matterId)).toEqual([]);
       });
+
+      it('a file the virus scanner could not fully check, recorded but not reported as malware (review D3)', async () => {
+        // Declares 1,000 bytes per part, so it passes the inspection; ClamAV counts the 450 MB it really unpacks to.
+        const zeros = Buffer.alloc(90 * 1024 * 1024);
+        const parts = Object.fromEntries(Array.from({ length: 5 }, (_, index) => [`word/media/part${index}.bin`, zeros]));
+        const understated = withDeclaredSizes(officeFile('word/document.xml', parts, { deflate: true }), 1000);
+        let response: request.Response | undefined;
+        const { stored, removed } = await storageDuring(async () => {
+          response = await upload(token, understated, 'letter.docx');
+        });
+
+        expect(response?.status).toBe(422);
+        expect(response?.body.message).toContain('could not be fully checked for viruses');
+        expect(removed).toEqual(stored);
+        expect(await documentsOf(matterId)).toEqual([]);
+        expect(await refusalsFor(matterId)).toEqual([
+          { action: 'document.refused', outcome: 'failure', metadata: { reason: 'unscannable', signature: 'Heuristics.Limits.Exceeded.MaxScanSize' } },
+        ]);
+      }, 60_000);
 
       it('a file over 50 MB', async () => {
         const response = await upload(token, Buffer.alloc(MAX_DOCUMENT_BYTES + 1, 0x61), 'note.txt');

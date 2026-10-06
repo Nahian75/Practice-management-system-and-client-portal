@@ -68,3 +68,17 @@ export function relationships(...items: { type: string; target: string; external
   );
   return `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${elements.join('')}</Relationships>`;
 }
+
+/** The ZIP with every declared unpacked size rewritten to `size`: a file that lies about how large it unpacks. */
+export function withDeclaredSizes(zip: Buffer, size: number): Buffer {
+  const copy = Buffer.from(zip);
+  for (let at = 0; at + 4 <= copy.length; at++) {
+    const signature = copy.readUInt32LE(at);
+    if (signature === 0x04034b50 && at + 30 <= copy.length) {
+      copy.writeUInt32LE(size, at + 22);
+    } else if (signature === 0x02014b50 && at + 46 <= copy.length) {
+      copy.writeUInt32LE(size, at + 24);
+    }
+  }
+  return copy;
+}

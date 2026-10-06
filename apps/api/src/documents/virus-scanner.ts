@@ -8,6 +8,9 @@ const SCAN_TIMEOUT_MS = 60_000;
 
 export type ScanResult = { clean: true } | { clean: false; signature: string };
 
+/** ClamAV's report for a file past its limits (AlertExceedsMax): not found to be malware, but not fully scanned either. */
+export const isLimitsAlert = (signature: string) => signature.startsWith('Heuristics.Limits.Exceeded');
+
 /** The scanner could not give an answer. Uploads fail closed: nothing unscanned is stored. */
 export class ScannerUnavailableError extends Error {
   override readonly name = 'ScannerUnavailableError';

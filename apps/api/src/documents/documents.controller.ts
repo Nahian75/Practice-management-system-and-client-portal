@@ -101,6 +101,11 @@ const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
       'Office files that fetch content from elsewhere when opened, or carry embedded objects or controls, are not accepted. Save a copy without them, or as PDF',
       HttpStatus.UNSUPPORTED_MEDIA_TYPE,
     ),
+  unscannable: () =>
+    new HttpException(
+      'The file could not be fully checked for viruses: it is too large or too complex once unpacked, so it was not stored. Save it as PDF, or split it',
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    ),
   malware: () => new HttpException('The file contains malware and was not stored. Compliance has been told', HttpStatus.UNPROCESSABLE_ENTITY),
   scanner_unavailable: () => new ServiceUnavailableException('Files cannot be checked for malware at the moment, so uploads are paused. Try again later'),
   file_name: () => new BadRequestException('The file name is not accepted: up to 255 characters, with no control characters'),
