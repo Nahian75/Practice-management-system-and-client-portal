@@ -1,11 +1,10 @@
 # Web app
 
-**Current state (2026-10-05):** Steps 9a and 9b built: the app, its security
-headers, the pass-through to the API, the layout, sign in with 2FA or a backup
-code, sign out, a signed-in home page, accepting an invitation, and password
-reset. The other screens are designed below.
+**Current state (2026-10-07):** The staff app screens through Documents and
+portal administration are built. Portal step 11d adds the read-only client
+screens, using the same secure pass-through and a separate client layout.
 
-The staff app, in the browser. The client portal comes later, in the same app.
+The staff app and client portal, in the same browser app with separate layouts.
 
 ## Decisions
 
@@ -190,6 +189,23 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - A withdrawn document has no sharing control. Withdrawing one that was
   shared stops sharing it in the same transaction.
 
+## Built in 11d
+
+- `/portal` lists the matters available to a client. Its layout shows only
+  "Your matters", the client's name and sign out; staff navigation is absent.
+- `/portal/matters/:id` shows only the client-safe matter fields and the
+  shared, unwithdrawn documents returned by the portal API. Downloads use the
+  versionless portal address, which always means the latest shared version.
+- Sign-in uses the account kind returned after two-factor authentication:
+  staff go to `/`, clients to `/portal`. The staff and portal layouts also
+  send an already signed-in person back to the correct side.
+- Portal pages are server-rendered per request with `no-store`. When the API
+  reports that access ended, the matter page shows the same plain message as
+  an unknown matter and no earlier details remain on the page.
+- Browser tests create the client through the real invitation and two-factor
+  flow, check both layout boundaries, verify the exact downloaded bytes, and
+  run axe on the matter list and detail screens.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
@@ -249,5 +265,4 @@ seven days old, exact versions).
 
 ## Not in the first version
 
-- The client portal (after Documents, so clients have something to see).
 - Dark mode, printing styles, and Welsh language.

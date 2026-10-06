@@ -1,8 +1,8 @@
 # Architecture
 
-**Current state (2026-10-06):** The API foundation and the Clients, Matters,
-Documents and client portal API modules are built. Staff screens are built;
-the client portal screens are next.
+**Current state (2026-10-07):** The API foundation and the Clients, Matters,
+Documents and client portal modules are built, with separate staff and client
+screens. The portal security review is next.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -44,11 +44,11 @@ authorization decisions.
 | Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security-reviewed: C1–C4, C8 and C10 fixed; C5 with Matters, C6 before production ([review](reviews/2026-10-04-clients.md)) |
 | Matters | Built: opening matters with teams and a required conflict check, other parties, conflict clearance, team changes, supervision takeover, editing and closing, compliance access with a reason, team visibility (`apps/api/src/matters/`). Security-reviewed: M1, M2 and M4 fixed; M5 open for design ([review](reviews/2026-10-05-matters.md)) |
 | Documents | Built (10a to 10d, and portal 11b): API and staff screens, including sharing with the client ([documents.md](documents.md)) |
-| Client portal | Steps 11a to 11c built: portal access for clients' people, document sharing, staff screens for both, and the read-only client API. Client screens are next ([portal.md](portal.md)) |
+| Client portal | Steps 11a to 11d built: portal access for clients' people, document sharing, staff controls, the read-only client API and separate client screens. Security review next ([portal.md](portal.md)) |
 | Tasks | Not started |
 | Notifications | Not started |
 | Finance | Not started |
 | Compliance / AML | Not started |
 | HR | Not started |
 | AI | Not started |
-| Web app (staff) | Steps 9a to 9e built: set-up, security headers, pass-through to the API, sign in and out, accepting invitations, password reset, client screens, matters, staff administration (`apps/web/`). Security review of the web app next ([web.md](web.md)) |
+| Web app | Staff screens and the read-only client portal are built: set-up, security headers, API pass-through, account set-up and recovery, clients, matters, documents and staff administration (`apps/web/`). The staff app was security-reviewed; the portal review is next ([web.md](web.md)) |

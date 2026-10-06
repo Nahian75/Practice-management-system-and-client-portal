@@ -1,11 +1,11 @@
 # Documents
 
-**Current state (2026-10-06):** Steps 10a to 10d and portal steps 11b and 11c
+**Current state (2026-10-07):** Steps 10a to 10d and portal steps 11b to 11d
 built: encrypted storage, scanning, file inspection, uploading, listing,
 downloading, new versions and
 withdrawal in the API (`apps/api/src/documents/`, migrations `0024` and
 `0025`); sharing with the client (migration `0027`); and the screens in the
-staff web app (see [web.md](web.md)). The client portal API now lists and
+staff web app (see [web.md](web.md)). The client portal now lists and
 downloads only the latest versions of shared documents. The
 module's security review is next. Compliance access to documents, through the
 matter's compliance access, is not built yet.
@@ -200,7 +200,6 @@ at least seven days old when pinned, as for npm packages.
 
 ## Not in this module
 
-- The client portal screens: portal step 11d. The client API is built.
 - Previews in the browser, text search inside documents, and editing: later,
   each with its own security review (they mean opening untrusted files on the
   server).

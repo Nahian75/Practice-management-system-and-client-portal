@@ -6,8 +6,9 @@ import { SignInForm } from './sign-in-form';
 export const metadata: Metadata = { title: 'Sign in' };
 
 export default async function SignInPage() {
-  if ((await currentAccount())?.kind === 'staff') {
-    redirect('/');
+  const account = await currentAccount();
+  if (account) {
+    redirect(account.kind === 'client' ? '/portal' : '/');
   }
 
   return (

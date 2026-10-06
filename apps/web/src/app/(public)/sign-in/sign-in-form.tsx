@@ -48,7 +48,8 @@ export function SignInForm() {
     const form = new FormData(event.currentTarget);
     const response = await send('/api/auth/two-factor', { code: String(form.get('code')).trim() });
     if (response.ok) {
-      router.replace('/');
+      const { account } = (await response.json()) as { account: { kind: 'staff' | 'client' } };
+      router.replace(account.kind === 'client' ? '/portal' : '/');
       router.refresh();
       return;
     }
@@ -115,4 +116,3 @@ export function SignInForm() {
     </form>
   );
 }
-

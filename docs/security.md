@@ -1,6 +1,8 @@
 # Security
 
-**Current state (2026-10-03):** API skeleton only (`apps/api`, one `/health` endpoint).
+**Current state (2026-10-07):** Core API and staff-web controls are built and
+reviewed. The client portal is built through step 11d; its security review is
+next.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning

@@ -1,10 +1,10 @@
 # Client portal
 
-**Current state (2026-10-06):** Steps 11a to 11c built: portal links in the
+**Current state (2026-10-07):** Steps 11a to 11d built: portal links in the
 API (`apps/api/src/portal/`, migration `0026`) and on the client page;
 document sharing in the documents API, migration `0027` and the document
-page; and the read-only client API for matters and shared documents. The
-portal screens (11d) are next.
+page; the read-only client API for matters and shared documents; and the
+client screens under `/portal`. The portal security review is next.
 
 Where the firm's clients sign in to follow their matters and receive the
 documents the firm shares with them.
@@ -99,6 +99,23 @@ an organisation it also checks that the named contact is still active. An
 ended link, inactive contact, disabled account or unshared document therefore
 takes effect on the next request.
 
+## Screens
+
+- `/portal` lists the client's open and closed matters, newest first, with
+  the reference, title, type, status, opened date and legal team.
+- `/portal/matters/:id` shows the same safe matter details and its shared
+  documents. A download is a plain link to the latest-version portal API;
+  there is no client screen or address for an earlier version.
+- The portal has its own header and navigation. It contains no links to
+  clients, staff or other internal sections.
+- After two-factor sign-in, the response's account kind sends staff to `/`
+  and clients to `/portal`. A client who enters a staff address is sent back
+  to `/portal`; a staff member who enters a portal address is sent back to
+  `/`. Someone signed out is sent to `/sign-in`.
+- Pages are rendered afresh on the server and API reads use the session cookie
+  with `no-store`, so ending a link or making an organisation contact inactive
+  is reflected on the next page request. The API remains the authority.
+
 ## Build order
 
 Each step ships with positive and negative tests and is reviewed before the next.
@@ -113,5 +130,5 @@ Each step ships with positive and negative tests and is reviewed before the next
   page. Done.
 - **11c.** The portal API for clients: their matters, the documents shared on
   each, downloads; access re-checked on every request. Done.
-- **11d.** The portal screens; the sign-in page sends clients to them.
+- **11d.** The portal screens; the sign-in page sends clients to them. Done.
 - Security review of the portal.

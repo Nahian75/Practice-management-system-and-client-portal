@@ -1,6 +1,7 @@
 # Testing
 
-**Current state (2026-10-04):** Unit, HTTP and database integration tests for the API.
+**Current state (2026-10-07):** Unit, HTTP and database integration tests for
+the API, and Playwright end-to-end tests for the staff app and client portal.
 
 ## Tools
 
@@ -113,6 +114,10 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   the sign-in page) and `apiSessionFor` (a second person, signed in through
   the API, to set up data such as someone else's client) from
   `e2e/support/session.ts`. Every test gets new people, so tests never share data.
+- Portal tests create a client account through the real staff invitation,
+  emailed link, password and two-factor flow. They check the staff/client
+  boundary, client-safe fields, exact latest-version downloads and access
+  ending on the next page request.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

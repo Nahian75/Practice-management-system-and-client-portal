@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { appName } from '@/config';
 import { currentAccount } from '@/lib/api';
 import { NavLinks } from '@/components/nav-links';
-import { SignOutButton } from './sign-out-button';
+import { SignOutButton } from '@/components/sign-out-button';
 
 /**
  * Every staff page. Without a valid staff session the visitor is sent to sign
@@ -12,8 +12,11 @@ import { SignOutButton } from './sign-out-button';
  */
 export default async function StaffLayout({ children }: { children: ReactNode }) {
   const account = await currentAccount();
-  if (account?.kind !== 'staff') {
+  if (!account) {
     redirect('/sign-in');
+  }
+  if (account.kind !== 'staff') {
+    redirect('/portal');
   }
 
   return (
