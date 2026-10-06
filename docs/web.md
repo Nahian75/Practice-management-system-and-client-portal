@@ -168,7 +168,11 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   them as attachments, so they are saved, never shown.
 - The pass-through holds request bodies up to `proxyClientMaxBodySize` and
   silently cuts off the rest (Next.js logs a warning). It is 52 MB, just above
-  the API's 50 MB limit, so an upload always reaches the API whole.
+  the API's 50 MB limit, so an upload always reaches the API whole. Next.js
+  keeps the whole body of every request it passes on in memory, so in
+  production the reverse proxy sends `/api/…` straight to the API instead
+  ([deployment.md](deployment.md), review D2); the pass-through serves
+  development and the tests.
 
 ## Security in the web app
 

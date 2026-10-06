@@ -43,28 +43,68 @@ Migration `0017` stops with a clear message if they are missing.
 Behind a load balancer, set `TRUSTED_PROXIES` to its address range. Leave it
 empty when the app is reached directly.
 
-### The way in: a reverse proxy on the same machine (review W1, W3)
+### The way in: a reverse proxy on the same machine (reviews W1, W3, D2)
 
 The web app and the API both listen on `127.0.0.1` only (`npm run start`
 binds the web app there; a test fails if it does not). Browsers reach them only
-through a TLS reverse proxy on the same machine, such as Caddy or nginx, which
-must:
+through a TLS reverse proxy on the same machine, such as Caddy or nginx, on one
+address, so the session cookie and the API's cross-site check work as they do
+locally. The reverse proxy must:
 
-- **Pass the browser's address last in `X-Forwarded-For`.** The web app hands
-  the header to the API unchanged, and the API (`TRUSTED_PROXIES=loopback`)
-  takes the last address that is not loopback. Whatever the browser wrote
-  itself comes earlier and is ignored. Caddy does this by default; in nginx,
-  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
-- **Remove the `x-middleware-rewrite` response header**, which names the API's
-  internal address (Caddy: `header_down -x-middleware-rewrite`; nginx:
-  `proxy_hide_header x-middleware-rewrite;`).
-- Send everything to the web app on port 3000; never expose the API's port.
-- **Allow request bodies of up to 52 MB** (document uploads; nginx:
-  `client_max_body_size 52m;`), and no more.
+- **Send `/api/…` straight to the API, without the `/api` prefix, and
+  everything else to the web app.** In production the web app's own `/api`
+  pass-through is not used: Next.js reads and keeps in memory the whole body
+  of every request it passes on, before it can refuse it (review D2). The
+  pass-through remains for development and the end-to-end tests.
+- **Limit request bodies before reading them:** 52 MB on the two upload routes
+  (`POST /api/matters/{id}/documents`, `POST /api/documents/{id}/versions`),
+  1 MB on every other address; and limit connections per client.
+- **Pass the browser's address last in `X-Forwarded-For`.** The API
+  (`TRUSTED_PROXIES=loopback`) takes the last address that is not loopback;
+  whatever the browser wrote itself comes earlier and is ignored. Caddy does
+  this by default; nginx as below.
+- **Pass the `Host` header unchanged**, so the API's cross-site check can
+  compare it with `Origin`.
 
-Never expose the web app's port directly: anyone reaching it could then choose
-the address the API records for them, and get round the per-address sign-in
-limit.
+An example for nginx, to be checked when hosting is chosen (TLS settings left out):
+
+```nginx
+limit_conn_zone $binary_remote_addr zone=per_client:10m;
+
+server {
+  # TLS on 443, certificates: per the hosting chosen.
+  limit_conn per_client 20;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto https;
+
+  # Document uploads: up to 52 MB, streamed on as they arrive.
+  location ~ ^/api/(matters/[^/]+/documents|documents/[^/]+/versions)$ {
+    client_max_body_size 52m;
+    proxy_request_buffering off;
+    rewrite ^/api/(.*)$ /$1 break;
+    proxy_pass http://127.0.0.1:3001;
+  }
+
+  # Every other API request: up to 1 MB.
+  location /api/ {
+    client_max_body_size 1m;
+    proxy_pass http://127.0.0.1:3001/;
+  }
+
+  # The web app's pages.
+  location / {
+    client_max_body_size 1m;
+    proxy_pass http://127.0.0.1:3000;
+  }
+}
+```
+
+Never expose the web app's or the API's port directly: anyone reaching them
+could choose the address the API records for them, and get round the
+per-address sign-in limit. Because the web app no longer passes API requests
+in production, the `x-middleware-rewrite` header that named the API's
+internal address (review W3) does not appear there either.
 
 `compose.yaml`:
 - Image pinned by digest, so the exact same image is pulled every time.
