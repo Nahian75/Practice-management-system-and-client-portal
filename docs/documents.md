@@ -1,10 +1,11 @@
 # Documents
 
-**Current state (2026-10-05):** Steps 10a to 10c built in the API
-(`apps/api/src/documents/`, migrations `0024` and `0025`): encrypted storage,
+**Current state (2026-10-06):** Steps 10a to 10d built: encrypted storage,
 scanning, file inspection, uploading, listing, downloading, new versions and
-withdrawal. The screens in the staff web app (step 10d) are next. Compliance
-access to documents, through the matter's compliance access, is not built yet.
+withdrawal in the API (`apps/api/src/documents/`, migrations `0024` and
+`0025`), and the screens in the staff web app (see [web.md](web.md)). The
+module's security review is next. Compliance access to documents, through the
+matter's compliance access, is not built yet.
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -186,5 +187,5 @@ Each step ships with positive and negative tests and is reviewed before the next
   bodies, so step 10d raises its limit for this route.
 - **10b-4.** Listing and downloading documents. Done.
 - **10c.** Versions and withdrawal. Done.
-- **10d.** The document screens in the staff web app.
+- **10d.** The document screens in the staff web app. Done.
 - Security review of the module.

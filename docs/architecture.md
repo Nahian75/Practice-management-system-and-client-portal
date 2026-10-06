@@ -40,7 +40,7 @@ authorization decisions.
 | Users / Roles | Built: roles, permissions, permission guard, staff-management endpoints (`apps/api/src/auth/permissions/`, `apps/api/src/staff/`) |
 | Clients | Built: create, open, list, search, edit and take over clients, and contacts (`apps/api/src/clients/`). Security-reviewed: C1–C4, C8 and C10 fixed; C5 with Matters, C6 before production ([review](reviews/2026-10-04-clients.md)) |
 | Matters | Built: opening matters with teams and a required conflict check, other parties, conflict clearance, team changes, supervision takeover, editing and closing, compliance access with a reason, team visibility (`apps/api/src/matters/`). Security-reviewed: M1, M2 and M4 fixed; M5 open for design ([review](reviews/2026-10-05-matters.md)) |
-| Documents | Steps 10a to 10c built in the API: storage, scanning, encryption, upload, list, download, versions, withdrawal; web screens next ([documents.md](documents.md)) |
+| Documents | Built (10a to 10d): API and staff screens; security review next ([documents.md](documents.md)) |
 | Client portal | Not started |
 | Tasks | Not started |
 | Notifications | Not started |

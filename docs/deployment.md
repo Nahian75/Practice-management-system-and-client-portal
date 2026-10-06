@@ -59,6 +59,8 @@ must:
   internal address (Caddy: `header_down -x-middleware-rewrite`; nginx:
   `proxy_hide_header x-middleware-rewrite;`).
 - Send everything to the web app on port 3000; never expose the API's port.
+- **Allow request bodies of up to 52 MB** (document uploads; nginx:
+  `client_max_body_size 52m;`), and no more.
 
 Never expose the web app's port directly: anyone reaching it could then choose
 the address the API records for them, and get round the per-address sign-in

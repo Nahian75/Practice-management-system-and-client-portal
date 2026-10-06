@@ -150,6 +150,26 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - A partner or compliance holder pressing a change button is told only
   administrators can change staff accounts.
 
+## Built in 10d
+
+- The matter page has a Documents section: the documents, newest first, with
+  each one's latest version, size and a download link; and, while the matter
+  is open, a form to add one (title, category, file).
+- `/documents/:id`: every version with its download link, a form for a new
+  version, and, for whoever added the document or the matter's supervising
+  partner, withdrawal with a reason and a tick to confirm. A withdrawn
+  document says who withdrew it, when and why, and has no download links.
+- Files are sent from the browser through `/api` as a multipart form, the
+  title and category before the file, as the API reads them. The page refuses
+  a missing file or one over 50 MB before sending it; the API checks
+  everything again and its reasons (wrong type, macros, malware, scanner
+  unavailable) are shown as given.
+- Downloads are plain links to the API through the pass-through; the API sends
+  them as attachments, so they are saved, never shown.
+- The pass-through holds request bodies up to `proxyClientMaxBodySize` and
+  silently cuts off the rest (Next.js logs a warning). It is 52 MB, just above
+  the API's 50 MB limit, so an upload always reaches the API whole.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from

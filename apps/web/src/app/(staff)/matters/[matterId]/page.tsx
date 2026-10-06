@@ -5,14 +5,23 @@ import { ConflictResults } from '@/components/conflict-results';
 import { MatterDetails } from '@/components/matter-details';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, currentAccount } from '@/lib/api';
+import type { DocumentSummary } from '@/lib/documents';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type ComplianceAccess, type ConflictCheck, type Matter } from '@/lib/matters';
 import { ClearanceForm } from './clearance-form';
+import { DocumentsSection } from './documents-section';
 
 export const metadata: Metadata = { title: 'Matter' };
 
-export default async function MatterPage({ params }: { params: Promise<{ matterId: string }> }) {
+export default async function MatterPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ matterId: string }>;
+  searchParams: Promise<{ documentsBefore?: string | string[] }>;
+}) {
   const { matterId } = await params;
+  const { documentsBefore } = await searchParams;
   const account = await currentAccount();
   if (!account) {
     redirect('/sign-in');
@@ -40,6 +49,9 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
     ? await apiGet<{ accesses: ComplianceAccess[] }>(`/matters/${encodeURIComponent(matter.id)}/compliance-accesses`)
     : undefined;
   const closed = matter.status === 'closed';
+  const documents = await apiGet<{ documents: DocumentSummary[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/documents`, {
+    before: typeof documentsBefore === 'string' ? documentsBefore : undefined,
+  });
 
   return (
     <>
@@ -72,6 +84,13 @@ export default async function MatterPage({ params }: { params: Promise<{ matterI
       )}
 
       <MatterDetails matter={matter} />
+
+      <DocumentsSection
+        matterId={matter.id}
+        documents={documents.body?.documents}
+        next={documents.body?.next ?? null}
+        canAdd={matter.status === 'open'}
+      />
 
       <h2>Conflict check</h2>
       {check.body ? (
