@@ -1,7 +1,7 @@
 # Notifications
 
-**Current state (2026-10-07):** First-version design approved by the project
-owner. Step 13a is built and tested; step 13b is next.
+**Current state (2026-10-08):** First-version design approved by the project
+owner. Steps 13a and 13b are built and tested; step 13c is next.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -104,9 +104,10 @@ hours, the row is marked failed and administrators receive one separate
 generic notice through the inbox. No failed payload is logged.
 
 Step 13a uses delays of 1 minute, 5 minutes, 30 minutes, 2 hours and then at
-most 6 hours between attempts. The administrator inbox notice starts with
-step 13b, when the inbox exists; until then `email.failed` is the durable audit
-record.
+most 6 hours between attempts. `email.failed` remains the durable record of a
+final delivery failure. A generic administrator inbox alert needs a separate
+later design: step 13b deliberately stores only task-linked kinds and cannot
+truthfully attach an email failure to a task.
 
 ## Reminder scheduler
 
@@ -127,6 +128,12 @@ record.
 |---|---|---|---|
 | GET | `/notifications` | Signed-in staff; current task visibility rechecked | 50 newest visible notifications and `next`; unread count included |
 | POST | `/notifications/:id/read` | The named recipient and still able to see the task | 204; repeating is harmless |
+
+Each list item contains the notification id, kind, creation and optional read
+times, plus the task's current id, title, status and due date. `next` is the
+last notification id when a full page is returned. Text is read from the
+current task only after access has been checked; it is not stored in the
+notification record.
 
 The staff header shows an unread count and links to `/notifications`. The page
 lists safe current task text only after the API has rechecked access. Each item
@@ -160,8 +167,10 @@ breaks of every safeguard and updated documentation before the next.
   migration of every existing background email caller; closes review item F5.
   No task notifications yet. Migrations `0035` and `0036`; implementation in
   `apps/api/src/mail/`.
-- **13b.** Insert-only staff notification records; task assignment and status
-  events; list/read API with current matter access rechecked.
+- **13b. Done.** Insert-only staff notification and read records; database-
+  created task assignment and status events; transactional audit; list/read
+  API with recipient and current matter access rechecked. Migration `0037`;
+  implementation in `apps/api/src/notifications/` and the Tasks service.
 - **13c.** Due-date scheduler, deduplicated reminders and generic task email.
 - **13d.** Staff notification header and inbox screens.
 - Security review of Notifications.
@@ -188,3 +197,21 @@ retry period and at-least-once delivery.
   values, mutable queue rows, bypassed lease transitions, mutable transition
   history, non-idempotent duplicate handling, overlapping drain loops and a
   shutdown stuck waiting for another worker's lease.
+
+## Step 13b verification
+
+- Positive tests cover assignment, reassignment, completion, cancellation and
+  reopening notices; suppression of self-made and no-op status changes;
+  current task text; newest-first 50-row paging; unread counts; one-way,
+  repeat-safe reading; and creation/read audit records containing ids only.
+- Negative tests cover client and missing sessions, a different staff
+  recipient, lost matter access, disabled accounts, invalid input, invalid
+  kinds and recipients, caller-supplied trusted values, duplicate keys,
+  direct writes, owner edits, deletion and truncation, and transaction
+  rollback when audit fails.
+- Fifteen deliberate break cases were run and restored. They proved the tests
+  catch missing task-insert and task-change notification triggers, missing
+  database preparation, mutable notification and read records, bypassed read
+  validation, excess application-role insert rights, missing truncation
+  guards, missing deduplication, missing live-access and recipient filters,
+  a missing staff route boundary, and missing creation or read audit.

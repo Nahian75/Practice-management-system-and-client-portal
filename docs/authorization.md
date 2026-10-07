@@ -179,6 +179,11 @@ Decided by the project owner: **only people assigned to a matter can open it.**
   changes additionally require the current assignee or active supervising
   partner. PostgreSQL applies the same rules while holding the matter and task
   locks.
+- Staff notification routes need a signed-in staff account rather than a role
+  permission. Each row is restricted to its named recipient and joined through
+  the task's current active matter team; losing membership hides it at once.
+  Marking it read repeats those checks in PostgreSQL and records the first read
+  only.
 - Compliance can open a matter they are not on only by recording a reason,
   which is audited and visible to the matter's supervising partner.
 - Clients see only their own matters, and only what is marked as shared with

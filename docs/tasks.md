@@ -1,12 +1,13 @@
 # Tasks
 
-**Current state (2026-10-07):** Steps 12a to 12c are built and
+**Current state (2026-10-08):** Steps 12a to 12c are built and
 security-reviewed: the database foundation and insert-only history
 (migrations `0029` to `0034`), all three task permissions, the complete staff
 API (`apps/api/src/tasks/`), and the matter and task screens. Review T1 makes
 supervisor-only status powers end with the partner role
 ([report](reviews/2026-10-07-tasks.md)). Tasks are not shown in the client
-portal.
+portal. Notifications step 13b now records task assignment and qualifying
+status events for the staff inbox.
 
 Work that the legal team must do on a matter. A task is part of the matter's
 record, not a personal reminder outside it.
@@ -87,6 +88,13 @@ still hold an active partner role before changing somebody else's task status.
 They lock that role row with the matter, task, membership and account, so a
 role removal and a status change are ordered rather than racing.
 
+Notifications migration `0037` creates an assignment notice with each new
+task. A real reassignment creates an unassigned notice for the old assignee and
+an assigned notice for the new assignee. Completion, cancellation and
+reopening notify the current assignee only when somebody else made the change.
+These records are created by database triggers in the same transaction as the
+task or history row; no-op changes create nothing.
+
 ## Who can do what
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
@@ -147,6 +155,10 @@ assignment uses `task.reassigned` with the before and after account ids; status
 uses `task.completed`, `task.cancelled` or `task.reopened` with the before and
 after states. Audit metadata does not copy task titles, descriptions, names or
 due dates. A failed audit write rolls the whole change back.
+
+The same transaction records `notification.created` for each task notice,
+using only notification, recipient, kind and task ids. If that audit write
+fails, the task creation or change and its notification all roll back.
 
 ## Not in this module
 

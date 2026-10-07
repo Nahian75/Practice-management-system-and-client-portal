@@ -4,6 +4,12 @@ import { AuditService } from '../audit/audit.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { Kysely } from 'kysely';
 import type { Database, TaskPriority, TaskStatus } from '../database/schema.js';
+import {
+  taskAssignmentNotificationKey,
+  taskCreatedNotificationKey,
+  taskStatusNotificationKey,
+} from '../notifications/notification.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import type { Task, TaskDetails } from './task.js';
 import { TasksRepository } from './tasks.repository.js';
 
@@ -28,6 +34,7 @@ export class TasksService {
   constructor(
     private readonly tasks: TasksRepository,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async create(
@@ -69,6 +76,11 @@ export class TasksService {
             metadata: { matterId, assigneeId: details.assigneeId, priority: details.priority, hasDueDate: details.dueOn != null },
             ...by.context,
           },
+          trx,
+        );
+        await this.notifications.auditCreated(
+          [taskCreatedNotificationKey(taskId, details.assigneeId)],
+          by,
           trx,
         );
         return this.tasks.findVisible(taskId, by.accountId, trx);
@@ -141,6 +153,14 @@ export class TasksService {
         by,
         trx,
       );
+      await this.notifications.auditCreated(
+        [
+          taskAssignmentNotificationKey(taskId, change.id, 'unassigned', change.from_assigned_to!),
+          taskAssignmentNotificationKey(taskId, change.id, 'assigned', change.to_assigned_to!),
+        ],
+        by,
+        trx,
+      );
       return 'changed';
     });
   }
@@ -166,6 +186,13 @@ export class TasksService {
         by,
         trx,
       );
+      if (current.assignee.accountId !== by.accountId) {
+        await this.notifications.auditCreated(
+          [taskStatusNotificationKey(taskId, change.id, status, current.assignee.accountId)],
+          by,
+          trx,
+        );
+      }
       return 'changed';
     });
   }

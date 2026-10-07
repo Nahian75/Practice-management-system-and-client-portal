@@ -438,6 +438,33 @@ export interface TaskChangesTable {
   changed_at: DatabaseSet<Date>;
 }
 
+export type NotificationKind =
+  | 'task_assigned'
+  | 'task_unassigned'
+  | 'task_completed'
+  | 'task_cancelled'
+  | 'task_reopened'
+  | 'task_due_soon'
+  | 'task_due_today'
+  | 'task_overdue';
+
+export interface NotificationsTable {
+  id: DatabaseSet<string>;
+  recipient_id: InsertOnly<string>;
+  kind: InsertOnly<NotificationKind>;
+  task_id: InsertOnly<string>;
+  deduplication_key: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+  /** Set once by inserting the immutable notification_reads record. */
+  read_at: DatabaseSet<Date | null>;
+}
+
+export interface NotificationReadsTable {
+  notification_id: InsertOnly<string>;
+  recipient_id: InsertOnly<string>;
+  read_at: DatabaseSet<Date>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -474,6 +501,8 @@ export interface Database {
   matter_supervision_takeovers: MatterSupervisionTakeoversTable;
   matter_team: MatterTeamTable;
   matters: MattersTable;
+  notification_reads: NotificationReadsTable;
+  notifications: NotificationsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

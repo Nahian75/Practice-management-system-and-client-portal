@@ -1,9 +1,9 @@
 # Testing
 
-**Current state (2026-10-07):** Unit, HTTP and database integration tests for
+**Current state (2026-10-08):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks module and Notifications step
-13a, and Playwright end-to-end tests for the staff app, Tasks step 12c and the
-client portal.
+13a and 13b, and Playwright end-to-end tests for the staff app, Tasks step 12c
+and the client portal.
 
 ## Tools
 
@@ -157,6 +157,12 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   regressions cover the same role loss; a controlled race proves role removal
   is ordered before or after the status change. They run axe on the matter and
   task screens.
+- Notification database tests cover trusted ids and times, allowed kinds and
+  recipients, database-created assignment and status events, deduplication,
+  application-role privileges, insert-only rows, truncation guards, live
+  access at first read and repeat-safe one-way read state. HTTP tests cover
+  current task text, recipient and matter visibility, staff/client boundaries,
+  paging, unread counts, strict input, private audit metadata and rollback.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

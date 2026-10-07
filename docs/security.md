@@ -1,9 +1,11 @@
 # Security
 
-**Current state (2026-10-07):** Core API, staff-web, client-portal and task
+**Current state (2026-10-08):** Core API, staff-web, client-portal and task
 controls are built and reviewed. The persistent encrypted email outbox is
-built as Notifications step 13a; the Notifications module review comes after
-steps 13b to 13d.
+built as Notifications step 13a. Step 13b adds insert-only staff task
+notifications, database-controlled one-way reads, live matter-access checks
+and staff-only list/read routes. The Notifications module review comes after
+steps 13c and 13d.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning

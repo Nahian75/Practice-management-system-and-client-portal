@@ -391,7 +391,11 @@ describe('Staff management', () => {
       await as(adminToken).put(`/staff/${staff.id}/roles/compliance`);
       await settle();
 
-      expect((await inbox(staff.email)).map((email) => email.subject)).toEqual(['You were given a new role']);
+      // Parallel tests may send other compliance notices after this grant.
+      const roleNotices = (await inbox(staff.email)).filter((email) =>
+        ['You were given a new role', 'The compliance role was granted'].includes(email.subject),
+      );
+      expect(roleNotices.map((email) => email.subject)).toEqual(['You were given a new role']);
     });
 
     it('sends nothing when nothing changed', async () => {
