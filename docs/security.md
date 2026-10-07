@@ -182,8 +182,9 @@ process before it accepts any request.
 | 2026-10-07 | Tasks module | [reviews/2026-10-07-tasks.md](reviews/2026-10-07-tasks.md) |
 
 Open items from reviews that must be closed before production: F2 (load
-balancer rate limiting), F3 (retention), F5 (persistent email outbox), C6 (encrypted storage and
-backups).
+balancer rate limiting), F3 (retention), F5 (persistent email outbox, now
+planned as [Notifications step 13a](notifications.md)), C6 (encrypted storage
+and backups).
 
 Local demo conveniences that must not reach production (to fix before
 deploying): `code.bat` and `scripts/demo-code.mjs`, which show the current

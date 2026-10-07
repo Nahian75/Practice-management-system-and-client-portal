@@ -27,7 +27,7 @@ record, not a personal reminder outside it.
 | Deleting | Never. Cancellation is the final-looking action, but it remains in the record and can be reopened | Rule: records are kept |
 | Matter state | No task work while a matter awaits conflict clearance or is closed. A matter cannot close with an open task | Project owner; closes Matters review M7 |
 | Client portal | Not shown. Tasks and their descriptions are internal | Project owner |
-| Reminders | Not in the first version. Automatic reminders belong to Notifications later | Project owner |
+| Reminders | Not in the first task version. Automatic reminders belong to Notifications; its first design is approved | Project owner; [Notifications design](notifications.md) |
 
 ## What a task holds
 
@@ -151,7 +151,8 @@ due dates. A failed audit write rolls the whole change back.
 ## Not in this module
 
 - Client portal tasks.
-- Automatic reminders and email: Notifications later.
+- Automatic reminders and email: designed for Notifications
+  ([notifications.md](notifications.md)).
 - Time recording and billing: Finance later.
 - General tasks which have no matter.
 

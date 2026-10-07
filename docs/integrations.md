@@ -1,6 +1,8 @@
 # Integrations
 
-**Current state (2026-10-04):** Two integrations built.
+**Current state (2026-10-07):** Two integrations built. A persistent,
+encrypted email outbox is approved as Notifications step 13a; it is not built
+yet.
 
 | Service | Purpose | Data sent | Status |
 |---|---|---|---|
@@ -34,3 +36,7 @@ Bcc:`.
   emails sent at the same moment were lost.
 - Locally, Mailpit catches everything at http://127.0.0.1:8025. No email leaves the machine.
 - Open: which provider, and its data-processing agreement and data location.
+- The current background queue is in memory. Its approved persistent
+  replacement, retry rules and privacy controls are in
+  [notifications.md](notifications.md); review item F5 remains open until it
+  is built.

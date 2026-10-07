@@ -48,7 +48,7 @@ authorization decisions.
 | Documents | Built (10a to 10d, and portal 11b): API and staff screens, including sharing with the client ([documents.md](documents.md)) |
 | Client portal | Steps 11a to 11d built and security-reviewed: portal access for clients' people, document sharing, staff controls, the read-only client API and separate client screens ([portal.md](portal.md), [review](reviews/2026-10-07-portal.md)) |
 | Tasks | Steps 12a to 12c built and security-reviewed: database safeguards and insert-only history, permissions, audit, create/read/change staff API and staff screens (`apps/api/src/tasks/`, `apps/web/src/app/(staff)/tasks/`, [tasks.md](tasks.md), [review](reviews/2026-10-07-tasks.md)) |
-| Notifications | Not started |
+| Notifications | Design approved; step 13a persistent email outbox is next ([notifications.md](notifications.md)) |
 | Finance | Not started |
 | Compliance / AML | Not started |
 | HR | Not started |
