@@ -1,8 +1,8 @@
 # Testing
 
 **Current state (2026-10-07):** Unit, HTTP and database integration tests for
-the API, including Tasks steps 12a and 12b, and Playwright end-to-end tests for
-the staff app, Tasks step 12c and the client portal.
+the API, including the security-reviewed Tasks module, and Playwright
+end-to-end tests for the staff app, Tasks step 12c and the client portal.
 
 ## Tools
 
@@ -134,8 +134,11 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
 - Task browser tests cover creating and listing, invalid input, details and
   before-and-after history, editing, reassignment, every status action,
   non-assignee controls, indistinguishable outsider access, open-task closure
-  refusal and closed-matter read-only behaviour. They run axe on the matter
-  and task screens.
+  refusal, closed-matter read-only behaviour, and the immediate loss of
+  supervisor status controls after the partner role ends. Database and HTTP
+  regressions cover the same role loss; a controlled race proves role removal
+  is ordered before or after the status change. They run axe on the matter and
+  task screens.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

@@ -43,7 +43,7 @@ const taskChangeSchema = z.discriminatedUnion('kind', [
   z.object({ ...changeCommonSchema, kind: z.literal('assignment'), from: personSchema, to: personSchema }),
   z.object({ ...changeCommonSchema, kind: z.literal('status'), from: z.enum(STATUSES), to: z.enum(STATUSES) }),
 ]);
-const detailsSchema = taskSchema.extend({ changes: z.array(taskChangeSchema) });
+const detailsSchema = taskSchema.extend({ canChangeStatus: z.boolean(), changes: z.array(taskChangeSchema) });
 const listQuerySchema = z.strictObject({ before: z.uuid().optional() });
 const listSchema = z.object({ tasks: z.array(taskSchema), next: z.uuid().nullable() });
 const editSchema = z

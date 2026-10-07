@@ -103,6 +103,10 @@ export class TasksRepository {
     if (!task) {
       return undefined;
     }
+    const matter = await this.db.selectFrom('matters').select('status').where('id', '=', task.matterId).executeTakeFirstOrThrow();
+    const canChangeStatus =
+      matter.status === 'open' &&
+      (task.assignee.accountId === viewerId || (await this.activeSupervisorForMatter(task.matterId, viewerId, this.db)));
     const rows = await this.db
       .selectFrom('task_changes')
       .innerJoin('tasks', 'tasks.id', 'task_changes.task_id')
@@ -120,7 +124,7 @@ export class TasksRepository {
       .where(visibleTo(viewerId))
       .orderBy('task_changes.id')
       .execute();
-    return { ...task, changes: rows.map(toTaskChange) };
+    return { ...task, canChangeStatus, changes: rows.map(toTaskChange) };
   }
 
   /** Current state needed for a change, only if the viewer is on the task's matter team. */
@@ -132,6 +136,12 @@ export class TasksRepository {
           .exists(
             eb
               .selectFrom('matter_team')
+              .innerJoin('account_roles as supervisor_role', (join) =>
+                join
+                  .onRef('supervisor_role.account_id', '=', 'matter_team.account_id')
+                  .on('supervisor_role.role', '=', 'partner')
+                  .on('supervisor_role.revoked_at', 'is', null),
+              )
               .select('matter_team.id')
               .whereRef('matter_team.matter_id', '=', 'tasks.matter_id')
               .where('matter_team.account_id', '=', viewerId)
@@ -144,6 +154,24 @@ export class TasksRepository {
       .where(visibleTo(viewerId))
       .executeTakeFirst();
     return row ? { ...toTask(row), matterStatus: row.matter_status, viewerSupervises: Boolean(row.viewer_supervises) } : undefined;
+  }
+
+  private async activeSupervisorForMatter(matterId: string, viewerId: string, executor: Kysely<Database>): Promise<boolean> {
+    const row = await executor
+      .selectFrom('matter_team')
+      .innerJoin('account_roles as supervisor_role', (join) =>
+        join
+          .onRef('supervisor_role.account_id', '=', 'matter_team.account_id')
+          .on('supervisor_role.role', '=', 'partner')
+          .on('supervisor_role.revoked_at', 'is', null),
+      )
+      .select('matter_team.id')
+      .where('matter_team.matter_id', '=', matterId)
+      .where('matter_team.account_id', '=', viewerId)
+      .where('matter_team.role', '=', 'supervising_partner')
+      .where('matter_team.removed_at', 'is', null)
+      .executeTakeFirst();
+    return row !== undefined;
   }
 
   insertDetailsChange(

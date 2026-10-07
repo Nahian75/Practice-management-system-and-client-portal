@@ -151,6 +151,10 @@ takes over supervision, giving a reason**. Built in 8e (migration `0020`):
 - The reason stays with the takeover; `matter.supervision_taken_over` points to
   it, and compliance holders are emailed by matter reference only.
 - The previous supervising partner is not kept on the team: they cannot act.
+- Before a takeover is recorded, losing the partner role already removes
+  supervisor-only task status powers. If another role still lets the person
+  see the matter, they retain only the task powers held by any team member
+  (Tasks review T1).
 
 ## Editing and closing
 

@@ -31,9 +31,6 @@ export default async function TaskPage({ params }: { params: Promise<{ taskId: s
   if (!matter) {
     return <HiddenTask />;
   }
-  const isSupervisor = matter.team.some((member) => member.accountId === account.id && member.role === 'supervising_partner');
-  const canChangeStatus = matter.status === 'open' && (task.assignee.accountId === account.id || isSupervisor);
-
   return (
     <>
       <p>
@@ -91,7 +88,7 @@ export default async function TaskPage({ params }: { params: Promise<{ taskId: s
       {matter.status === 'open' && (
         <>
           <hr className="rule" />
-          <TaskActions task={task} team={matter.team} canChangeStatus={canChangeStatus} />
+          <TaskActions task={task} team={matter.team} canChangeStatus={task.canChangeStatus} />
         </>
       )}
     </>

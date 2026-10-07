@@ -51,5 +51,6 @@ export type TaskChange =
     };
 
 export interface TaskDetails extends Task {
+  canChangeStatus: boolean;
   changes: TaskChange[];
 }

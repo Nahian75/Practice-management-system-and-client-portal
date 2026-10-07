@@ -1,9 +1,12 @@
 # Tasks
 
-**Current state (2026-10-07):** Steps 12a to 12c are built: the database
-foundation and insert-only history (migrations `0029` to `0032`), all three
-task permissions, the complete staff API (`apps/api/src/tasks/`), and the
-matter and task screens. Tasks are not shown in the client portal.
+**Current state (2026-10-07):** Steps 12a to 12c are built and
+security-reviewed: the database foundation and insert-only history
+(migrations `0029` to `0034`), all three task permissions, the complete staff
+API (`apps/api/src/tasks/`), and the matter and task screens. Review T1 makes
+supervisor-only status powers end with the partner role
+([report](reviews/2026-10-07-tasks.md)). Tasks are not shown in the client
+portal.
 
 Work that the legal team must do on a matter. A task is part of the matter's
 record, not a personal reminder outside it.
@@ -19,7 +22,7 @@ record, not a personal reminder outside it.
 | What it holds | A title, optional description, optional due date, priority, assignee, status, creator and creation time | Project owner |
 | Priority | Low, normal, high or urgent; normal by default | Project owner |
 | Status | Open, completed or cancelled. A new task is open | Project owner |
-| Who finishes or cancels | The current assignee, or the matter's supervising partner | Project owner |
+| Who finishes or cancels | The current assignee, or the matter's active supervising partner while they still hold the partner role | Project owner; current role rechecked by review T1 |
 | Reopening | Allowed while the matter is open; the change and who made it are kept | Project owner |
 | Deleting | Never. Cancellation is the final-looking action, but it remains in the record and can be reopened | Rule: records are kept |
 | Matter state | No task work while a matter awaits conflict clearance or is closed. A matter cannot close with an open task | Project owner; closes Matters review M7 |
@@ -79,6 +82,11 @@ owner. The app cannot supply ids, times or before values. Matter closure takes
 the same matter lock and is refused while any task remains open, so a closure
 and a task status change cannot pass one another unseen.
 
+Review migrations `0033` and `0034` require a recorded supervising partner to
+still hold an active partner role before changing somebody else's task status.
+They lock that role row with the matter, task, membership and account, so a
+role removal and a status change are ordered rather than racing.
+
 ## Who can do what
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
@@ -97,12 +105,12 @@ something that does not exist.
 |---|---|---|---|
 | POST | `/matters/:id/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. 400 invalid or unknown fields; 404 not on the team; 409 matter not open or the team changed meanwhile |
 | GET | `/matters/:id/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` for the next page. Includes completed and cancelled tasks once those states exist. 404 if not on the team |
-| GET | `/tasks/:id` | `tasks.view` + team | The task, assignee and creator display names, and oldest-first change history. 404 if not on the team |
+| GET | `/tasks/:id` | `tasks.view` + team | The task, assignee and creator display names, oldest-first change history, and `canChangeStatus` for the current person. 404 if not on the team |
 | PATCH | `/tasks/:id` | `tasks.manage` + team, open matter | One or more of `{title, description, dueOn, priority}`. 200 with the current task; 400 for empty or unknown fields |
 | PUT | `/tasks/:id/assignee` | `tasks.manage` + team, open matter | `{assigneeId}`. The new assignee must be active on the same team. 200 with the current task |
-| POST | `/tasks/:id/complete` | `tasks.manage` + assignee or supervising partner, open matter | 204. Repeating completion is a no-op |
-| POST | `/tasks/:id/cancel` | `tasks.manage` + assignee or supervising partner, open matter | 204. A completed task must be reopened first |
-| POST | `/tasks/:id/reopen` | `tasks.manage` + assignee or supervising partner, open matter | 204. Repeating an open state is a no-op |
+| POST | `/tasks/:id/complete` | `tasks.manage` + assignee or active supervising partner, open matter | 204. Repeating completion is a no-op |
+| POST | `/tasks/:id/cancel` | `tasks.manage` + assignee or active supervising partner, open matter | 204. A completed task must be reopened first |
+| POST | `/tasks/:id/reopen` | `tasks.manage` + assignee or active supervising partner, open matter | 204. Repeating an open state is a no-op |
 
 Every change route answers 404 outside the active matter team and 409 when the
 matter, team, account or task state changed meanwhile. Status changes answer
@@ -120,8 +128,9 @@ supervising partner.
   before-and-after history. An unknown task and one outside the person's team
   give the same plain answer.
 - While the matter is open, any team member can edit details or reassign the
-  task. Status buttons appear only to the current assignee or supervising
-  partner. A closed matter leaves the task and history read-only.
+  task. Status buttons use the API's current decision and appear only to the
+  current assignee or a supervising partner who still holds the partner role.
+  A closed matter leaves the task and history read-only.
 - The screens use the API for every decision. Hidden forms and buttons make
   the page clearer; they are not security controls.
 
@@ -159,4 +168,5 @@ safeguard, and documentation before the next.
   while an open task remains. Done.
 - **12c.** Staff screens on the matter and task pages: list, create, edit,
   reassign and status actions. Done.
-- Security review of the module.
+- Security review of the module. Done
+  ([report](reviews/2026-10-07-tasks.md)); T1 fixed.

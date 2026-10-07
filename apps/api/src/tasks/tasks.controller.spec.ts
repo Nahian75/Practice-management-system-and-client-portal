@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
+import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
@@ -399,6 +399,18 @@ describe('Tasks', () => {
       const created = await createTask();
 
       expect((await as(await signedIn(colleague)).post(`/tasks/${created.body.id}/complete`, {})).status).toBe(403);
+    });
+
+    it('removes supervisor status powers when the recorded supervisor loses the partner role', async () => {
+      await grantTestRole(db, partner.id, 'fee_earner');
+      const partnerToken = await signedIn(partner);
+      const created = await createTask();
+      await revokeTestRole(db, partner.id, 'partner');
+
+      const details = await as(partnerToken).get(`/tasks/${created.body.id}`);
+      expect(details.status).toBe(200);
+      expect(details.body.canChangeStatus).toBe(false);
+      expect((await as(partnerToken).post(`/tasks/${created.body.id}/complete`, {})).status).toBe(403);
     });
 
     it('hides every change route outside the matter team', async () => {

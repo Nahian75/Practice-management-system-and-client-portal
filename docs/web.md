@@ -3,7 +3,8 @@
 **Current state (2026-10-07):** The staff app screens through Tasks step 12c
 and portal administration are built. Portal step 11d adds the read-only client
 screens, using the same secure pass-through and a separate client layout. The
-staff and client sides are security-reviewed through the portal work.
+staff and client sides are security-reviewed through the portal work; the task
+screens were checked again with the Tasks module review.
 
 The staff app and client portal, in the same browser app with separate layouts.
 
@@ -217,9 +218,10 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   Detail changes show both full snapshots; assignment and status changes show
   their before and after values, with who changed them and when.
 - On an open matter, every team member sees detail and reassignment forms.
-  Complete and cancel or reopen buttons appear only to the current assignee or
-  supervising partner. Closed tasks stay readable but every change control is
-  absent.
+  Complete and cancel or reopen buttons use the API's current capability and
+  appear only to the current assignee or an active supervising partner who
+  still holds the partner role. Closed tasks stay readable but every change
+  control is absent.
 - An unknown task and one outside the person's matter team have the same
   screen. The API remains the security boundary and rechecks every operation;
   the screen's hidden controls are only for clarity.

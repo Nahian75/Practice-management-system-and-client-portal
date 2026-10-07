@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestAccount, grantTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
+import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl, testOwnerDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
 import type { Database, StaffRole } from '../database/schema.js';
@@ -323,6 +323,47 @@ describe('tasks table', () => {
       const task = await addTask();
 
       await expect(addChange(task.id, 'status', colleague.id, { status: 'completed' })).rejects.toThrow(/assignee or supervising partner/);
+    });
+
+    it('refuses status changes by a recorded supervisor who no longer holds the partner role', async () => {
+      const task = await addTask();
+      await revokeTestRole(db, partner.id, 'partner');
+
+      await expect(addChange(task.id, 'status', partner.id, { status: 'completed' })).rejects.toThrow(/active partner role/);
+    });
+
+    it('waits for a simultaneous partner-role removal, then refuses the supervisor status change', async () => {
+      const task = await addTask();
+      let removalStarted!: () => void;
+      let finishRemoval!: () => void;
+      const started = new Promise<void>((resolve) => (removalStarted = resolve));
+      const finish = new Promise<void>((resolve) => (finishRemoval = resolve));
+      const removing = ownerDb.transaction().execute(async (trx) => {
+        await trx
+          .updateTable('account_roles')
+          .set({ revoked_at: new Date() })
+          .where('account_id', '=', partner.id)
+          .where('role', '=', 'partner')
+          .where('revoked_at', 'is', null)
+          .execute();
+        removalStarted();
+        await finish;
+      });
+      await started;
+
+      const changing = addChange(task.id, 'status', partner.id, { status: 'completed' });
+      const early = await Promise.race([
+        changing.then(
+          () => 'finished',
+          () => 'finished',
+        ),
+        new Promise<'waiting'>((resolve) => setTimeout(() => resolve('waiting'), 50)),
+      ]);
+      expect(early).toBe('waiting');
+
+      finishRemoval();
+      await removing;
+      await expect(changing).rejects.toThrow(/active partner role/);
     });
 
     it('refuses every kind of change from outside the active team', async () => {

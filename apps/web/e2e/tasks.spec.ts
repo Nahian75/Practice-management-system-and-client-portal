@@ -130,6 +130,23 @@ test('hides status actions from another team member and hides an outsider task',
   await expect(page.getByText('Private task')).toHaveCount(0);
 });
 
+test('removes supervisor status actions when the supervisor loses the partner role', async ({ page, request }) => {
+  const administrator = await apiSessionFor(request, ['administrator']);
+  const assignee = await apiSessionFor(request);
+  await signedInStaff(page, request, ['partner', 'fee_earner']);
+  const formerPartnerId = await accountIdOf(page);
+  const matter = await openMatter(page.request, formerPartnerId, [assignee.accountId]);
+  const task = await createTask(page.request, matter.id, assignee.accountId);
+
+  expect((await administrator.api.delete(`/api/staff/${formerPartnerId}/roles/partner`)).status()).toBe(204);
+  await page.goto(`/tasks/${task.id}`);
+
+  await expect(page.getByRole('form', { name: 'Change task details' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Complete task' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Cancel task' })).toHaveCount(0);
+  await noAxeViolations(page);
+});
+
 test('explains open-task closure refusal and makes closed tasks read-only', async ({ page, request }) => {
   await signedInStaff(page, request, ['partner']);
   const accountId = await accountIdOf(page);

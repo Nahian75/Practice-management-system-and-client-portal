@@ -34,6 +34,7 @@ export type TaskChange =
   | (TaskChangeBase & { kind: 'status'; from: TaskStatus; to: TaskStatus });
 
 export interface TaskDetails extends Task {
+  canChangeStatus: boolean;
   changes: TaskChange[];
 }
 
