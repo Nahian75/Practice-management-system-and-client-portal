@@ -1,10 +1,9 @@
 # Tasks
 
-**Current state (2026-10-07):** Steps 12a and 12b are built: the database
+**Current state (2026-10-07):** Steps 12a to 12c are built: the database
 foundation and insert-only history (migrations `0029` to `0032`), all three
-task permissions, and the staff API for creating, reading, editing,
-reassigning and changing task status (`apps/api/src/tasks/`). Staff screens
-follow in 12c. Tasks are not shown in the client portal.
+task permissions, the complete staff API (`apps/api/src/tasks/`), and the
+matter and task screens. Tasks are not shown in the client portal.
 
 Work that the legal team must do on a matter. A task is part of the matter's
 record, not a personal reminder outside it.
@@ -110,6 +109,22 @@ matter, team, account or task state changed meanwhile. Status changes answer
 403 when the caller is on the team but is neither the assignee nor the active
 supervising partner.
 
+## Staff screens
+
+- The matter page lists every task newest first, including completed and
+  cancelled work. Each row shows status, priority, due date and assignee.
+- While the matter is open, the same page has a form to create a task and
+  assign it to anyone currently on the team. Closed matters keep the list but
+  have no creation form.
+- `/tasks/:id` shows the current details and the permanent, oldest-first
+  before-and-after history. An unknown task and one outside the person's team
+  give the same plain answer.
+- While the matter is open, any team member can edit details or reassign the
+  task. Status buttons appear only to the current assignee or supervising
+  partner. A closed matter leaves the task and history read-only.
+- The screens use the API for every decision. Hidden forms and buttons make
+  the page clearer; they are not security controls.
+
 ## Audit
 
 Step 12a records `task.created`, in the same transaction as the task. It uses
@@ -143,5 +158,5 @@ safeguard, and documentation before the next.
   actor rules; completion, cancellation and reopening; refuse matter closure
   while an open task remains. Done.
 - **12c.** Staff screens on the matter and task pages: list, create, edit,
-  reassign and status actions.
+  reassign and status actions. Done.
 - Security review of the module.

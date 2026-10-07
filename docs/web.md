@@ -1,9 +1,9 @@
 # Web app
 
-**Current state (2026-10-07):** The staff app screens through Documents and
-portal administration are built. Portal step 11d adds the read-only client
-screens, using the same secure pass-through and a separate client layout.
-Both sides are security-reviewed.
+**Current state (2026-10-07):** The staff app screens through Tasks step 12c
+and portal administration are built. Portal step 11d adds the read-only client
+screens, using the same secure pass-through and a separate client layout. The
+staff and client sides are security-reviewed through the portal work.
 
 The staff app and client portal, in the same browser app with separate layouts.
 
@@ -207,6 +207,23 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   flow, check both layout boundaries, verify the exact downloaded bytes, and
   run axe on the matter list and detail screens.
 
+## Built in 12c
+
+- The matter page has a Tasks section: newest first, with status, priority,
+  due date and assignee. Completed and cancelled tasks remain visible. Open
+  matters also show a form for title, optional description and due date,
+  priority and an assignee from the current team.
+- `/tasks/:id` shows the current details and complete oldest-first history.
+  Detail changes show both full snapshots; assignment and status changes show
+  their before and after values, with who changed them and when.
+- On an open matter, every team member sees detail and reassignment forms.
+  Complete and cancel or reopen buttons appear only to the current assignee or
+  supervising partner. Closed tasks stay readable but every change control is
+  absent.
+- An unknown task and one outside the person's matter team have the same
+  screen. The API remains the security boundary and rechecks every operation;
+  the screen's hidden controls are only for clarity.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
@@ -249,6 +266,9 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **9c** | Clients: list, search, create (individual or organisation), view with contacts and matters, edit, contacts, takeover |
 | **9d** | Matters, in three parts. 9d-1: the colleagues list in the API. 9d-2: conflict check and opening, list, view (team, parties, conflict check, clearance). 9d-3: editing, team changes, closing, supervision takeover, compliance access |
 | **9e** | Staff (administrators): list, invite, roles, disable and re-enable |
+| **10d** | Documents on the matter and document detail pages: upload, version, download, withdraw and client sharing |
+| **11a/11d** | Portal access administration and the separate read-only client portal |
+| **12c** | Tasks on the matter and task detail pages: create, list, edit, reassign, complete, cancel, reopen and history |
 | | Security review of the web app |
 
 ## Testing

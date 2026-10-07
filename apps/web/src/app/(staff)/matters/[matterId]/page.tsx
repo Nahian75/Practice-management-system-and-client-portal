@@ -8,8 +8,10 @@ import { apiGet, currentAccount } from '@/lib/api';
 import type { DocumentSummary } from '@/lib/documents';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type ComplianceAccess, type ConflictCheck, type Matter } from '@/lib/matters';
+import type { Task } from '@/lib/tasks';
 import { ClearanceForm } from './clearance-form';
 import { DocumentsSection } from './documents-section';
+import { TasksSection } from './tasks-section';
 
 export const metadata: Metadata = { title: 'Matter' };
 
@@ -18,10 +20,10 @@ export default async function MatterPage({
   searchParams,
 }: {
   params: Promise<{ matterId: string }>;
-  searchParams: Promise<{ documentsBefore?: string | string[] }>;
+  searchParams: Promise<{ documentsBefore?: string | string[]; tasksBefore?: string | string[] }>;
 }) {
   const { matterId } = await params;
-  const { documentsBefore } = await searchParams;
+  const { documentsBefore, tasksBefore } = await searchParams;
   const account = await currentAccount();
   if (!account) {
     redirect('/sign-in');
@@ -49,9 +51,14 @@ export default async function MatterPage({
     ? await apiGet<{ accesses: ComplianceAccess[] }>(`/matters/${encodeURIComponent(matter.id)}/compliance-accesses`)
     : undefined;
   const closed = matter.status === 'closed';
-  const documents = await apiGet<{ documents: DocumentSummary[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/documents`, {
-    before: typeof documentsBefore === 'string' ? documentsBefore : undefined,
-  });
+  const [documents, tasks] = await Promise.all([
+    apiGet<{ documents: DocumentSummary[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/documents`, {
+      before: typeof documentsBefore === 'string' ? documentsBefore : undefined,
+    }),
+    apiGet<{ tasks: Task[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/tasks`, {
+      before: typeof tasksBefore === 'string' ? tasksBefore : undefined,
+    }),
+  ]);
 
   return (
     <>
@@ -84,6 +91,8 @@ export default async function MatterPage({
       )}
 
       <MatterDetails matter={matter} />
+
+      <TasksSection matter={matter} tasks={tasks.body?.tasks} next={tasks.body?.next ?? null} />
 
       <DocumentsSection
         matterId={matter.id}

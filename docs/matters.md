@@ -303,6 +303,9 @@ of the audit log, as for clients.
 - Matter closure is refused while any task remains open. PostgreSQL holds the
   matter row lock while it checks, so simultaneous completion or reopening is
   ordered before or after closure rather than missed.
+- The staff matter page lists its tasks and, while the matter is open, has the
+  task creation form. Closed matters keep their task list as part of the
+  permanent record.
 
 ## Not in this module
 

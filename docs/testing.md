@@ -1,8 +1,8 @@
 # Testing
 
 **Current state (2026-10-07):** Unit, HTTP and database integration tests for
-the API, including Tasks steps 12a and 12b, and Playwright end-to-end tests for the
-staff app and client portal.
+the API, including Tasks steps 12a and 12b, and Playwright end-to-end tests for
+the staff app, Tasks step 12c and the client portal.
 
 ## Tools
 
@@ -131,6 +131,11 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   completion and reopening. HTTP tests cover permissions, hidden records,
   strict input, history responses, audit privacy and rollback, no-op audit
   suppression, status actors, closure refusal and 100-row pagination.
+- Task browser tests cover creating and listing, invalid input, details and
+  before-and-after history, editing, reassignment, every status action,
+  non-assignee controls, indistinguishable outsider access, open-task closure
+  refusal and closed-matter read-only behaviour. They run axe on the matter
+  and task screens.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.
