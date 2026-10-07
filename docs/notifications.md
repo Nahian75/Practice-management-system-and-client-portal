@@ -1,7 +1,7 @@
 # Notifications
 
 **Current state (2026-10-07):** First-version design approved by the project
-owner. Step 13a is not started.
+owner. Step 13a is built and tested; step 13b is next.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -101,6 +101,11 @@ retry. Temporary SMTP/network failures retry; after the final limit of 24
 hours, the row is marked failed and administrators receive one separate
 generic notice through the inbox. No failed payload is logged.
 
+Step 13a uses delays of 1 minute, 5 minutes, 30 minutes, 2 hours and then at
+most 6 hours between attempts. The administrator inbox notice starts with
+step 13b, when the inbox exists; until then `email.failed` is the durable audit
+record.
+
 ## Reminder scheduler
 
 - Runs safely on every API instance; a PostgreSQL advisory lock lets only one
@@ -149,9 +154,10 @@ event where practical. Delivery outcomes are separate worker transactions.
 Each implementation step ships with positive and negative tests, deliberate
 breaks of every safeguard and updated documentation before the next.
 
-- **13a.** Persistent encrypted email outbox, worker, retries and migration of
-  every existing background email caller; closes review item F5. No task
-  notifications yet.
+- **13a. Done.** Persistent encrypted email outbox, worker, retries and
+  migration of every existing background email caller; closes review item F5.
+  No task notifications yet. Migrations `0035` and `0036`; implementation in
+  `apps/api/src/mail/`.
 - **13b.** Insert-only staff notification records; task assignment and status
   events; list/read API with current matter access rechecked.
 - **13c.** Due-date scheduler, deduplicated reminders and generic task email.
@@ -163,3 +169,19 @@ breaks of every safeguard and updated documentation before the next.
 The project owner approved this design on 7 October 2026, including the
 channels, four reminder points, no opt-out, generic email content, 24-hour
 retry period and at-least-once delivery.
+
+## Step 13a verification
+
+- Positive tests cover encrypted storage, restart delivery, deduplication,
+  leases, concurrent workers, retries, terminal payload clearing and all
+  existing invitation, reset and security-notice callers.
+- Negative tests cover malformed and corrupted payloads, expired links,
+  final expiry, wrong leases, unknown kinds, caller-supplied state, direct
+  edits, deletion and truncation, unsafe audit/log content and immutable
+  transition history.
+- Thirteen deliberate break cases were run and restored. They proved the
+  tests catch readable payload storage, missing authenticated account binding,
+  sending stale or expired mail, provider text in logs, addresses in audit,
+  lost retries, retrying corrupt ciphertext, caller-controlled database
+  values, mutable queue rows, bypassed lease transitions, mutable transition
+  history and non-idempotent duplicate handling.

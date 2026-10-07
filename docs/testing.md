@@ -1,8 +1,9 @@
 # Testing
 
 **Current state (2026-10-07):** Unit, HTTP and database integration tests for
-the API, including the security-reviewed Tasks module, and Playwright
-end-to-end tests for the staff app, Tasks step 12c and the client portal.
+the API, including the security-reviewed Tasks module and Notifications step
+13a, and Playwright end-to-end tests for the staff app, Tasks step 12c and the
+client portal.
 
 ## Tools
 
@@ -45,6 +46,14 @@ files: a test that needs data creates it.
 Tests that send email deliver to Mailpit and read it back through its API
 (`test/mailpit.ts`). Each test uses its own random address.
 
+The outbox tests also inspect PostgreSQL directly: no address, subject, body
+or one-time token is readable there; a new worker delivers a row left by an
+earlier instance; terminal outcomes clear ciphertext; duplicate keys produce
+one row; and audit metadata stays free of message content. The database-wide
+lease, state-machine and owner-immutability tests run as
+`mail-outbox.migration.exclusive.spec.ts`, after ordinary tests, so their
+deliberately held leases cannot delay another test's worker.
+
 ## Offline by default
 
 `createTestApp` replaces the breached-password service with one that answers
@@ -53,10 +62,12 @@ to simulate a breached password.
 
 ## Waiting for email
 
-Tests never wait a fixed time for email. `MailOutbox.drain()` resolves once every
-queued email has reached Mailpit, so "no email was sent" is a real result, not a
-timeout that happened to be too short. Integration tests have a 20-second limit
-(`vitest.config.ts`); Vitest's 5-second default is meant for unit tests.
+Tests never wait a fixed time for email. `MailOutbox.drain()` resolves once
+every email due now has reached a terminal outcome or a future retry time,
+including rows leased by another test worker. Thus "no email was sent" is a
+real result, not a timeout that happened to be too short. Integration tests
+have a 20-second limit (`vitest.config.ts`); Vitest's 5-second default is meant
+for unit tests.
 
 ## Network addresses in tests
 

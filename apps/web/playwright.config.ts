@@ -46,6 +46,7 @@ export default defineConfig({
         TOTP_ENCRYPTION_KEY: required('TOTP_ENCRYPTION_KEY'),
         APP_BASE_URL: E2E_WEB_URL,
         SMTP_URL: required('SMTP_URL'),
+        MAIL_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
         MAIL_FROM_ADDRESS: required('MAIL_FROM_ADDRESS'),
         MAIL_FROM_NAME: required('MAIL_FROM_NAME'),
         TRUSTED_PROXIES: 'loopback',

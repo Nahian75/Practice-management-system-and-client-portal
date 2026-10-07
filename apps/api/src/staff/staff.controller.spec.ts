@@ -426,12 +426,14 @@ describe('Staff management', () => {
       .execute();
     expect(events).toEqual(
       [
+        'email.queued',
         'account.invited',
         'staff.role_granted',
         'staff.role_revoked',
         'staff.change_refused',
         'staff.disabled',
         'staff.enabled',
+        'email.queued',
         'account.invited',
       ].map(
         (action) => ({ action, ip_address: '198.18.7.7', user_agent: 'staff-admin-test' }),

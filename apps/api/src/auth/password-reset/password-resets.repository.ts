@@ -16,15 +16,15 @@ export class PasswordResetsRepository {
   constructor(@Inject(DATABASE) private readonly db: Kysely<Database>) {}
 
   /** Closes any open reset for the account and stores the new one, in one transaction. */
-  async replaceOpen(reset: NewPasswordReset): Promise<void> {
-    await this.db.transaction().execute(async (trx) => {
+  async replaceOpen(reset: NewPasswordReset): Promise<string> {
+    return this.db.transaction().execute(async (trx) => {
       await trx
         .updateTable('password_resets')
         .set({ closed_at: reset.createdAt, close_reason: 'replaced' })
         .where('account_id', '=', reset.accountId)
         .where('closed_at', 'is', null)
         .execute();
-      await trx
+      const inserted = await trx
         .insertInto('password_resets')
         .values({
           account_id: reset.accountId,
@@ -33,7 +33,9 @@ export class PasswordResetsRepository {
           expires_at: reset.expiresAt,
           requested_ip: reset.requestedIp ?? null,
         })
-        .execute();
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      return inserted.id;
     });
   }
 

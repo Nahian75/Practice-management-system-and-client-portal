@@ -1,8 +1,7 @@
 # Integrations
 
-**Current state (2026-10-07):** Two integrations built. A persistent,
-encrypted email outbox is approved as Notifications step 13a; it is not built
-yet.
+**Current state (2026-10-07):** Two integrations built. Notifications step
+13a replaced the process-local email queue with a persistent encrypted outbox.
 
 | Service | Purpose | Data sent | Status |
 |---|---|---|---|
@@ -22,7 +21,9 @@ yet.
 
 ## Email (SMTP)
 
-- `apps/api/src/mail/mailer.ts`, configured by `SMTP_URL`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`.
+- `apps/api/src/mail/mailer.ts`, configured by `SMTP_URL`,
+  `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME`. The queue is encrypted under the
+  separate `MAIL_ENCRYPTION_KEY`.
 - Production: `smtps://` (implicit TLS) or `smtp://` with STARTTLS required.
   The server certificate is always verified; TLS 1.2 minimum.
 - Every message is checked before sending: exactly one valid recipient, a
@@ -36,7 +37,15 @@ Bcc:`.
   emails sent at the same moment were lost.
 - Locally, Mailpit catches everything at http://127.0.0.1:8025. No email leaves the machine.
 - Open: which provider, and its data-processing agreement and data location.
-- The current background queue is in memory. Its approved persistent
-  replacement, retry rules and privacy controls are in
-  [notifications.md](notifications.md); review item F5 remains open until it
-  is built.
+- `email_outbox` keeps mail through an API restart. The address, subject and
+  body are AES-256-GCM ciphertext; PostgreSQL holds no readable copy. Several
+  API instances claim due rows with short leases and `FOR UPDATE SKIP LOCKED`.
+- Temporary failures retry after 1 minute, 5 minutes, 30 minutes, 2 hours and
+  then at most every 6 hours. Delivery finally fails after 24 hours. Invalid
+  or permanently refused messages fail without retry. Successful, stale and
+  finally failed rows have their encrypted payload cleared.
+- Queue and outcome audit records contain the outbox id, kind and safe
+  account/resource ids only. Provider errors, addresses, subjects and bodies
+  are neither logged nor audited. Details are in
+  [notifications.md](notifications.md). Authentication review item F5 is
+  closed.

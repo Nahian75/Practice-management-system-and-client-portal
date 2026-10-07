@@ -76,6 +76,8 @@ const envSchema = z
     SMTP_URL: z.url({ protocol: /^smtps?$/ }),
     MAIL_FROM_ADDRESS: z.email(),
     MAIL_FROM_NAME: z.string().min(1).max(100).default('Practice Portal'),
+    /** Seals queued email addresses, subjects and bodies before they enter PostgreSQL. */
+    MAIL_ENCRYPTION_KEY: encryptionKeySchema,
     TRUSTED_PROXIES: trustedProxiesSchema,
     /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
     DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),

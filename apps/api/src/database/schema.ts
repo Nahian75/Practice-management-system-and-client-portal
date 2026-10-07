@@ -5,6 +5,7 @@ import type { ColumnType } from 'kysely';
 
 type DatabaseSet<T> = ColumnType<T, never, never>;
 type InsertOnly<T> = ColumnType<T, T, never>;
+type InsertWithDefault<T> = ColumnType<T, T | undefined, never>;
 type Writable<T> = ColumnType<T, T, T>;
 type WritableWithDefault<T> = ColumnType<T, T | undefined, T>;
 type UpdateOnly<T> = ColumnType<T, never, T>;
@@ -38,6 +39,48 @@ export interface AuditEventsTable {
 }
 
 export type AuditMetadataValue = string | number | boolean | null;
+
+export type EmailKind = 'account_invitation' | 'password_reset' | 'security_notice';
+export type EmailOutboxStatus = 'pending' | 'sent' | 'discarded' | 'failed';
+export type EmailFailureClass =
+  | 'temporary'
+  | 'malformed'
+  | 'invalid_payload'
+  | 'provider_rejected'
+  | 'delivery_expired';
+
+export interface EmailOutboxTable {
+  id: DatabaseSet<string>;
+  kind: InsertOnly<EmailKind>;
+  recipient_account_id: InsertOnly<string | null>;
+  resource_type: InsertOnly<string | null>;
+  resource_id: InsertOnly<string | null>;
+  deduplication_key: InsertOnly<string | null>;
+  key_version: ColumnType<number | null, number, never>;
+  nonce: ColumnType<Buffer | null, Buffer, never>;
+  ciphertext: ColumnType<Buffer | null, Buffer, never>;
+  auth_tag: ColumnType<Buffer | null, Buffer, never>;
+  status: DatabaseSet<EmailOutboxStatus>;
+  queued_at: DatabaseSet<Date>;
+  not_before: InsertWithDefault<Date>;
+  expires_at: DatabaseSet<Date>;
+  discard_after: InsertOnly<Date | null>;
+  attempt_count: DatabaseSet<number>;
+  lease_id: DatabaseSet<string | null>;
+  leased_until: DatabaseSet<Date | null>;
+  completed_at: DatabaseSet<Date | null>;
+  failure_class: DatabaseSet<EmailFailureClass | null>;
+}
+
+export interface EmailOutboxChangesTable {
+  id: DatabaseSet<string>;
+  email_outbox_id: DatabaseSet<string>;
+  action: DatabaseSet<'claimed' | 'retry' | 'sent' | 'discarded' | 'failed'>;
+  lease_id: DatabaseSet<string>;
+  retry_seconds: DatabaseSet<number | null>;
+  failure_class: DatabaseSet<EmailFailureClass | null>;
+  changed_at: DatabaseSet<Date>;
+}
 
 export type SessionStage = 'two_factor_pending' | 'authenticated';
 export type SessionEndReason = 'signed_out' | 'expired' | 'revoked' | 'replaced';
@@ -422,6 +465,8 @@ export interface Database {
   document_sharing_changes: DocumentSharingChangesTable;
   document_withdrawals: DocumentWithdrawalsTable;
   documents: DocumentsTable;
+  email_outbox: EmailOutboxTable;
+  email_outbox_changes: EmailOutboxChangesTable;
   invitations: InvitationsTable;
   matter_closures: MatterClosuresTable;
   matter_compliance_accesses: MatterComplianceAccessesTable;

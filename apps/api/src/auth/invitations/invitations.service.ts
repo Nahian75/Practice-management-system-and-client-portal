@@ -7,7 +7,7 @@ import { CLOCK, type Clock } from '../../common/time/clock.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
 import type { AccountKind } from '../../database/schema.js';
-import { MAILER, type Mailer } from '../../mail/mailer.js';
+import { MailOutbox } from '../../mail/mail-outbox.js';
 import { AccountsRepository } from '../accounts/accounts.repository.js';
 import { PasswordHasher } from '../passwords/password-hasher.js';
 import { PasswordPolicy, type PasswordProblem } from '../passwords/password-policy.js';
@@ -59,7 +59,7 @@ export class InvitationsService {
     private readonly twoFactor: TwoFactorService,
     private readonly backupCodes: BackupCodesService,
     private readonly audit: AuditService,
-    @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly outbox: MailOutbox,
     @Inject(ENV) private readonly env: Env,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -85,7 +85,7 @@ export class InvitationsService {
     const now = this.clock.now();
     const expiresAt = new Date(now.getTime() + INVITATION_LIFETIME_MS);
 
-    await this.invitations.replaceOpen({
+    const invitationId = await this.invitations.replaceOpen({
       accountId,
       tokenHash: hashOpaqueToken(token),
       createdAt: now,
@@ -93,11 +93,21 @@ export class InvitationsService {
       createdBy: invitedBy.accountId,
     });
 
-    await this.mailer.send({
-      to: email,
-      subject: 'Set up your Practice Portal account',
-      text: invitationEmail(existing?.display_name ?? input.displayName, this.invitationLink(token)),
-    });
+    await this.outbox.enqueue(
+      {
+        to: email,
+        subject: 'Set up your Practice Portal account',
+        text: invitationEmail(existing?.display_name ?? input.displayName, this.invitationLink(token)),
+      },
+      {
+        kind: 'account_invitation',
+        recipientAccountId: accountId,
+        resource: { type: 'invitation', id: invitationId },
+        deduplicationKey: `account-invitation:${invitationId}`,
+        actor: invitedBy.actor,
+        context: invitedBy.context,
+      },
+    );
 
     await this.audit.record({
       actor: invitedBy.actor,

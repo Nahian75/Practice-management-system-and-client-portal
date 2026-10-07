@@ -5,7 +5,13 @@ const LOCAL_DATABASE_URL = 'postgres://pms_app:local-password@127.0.0.1:5432/pms
 const PRODUCTION_DATABASE_URL = 'postgres://pms_app:prod-password@db.internal:5432/pms';
 
 const TOTP_KEY = Buffer.alloc(32, 7).toString('base64');
-const MAIL = { APP_BASE_URL: 'http://localhost:3000', SMTP_URL: 'smtp://127.0.0.1:1025', MAIL_FROM_ADDRESS: 'no-reply@example.com' };
+const MAIL_KEY = Buffer.alloc(32, 8).toString('base64');
+const MAIL = {
+  APP_BASE_URL: 'http://localhost:3000',
+  SMTP_URL: 'smtp://127.0.0.1:1025',
+  MAIL_FROM_ADDRESS: 'no-reply@example.com',
+  MAIL_ENCRYPTION_KEY: MAIL_KEY,
+};
 const DOCUMENT_KEY = Buffer.alloc(32, 9).toString('base64');
 const DOCUMENTS = {
   DOCUMENTS_S3_ENDPOINT: 'http://127.0.0.1:8333',
@@ -53,6 +59,7 @@ describe('loadEnv', () => {
     'APP_BASE_URL',
     'SMTP_URL',
     'MAIL_FROM_ADDRESS',
+    'MAIL_ENCRYPTION_KEY',
     'DOCUMENTS_S3_ENDPOINT',
     'DOCUMENTS_S3_BUCKET',
     'DOCUMENTS_S3_ACCESS_KEY',
@@ -84,6 +91,7 @@ describe('loadEnv', () => {
     ['SMTP_URL', 'http://mail.example.com'],
     ['MAIL_FROM_ADDRESS', 'not-an-email'],
     ['MAIL_FROM_NAME', ''],
+    ['MAIL_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
     ['TRUSTED_PROXIES', '*'],
     ['TRUSTED_PROXIES', 'true'],
     ['TRUSTED_PROXIES', 'proxy.example.com'],

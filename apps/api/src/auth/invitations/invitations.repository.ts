@@ -16,10 +16,10 @@ export class InvitationsRepository {
   constructor(@Inject(DATABASE) private readonly db: Kysely<Database>) {}
 
   /** Closes any open invitation for the account and stores the new one, in one transaction. */
-  async replaceOpen(invitation: NewInvitation): Promise<void> {
-    await this.db.transaction().execute(async (trx) => {
+  async replaceOpen(invitation: NewInvitation): Promise<string> {
+    return this.db.transaction().execute(async (trx) => {
       await this.closeOpenForAccount(invitation.accountId, invitation.createdAt, trx);
-      await trx
+      const inserted = await trx
         .insertInto('invitations')
         .values({
           account_id: invitation.accountId,
@@ -28,7 +28,9 @@ export class InvitationsRepository {
           expires_at: invitation.expiresAt,
           created_by: invitation.createdBy,
         })
-        .execute();
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      return inserted.id;
     });
   }
 

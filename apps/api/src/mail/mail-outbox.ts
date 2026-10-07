@@ -1,40 +1,213 @@
-import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
-import { MAILER, type MailMessage, type Mailer } from './mailer.js';
+import { Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import type { AuditActor } from '../audit/audit-event.js';
+import { AuditService } from '../audit/audit.service.js';
+import { SecretBoxError } from '../common/crypto/secret-box.js';
+import type { RequestContext } from '../common/http/request-context.js';
+import type { AuditMetadataValue, EmailKind } from '../database/schema.js';
+import { MailCipher, type MailEnvelopeMetadata } from './mail-cipher.js';
+import {
+  type ClaimedEmail,
+  type EmailDeliveryOutcome,
+  MailOutboxRepository,
+} from './mail-outbox.repository.js';
+import { InvalidMailMessageError, type MailMessage, type Mailer } from './mailer.js';
+import { MAILER } from './mailer.js';
+import { Inject } from '@nestjs/common';
 
-/**
- * Sends email without making the caller wait. Used where the time taken to
- * send would otherwise reveal something, such as whether an email address
- * has an account. Failures are logged, never the message: bodies can carry
- * one-time links.
- *
- * Messages still in flight are awaited at shutdown. A crash can still lose
- * one; a persistent queue replaces this before production.
- */
+const POLL_INTERVAL_MS = 250;
+const OTHER_WORKER_POLL_MS = 10;
+const RETRY_SECONDS = [60, 5 * 60, 30 * 60, 2 * 60 * 60, 6 * 60 * 60] as const;
+
+export interface EnqueueMailOptions {
+  kind: EmailKind;
+  recipientAccountId?: string;
+  resource?: { type: string; id: string };
+  deduplicationKey?: string;
+  notBefore?: Date;
+  discardAfter?: Date;
+  actor?: AuditActor;
+  context?: RequestContext;
+}
+
 @Injectable()
-export class MailOutbox implements OnApplicationShutdown {
+export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(MailOutbox.name);
-  private readonly inFlight = new Set<Promise<void>>();
+  private readonly active = new Set<Promise<void>>();
+  private timer: NodeJS.Timeout | undefined;
+  private stopping = false;
 
-  constructor(@Inject(MAILER) private readonly mailer: Mailer) {}
+  constructor(
+    private readonly repository: MailOutboxRepository,
+    private readonly cipher: MailCipher,
+    @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly audit: AuditService,
+  ) {}
 
-  enqueue(message: MailMessage): void {
-    const sending = this.mailer
-      .send(message)
-      .catch((error: unknown) => {
-        this.logger.error(`Email could not be sent: ${error instanceof Error ? error.name : 'unknown error'}`);
-      })
-      .finally(() => this.inFlight.delete(sending));
-    this.inFlight.add(sending);
+  async enqueue(message: MailMessage, options: EnqueueMailOptions): Promise<string> {
+    const metadata = metadataFor(options);
+    const sealed = this.cipher.seal(message, metadata);
+    return this.repository.transaction(async (trx) => {
+      const queued = await this.repository.enqueue(
+        {
+          ...metadata,
+          deduplicationKey: options.deduplicationKey ?? null,
+          ...sealed,
+          notBefore: options.notBefore,
+          discardAfter: options.discardAfter ?? null,
+        },
+        trx,
+      );
+      if (queued.created) {
+        await this.audit.record(
+          {
+            actor: options.actor ?? { type: 'system' },
+            action: 'email.queued',
+            outcome: 'success',
+            resource: { type: 'email_outbox', id: queued.id },
+            metadata: safeMetadata(metadata),
+            ...options.context,
+          },
+          trx,
+        );
+      }
+      return queued.id;
+    });
   }
 
-  /** Resolves once every email queued so far has been handed to the mail server, or has failed. */
+  onModuleInit(): void {
+    this.schedule(0);
+  }
+
   async drain(): Promise<void> {
-    while (this.inFlight.size > 0) {
-      await Promise.all(this.inFlight);
+    const running = this.processDue();
+    this.active.add(running);
+    try {
+      await running;
+    } finally {
+      this.active.delete(running);
     }
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.drain();
+    this.stopping = true;
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    await Promise.all(this.active);
   }
+
+  private schedule(delay: number): void {
+    if (this.stopping) {
+      return;
+    }
+    this.timer = setTimeout(() => {
+      void this.drain()
+        .catch(() => this.logger.error('Email outbox polling failed'))
+        .finally(() => this.schedule(POLL_INTERVAL_MS));
+    }, delay);
+    this.timer.unref();
+  }
+
+  private async processDue(): Promise<void> {
+    for (;;) {
+      const message = await this.repository.claim();
+      if (message) {
+        await this.deliver(message);
+        continue;
+      }
+      if (!(await this.repository.hasDue())) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, OTHER_WORKER_POLL_MS));
+    }
+  }
+
+  private async deliver(row: ClaimedEmail): Promise<void> {
+    if (row.discardAfter && row.databaseNow >= row.discardAfter) {
+      await this.complete(row, { outcome: 'discarded' });
+      return;
+    }
+    if (row.databaseNow >= row.expiresAt) {
+      await this.complete(row, { outcome: 'failed', failureClass: 'delivery_expired' });
+      return;
+    }
+
+    let message: MailMessage;
+    try {
+      message = this.cipher.open(row, row);
+    } catch (error) {
+      const failureClass = error instanceof SecretBoxError ? 'invalid_payload' : 'malformed';
+      await this.complete(row, { outcome: 'failed', failureClass });
+      return;
+    }
+
+    try {
+      await this.mailer.send(message);
+      await this.complete(row, { outcome: 'sent' });
+    } catch (error) {
+      if (error instanceof InvalidMailMessageError) {
+        await this.complete(row, { outcome: 'failed', failureClass: 'malformed' });
+      } else if (isPermanentRefusal(error)) {
+        await this.complete(row, { outcome: 'failed', failureClass: 'provider_rejected' });
+      } else {
+        const retryAfterSeconds = RETRY_SECONDS[Math.min(row.attemptCount - 1, RETRY_SECONDS.length - 1)]!;
+        await this.complete(row, { outcome: 'retry', retryAfterSeconds, failureClass: 'temporary' });
+        this.logger.warn(
+          `Email ${row.id} (${row.kind}) will retry after attempt ${row.attemptCount}`,
+        );
+      }
+    }
+  }
+
+  private async complete(row: ClaimedEmail, result: EmailDeliveryOutcome): Promise<void> {
+    const accepted = await this.repository.transaction(async (trx) => {
+      if (!(await this.repository.finish(row.id, row.leaseId, result, trx))) {
+        return false;
+      }
+      if (result.outcome !== 'retry') {
+        await this.audit.record(
+          {
+            actor: { type: 'system' },
+            action: `email.${result.outcome}`,
+            outcome: result.outcome === 'failed' ? 'failure' : 'success',
+            resource: { type: 'email_outbox', id: row.id },
+            metadata: safeMetadata(row),
+          },
+          trx,
+        );
+      }
+      return true;
+    });
+    if (accepted && result.outcome !== 'retry') {
+      this.logger.log(`Email ${row.id} (${row.kind}) ${result.outcome} on attempt ${row.attemptCount}`);
+    }
+  }
+}
+
+function metadataFor(options: EnqueueMailOptions): MailEnvelopeMetadata {
+  return {
+    kind: options.kind,
+    recipientAccountId: options.recipientAccountId ?? null,
+    resourceType: options.resource?.type ?? null,
+    resourceId: options.resource?.id ?? null,
+  };
+}
+
+function safeMetadata(metadata: MailEnvelopeMetadata): Record<string, AuditMetadataValue> {
+  return {
+    messageKind: metadata.kind,
+    recipientAccountId: metadata.recipientAccountId,
+    resourceType: metadata.resourceType,
+    resourceId: metadata.resourceId,
+  };
+}
+
+function isPermanentRefusal(error: unknown): boolean {
+  return (
+    typeof error === 'object'
+    && error !== null
+    && 'responseCode' in error
+    && typeof error.responseCode === 'number'
+    && error.responseCode >= 500
+  );
 }

@@ -1,7 +1,9 @@
 # Security
 
 **Current state (2026-10-07):** Core API, staff-web, client-portal and task
-controls are built and reviewed.
+controls are built and reviewed. The persistent encrypted email outbox is
+built as Notifications step 13a; the Notifications module review comes after
+steps 13b to 13d.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning
@@ -182,9 +184,9 @@ process before it accepts any request.
 | 2026-10-07 | Tasks module | [reviews/2026-10-07-tasks.md](reviews/2026-10-07-tasks.md) |
 
 Open items from reviews that must be closed before production: F2 (load
-balancer rate limiting), F3 (retention), F5 (persistent email outbox, now
-planned as [Notifications step 13a](notifications.md)), C6 (encrypted storage
-and backups).
+balancer rate limiting), F3 (retention), C6 (encrypted storage and backups).
+Authentication review F5 is closed by the persistent email outbox in
+[Notifications step 13a](notifications.md).
 
 Local demo conveniences that must not reach production (to fix before
 deploying): `code.bat` and `scripts/demo-code.mjs`, which show the current
@@ -229,6 +231,7 @@ neither the limit nor the recorded address.
 | Secret | Purpose | If lost | If leaked |
 |---|---|---|---|
 | `TOTP_ENCRYPTION_KEY` | Encrypts 2FA secrets | Every account must re-enrol 2FA | With a copy of the database, an attacker could generate 2FA codes. Rotate the key and require re-enrolment |
+| `MAIL_ENCRYPTION_KEY` | Encrypts queued email addresses, subjects and bodies | Pending mail cannot be delivered; people may need a new invitation or reset link | With a copy of the database, an attacker could read pending email, including one-time links. Rotate the key; old pending rows fail their integrity check and must be requested again |
 
 Locally in `apps/api/.env` (git-ignored). In production from the secret manager,
 never from a file in the image.

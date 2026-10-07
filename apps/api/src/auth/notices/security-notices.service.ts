@@ -289,7 +289,10 @@ export class SecurityNoticesService {
   private async notify(accountId: string, subject: string, lines: (name: string) => string[]): Promise<void> {
     const account = await this.accounts.findById(accountId);
     if (account) {
-      this.outbox.enqueue({ to: account.email, subject, text: lines(account.display_name).join('\n') });
+      await this.outbox.enqueue(
+        { to: account.email, subject, text: lines(account.display_name).join('\n') },
+        { kind: 'security_notice', recipientAccountId: account.id },
+      );
     }
   }
 }

@@ -1,6 +1,8 @@
 # Authentication
 
-**Current state (2026-10-04):** All five steps built: sign-in with password and 2FA, sessions, invitations, password reset, security notice emails, per-account and per-address limits. Invitations are sent from the command line until staff roles exist.
+**Current state (2026-10-07):** All five authentication steps are built.
+Invitations, password resets and security notices now use the persistent
+encrypted email outbox from Notifications step 13a.
 
 ## Decisions
 
@@ -194,15 +196,19 @@ Sent in the background, never slowing or failing the action that caused them:
 | Compliance access limit reached | Someone reaches 30 compliance accesses in an hour: sent to every other compliance holder and every administrator, naming the person only |
 | Client taken over | A partner takes over a client: sent to every active compliance holder except that partner. Names the client by reference only; the reason stays out |
 
-Background email (`MailOutbox`) waits for anything still sending when the app
-shuts down, but a crash can lose a message. A persistent queue replaces it
-before production.
+Background email is written to PostgreSQL before the caller returns. Its
+address, subject and body are encrypted under `MAIL_ENCRYPTION_KEY`; a worker
+with a short lease sends it, and another API instance resumes it after a crash.
+Temporary faults retry for at most 24 hours. One-time reset mail is discarded
+after its 30-minute link expires. Audit and logs contain ids and outcomes,
+never message content. See [notifications.md](notifications.md).
 
 ## Secrets this module needs
 
 | Secret | Use |
 |---|---|
 | `TOTP_ENCRYPTION_KEY` | 32-byte key. 2FA secrets are stored encrypted (AES-256-GCM), so a database leak alone cannot generate codes |
+| `MAIL_ENCRYPTION_KEY` | 32-byte key. Pending email addresses, subjects and bodies are stored as AES-256-GCM ciphertext |
 
 From the environment locally, from the secret manager in production.
 

@@ -76,7 +76,7 @@ export class PasswordResetService {
     }
 
     const token = generateOpaqueToken();
-    await this.resets.replaceOpen({
+    const resetId = await this.resets.replaceOpen({
       accountId: account.id,
       tokenHash: hashOpaqueToken(token),
       createdAt: now,
@@ -84,11 +84,22 @@ export class PasswordResetService {
       requestedIp: context.ipAddress,
     });
 
-    this.outbox.enqueue({
-      to: account.email,
-      subject: 'Reset your Practice Portal password',
-      text: resetEmail(account.display_name, this.resetLink(token)),
-    });
+    await this.outbox.enqueue(
+      {
+        to: account.email,
+        subject: 'Reset your Practice Portal password',
+        text: resetEmail(account.display_name, this.resetLink(token)),
+      },
+      {
+        kind: 'password_reset',
+        recipientAccountId: account.id,
+        resource: { type: 'password_reset', id: resetId },
+        deduplicationKey: `password-reset:${resetId}`,
+        discardAfter: new Date(now.getTime() + RESET_LIFETIME_MS),
+        actor,
+        context,
+      },
+    );
     await this.audit.record({ actor, action: 'auth.password_reset_requested', outcome: 'success', ...context });
   }
 
