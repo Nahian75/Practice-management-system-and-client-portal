@@ -356,6 +356,45 @@ export interface DocumentSharingChangesTable {
   changed_at: DatabaseSet<Date>;
 }
 
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type TaskStatus = 'open' | 'completed' | 'cancelled';
+
+export interface TasksTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  title: InsertOnly<string>;
+  description: InsertOnly<string | null>;
+  /** A date column arrives as a string (YYYY-MM-DD), so no time zone can shift it. */
+  due_on: InsertOnly<string | null>;
+  priority: InsertOnly<TaskPriority>;
+  status: DatabaseSet<TaskStatus>;
+  assigned_to: InsertOnly<string>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export type TaskChangeKind = 'details' | 'assignment' | 'status';
+
+export interface TaskChangesTable {
+  id: DatabaseSet<string>;
+  task_id: InsertOnly<string>;
+  kind: InsertOnly<TaskChangeKind>;
+  from_title: DatabaseSet<string | null>;
+  to_title: InsertOnly<string | null>;
+  from_description: DatabaseSet<string | null>;
+  to_description: InsertOnly<string | null>;
+  from_due_on: DatabaseSet<string | null>;
+  to_due_on: InsertOnly<string | null>;
+  from_priority: DatabaseSet<TaskPriority | null>;
+  to_priority: InsertOnly<TaskPriority | null>;
+  from_assigned_to: DatabaseSet<string | null>;
+  to_assigned_to: InsertOnly<string | null>;
+  from_status: DatabaseSet<TaskStatus | null>;
+  to_status: InsertOnly<TaskStatus | null>;
+  changed_by: InsertOnly<string>;
+  changed_at: DatabaseSet<Date>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -394,5 +433,7 @@ export interface Database {
   portal_links: PortalLinksTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
+  task_changes: TaskChangesTable;
+  tasks: TasksTable;
   totp_credentials: TotpCredentialsTable;
 }

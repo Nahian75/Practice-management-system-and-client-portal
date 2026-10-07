@@ -1,6 +1,8 @@
 # Data Model
 
-**Current state (2026-10-03):** Databases, roles, the migration runner, the audit table and the accounts table exist.
+**Current state (2026-10-07):** The database foundation through Tasks step
+12b exists, with separate owner and application roles and forward-only
+migrations through `0032`.
 
 ## Database
 
@@ -68,6 +70,8 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `client_responsibility_changes` | `0012_client_takeover.sql` | `SELECT`; `INSERT` of client, from, to and reason only. A `SECURITY DEFINER` trigger checks the takeover rules and applies the change to `clients.responsible_id`. No row can be changed or deleted, for every role | [clients.md](clients.md#taking-over-a-client) |
 | `client_individuals`, `client_organisations` | `0010_clients.sql`, `0011_client_editing.sql` | `SELECT`, `INSERT`; `UPDATE` of every detail column, not `client_id`. No `DELETE`. One row per client (primary key); a trigger keeps it to the client's kind | [clients.md](clients.md) |
 | (client text) | `0015_client_text_safe.sql` | `app.is_safe_text()` checks every client text column and the takeover reason: no control characters, line separators or direction overrides. `pms_app` is granted `EXECUTE` on it, since new functions carry no rights by default | [review C4](reviews/2026-10-04-clients.md) |
+| `tasks` | `0029_tasks.sql` to `0032_task_changes.sql` | `SELECT`; `INSERT` of matter, text, due date, priority, assignee and creator only. The database supplies id, open status and creation time. No direct `UPDATE` or `DELETE`; owner-level triggers allow only the nested current-value update made by the history trigger. Creation locks and checks the open matter, active creator membership and active assignee membership | [tasks.md](tasks.md) |
+| `task_changes` | `0032_task_changes.sql` | `SELECT`; app `INSERT` of task, kind, requested new values and actor only. A `SECURITY DEFINER` trigger locks and checks the open matter, task, actor and assignee, supplies trusted before values, updates the task, and removes no-ops. No `UPDATE`, `DELETE` or `TRUNCATE`, including for the owner. Matter closure uses the same matter lock and refuses open tasks | [tasks.md](tasks.md) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

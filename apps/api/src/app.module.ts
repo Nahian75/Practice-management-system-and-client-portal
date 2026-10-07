@@ -9,13 +9,14 @@ import { MattersModule } from './matters/matters.module.js';
 import { PortalModule } from './portal/portal.module.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { StaffModule } from './staff/staff.module.js';
+import { TasksModule } from './tasks/tasks.module.js';
 
 @Module({})
 export class AppModule {
   static forRoot(env: Env): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule],
+      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, TasksModule],
     };
   }
 }

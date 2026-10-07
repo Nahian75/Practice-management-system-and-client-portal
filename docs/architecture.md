@@ -2,7 +2,8 @@
 
 **Current state (2026-10-07):** The API foundation and the Clients, Matters,
 Documents and client portal modules are built, with separate staff and client
-screens. The client portal is security-reviewed.
+screens. The client portal is security-reviewed. Tasks steps 12a and 12b,
+including protected history and the complete staff API, are built.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -45,7 +46,7 @@ authorization decisions.
 | Matters | Built: opening matters with teams and a required conflict check, other parties, conflict clearance, team changes, supervision takeover, editing and closing, compliance access with a reason, team visibility (`apps/api/src/matters/`). Security-reviewed: M1, M2 and M4 fixed; M5 open for design ([review](reviews/2026-10-05-matters.md)) |
 | Documents | Built (10a to 10d, and portal 11b): API and staff screens, including sharing with the client ([documents.md](documents.md)) |
 | Client portal | Steps 11a to 11d built and security-reviewed: portal access for clients' people, document sharing, staff controls, the read-only client API and separate client screens ([portal.md](portal.md), [review](reviews/2026-10-07-portal.md)) |
-| Tasks | Not started |
+| Tasks | Steps 12a and 12b built: database safeguards and insert-only history, permissions, audit, and create/read/change staff API (`apps/api/src/tasks/`, [tasks.md](tasks.md)) |
 | Notifications | Not started |
 | Finance | Not started |
 | Compliance / AML | Not started |

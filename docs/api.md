@@ -1,11 +1,22 @@
 # API
 
-**Current state (2026-10-06):** Health, authentication, staff management, clients (create, open, list, search, edit, take over, contacts), and matters (conflict checks, opening, viewing, editing, team, closing, compliance access), with the colleagues list for choosing a team, documents (upload, list, download, versions, withdrawal and client sharing), portal access for clients' people, and the read-only client portal API.
+**Current state (2026-10-07):** Health, authentication, staff management,
+clients, matters, documents, portal access and the read-only client portal API
+are built. Tasks steps 12a and 12b add create, list, details with history,
+editing, reassignment and status changes for matter tasks.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
+| GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
+| GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |
+| PATCH | `/tasks/:taskId` | `tasks.manage` + team, open matter | Change one or more detail fields. 200 with the current task; 400 for empty, invalid or unknown fields; 404 outside the team; 409 if state changed meanwhile |
+| PUT | `/tasks/:taskId/assignee` | `tasks.manage` + team, open matter | Reassign to an active member of the same team. 200 with the current task; 409 for an invalid assignee or changed state |
+| POST | `/tasks/:taskId/complete` | `tasks.manage` + assignee or supervising partner, open matter | Mark open task completed. 204; repeating the current state is a no-op |
+| POST | `/tasks/:taskId/cancel` | `tasks.manage` + assignee or supervising partner, open matter | Mark open task cancelled. 204; a completed task must be reopened first |
+| POST | `/tasks/:taskId/reopen` | `tasks.manage` + assignee or supervising partner, open matter | Reopen a completed or cancelled task. 204; repeating the current state is a no-op |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |
 | POST | `/auth/two-factor` | Public, but needs a session waiting for 2FA | `{"code"}`: a 6-digit authenticator code or a backup code. 200 `{"account"}` with a new session cookie. 401 `The code is incorrect` (try again) or `Please sign in again` (no waiting sign-in, 5 wrong codes, or account blocked) |
@@ -36,7 +47,7 @@
 | GET | `/matters` | `matters.view` | `{"matters": [...], "next"}`: matters you are on the team of, 50 at a time, newest first. `?before=<next>` |
 | GET | `/matters/:matterId` | `matters.view` + team | Details, client summary and team. 404 if not on the team |
 | PATCH | `/matters/:matterId` | `matters.edit` + team | `{title?, matterType?}` → 200 with the matter. 409 closed |
-| POST | `/matters/:matterId/close` | `matters.supervise` + supervising partner | `{"reason"}` → 204. Final. 403 not the supervising partner, 409 already closed |
+| POST | `/matters/:matterId/close` | `matters.supervise` + supervising partner | `{"reason"}` → 204. Final. 403 not the supervising partner, 409 already closed or an open task remains |
 | PUT | `/matters/:matterId/team/:accountId` | `matters.supervise` + supervising partner | Adds a fee earner. 204, also when already on the team. 400 not active staff who can work on matters |
 | DELETE | `/matters/:matterId/team/:accountId` | `matters.supervise` + supervising partner | Removes a fee earner, who loses access at once. 204, also when not on the team. 409 for the supervising partner |
 | POST | `/matters/:matterId/supervisor` | `matters.supervise` + supervising partner | `{accountId}` → 204: hands supervision to that partner; the previous one stays as a fee earner. 400 not an active partner |

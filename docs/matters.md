@@ -298,7 +298,11 @@ of the audit log, as for clients.
 
 - Work on a matter (documents, tasks, time, bills) must be refused while it is
   `awaiting_clearance` or `closed`, in the database as well as the API
-  (review M7).
+  (review M7). Documents and Tasks now enforce this for new work and task
+  changes; time and bills remain for their modules.
+- Matter closure is refused while any task remains open. PostgreSQL holds the
+  matter row lock while it checks, so simultaneous completion or reopening is
+  ordered before or after closure rather than missed.
 
 ## Not in this module
 

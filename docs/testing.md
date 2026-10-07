@@ -1,7 +1,8 @@
 # Testing
 
 **Current state (2026-10-07):** Unit, HTTP and database integration tests for
-the API, and Playwright end-to-end tests for the staff app and client portal.
+the API, including Tasks steps 12a and 12b, and Playwright end-to-end tests for the
+staff app and client portal.
 
 ## Tools
 
@@ -122,6 +123,14 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   attacks directly as both database roles, and force a share and withdrawal
   to race by holding their PostgreSQL advisory lock. That makes the narrow
   audit race repeat every time instead of hoping timing exposes it.
+- Task database tests bypass the API to check the open-matter, active creator
+  and active assignee rules, protected columns, constraints and owner-level
+  immutability. They also cover insert-only before-and-after history, actor
+  and transition rules, invalid mixed change shapes and no-op removal.
+  Controlled races prove the row locks order closure against creation,
+  completion and reopening. HTTP tests cover permissions, hidden records,
+  strict input, history responses, audit privacy and rollback, no-op audit
+  suppression, status actors, closure refusal and 100-row pagination.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

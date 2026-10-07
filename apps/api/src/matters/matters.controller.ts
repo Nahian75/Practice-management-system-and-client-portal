@@ -318,6 +318,8 @@ export class MattersController {
         throw new ForbiddenException("Only the matter's supervising partner can close it");
       case 'already_closed':
         throw new ConflictException(MATTER_CLOSED_MESSAGE);
+      case 'open_tasks':
+        throw new ConflictException('Complete or cancel every open task before closing the matter');
       case 'closed':
         return;
     }

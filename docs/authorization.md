@@ -1,8 +1,8 @@
 # Authorization
 
-**Current state (2026-10-06):** Layers 1 and 2 built, including the
+**Current state (2026-10-07):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
-compliance access with a reason, and client portal links.
+compliance access with a reason, client portal links, and matter tasks.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -74,6 +74,9 @@ Each module adds its own permissions when it is built. These exist now:
 | `documents.share` — share a document with the client, or stop sharing it | | ✓ | ✓ | | |
 | `portal.invite` — invite a client's person to the portal, at the address on record, and end their access ([rules](portal.md)) | | ✓ | ✓ | | |
 | `clients.take_over` — become responsible for a client whose responsible person can no longer see it ([rules](clients.md#taking-over-a-client)) | | ✓ | | | |
+| `tasks.view` - read tasks on matters you are on the team of ([rules](tasks.md)) | | ✓ | ✓ | | |
+| `tasks.create` - create and assign tasks on open matters you are on the team of | | ✓ | ✓ | | |
+| `tasks.manage` - edit, reassign and change status under the task rules | | ✓ | ✓ | | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.
@@ -162,13 +165,20 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters, clients and portal links (built)
+## Layer 3: matters, clients, tasks and portal links (built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 
 - A matter has a team: fee earners and a supervising partner.
 - Staff see a matter, its documents and its client only through a team they
   belong to. Holding the `partner` role alone does not open every matter.
+- Tasks use that same filter for every list and detail query. Creation also
+  requires an open matter and an active assignee on the team; PostgreSQL
+  rechecks and locks those records during the insert.
+- Task detail and assignment changes require active team membership. Status
+  changes additionally require the current assignee or active supervising
+  partner. PostgreSQL applies the same rules while holding the matter and task
+  locks.
 - Compliance can open a matter they are not on only by recording a reason,
   which is audited and visible to the matter's supervising partner.
 - Clients see only their own matters, and only what is marked as shared with

@@ -49,7 +49,7 @@ type ComplianceAccessOutcome =
   | { kind: 'limited'; alert: boolean };
 
 export type EditResult = 'updated' | 'not_found' | 'closed';
-export type CloseResult = 'closed' | 'not_found' | 'not_supervisor' | 'already_closed';
+export type CloseResult = 'closed' | 'not_found' | 'not_supervisor' | 'already_closed' | 'open_tasks';
 
 export type SupervisionTakeoverResult = 'taken_over' | 'not_found' | 'supervisor_can_act';
 
@@ -461,7 +461,19 @@ export class MattersService {
           return 'already_closed';
       }
 
-      const closureId = await this.matters.recordClosure({ matterId, closedBy: by.accountId, reason }, trx);
+      if (await this.matters.hasOpenTasks(matterId, trx)) {
+        return 'open_tasks';
+      }
+
+      let closureId: string;
+      try {
+        closureId = await this.matters.recordClosure({ matterId, closedBy: by.accountId, reason }, trx);
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === '23514' && error.message.includes('open tasks')) {
+          return 'open_tasks';
+        }
+        throw error;
+      }
       await this.audit.record(
         {
           actor: by.actor,

@@ -393,6 +393,11 @@ export class MattersRepository {
     return id;
   }
 
+  async hasOpenTasks(matterId: string, trx: Kysely<Database>): Promise<boolean> {
+    const task = await trx.selectFrom('tasks').select('id').where('matter_id', '=', matterId).where('status', '=', 'open').executeTakeFirst();
+    return task !== undefined;
+  }
+
   /** Records a compliance access. The database checks the accessor holds the compliance role. */
   async recordComplianceAccess(access: { matterId: string; accessedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
     const { id } = await trx

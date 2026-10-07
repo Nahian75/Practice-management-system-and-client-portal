@@ -752,6 +752,28 @@ describe('Matters', () => {
         expect((await close(partnerToken)).status).toBe(409);
       });
 
+      it('refuses closure while an open task remains', async () => {
+        await db
+          .insertInto('tasks')
+          .values({
+            matter_id: matterId,
+            title: 'Send the final report',
+            description: null,
+            due_on: null,
+            priority: 'normal',
+            assigned_to: feeEarner.id,
+            created_by: feeEarner.id,
+          })
+          .execute();
+
+        const response = await close(partnerToken);
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toMatch(/open task/i);
+        expect((await as(token).get(`/matters/${matterId}`)).body.status).toBe('open');
+        expect(await eventsOf('matter.closed')).toEqual([]);
+      });
+
       it('is refused to a partner on the team who is not its supervising partner, and closed to fee earners', async () => {
         const otherPartner = await staffWith('partner');
         await request(app.getHttpServer()).put(`/matters/${matterId}/team/${otherPartner.id}`).set('Cookie', `__Host-session=${partnerToken}`);

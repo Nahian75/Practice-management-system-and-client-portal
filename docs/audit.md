@@ -1,7 +1,8 @@
 # Audit
 
-**Current state (2026-10-03):** Audit table, database protections and the
-`AuditService` exist. No module records events yet.
+**Current state (2026-10-07):** The protected audit table and `AuditService`
+are used by authentication, staff, clients, matters, documents, portal access
+and Tasks steps 12a and 12b.
 
 ## Purpose
 
@@ -17,6 +18,7 @@ Each module adds its events as it is built. Required by the engineering rules:
 - permission and role changes
 - access to client and matter records
 - document upload, download, share
+- task creation and later task changes
 - AML decisions
 - financial transactions and approvals
 - HR record access
@@ -58,3 +60,12 @@ before production.
   bodies in `metadata`. Record IDs and outcomes.
 - Record denied attempts as well as successes: they show attacks.
 - For an action that changes data, record inside the same transaction.
+
+Tasks records `task.created` with the task and matter ids, assignee id,
+priority, and whether a due date exists. Detail changes use `task.updated`
+with changed field names. Assignment uses `task.reassigned` with the old and
+new account ids. Status uses `task.completed`, `task.cancelled` or
+`task.reopened` with the old and new status. These events are written in the
+same transaction as the task and its history, and never copy the title,
+description, names or due date into audit metadata. No-op requests create no
+event.
