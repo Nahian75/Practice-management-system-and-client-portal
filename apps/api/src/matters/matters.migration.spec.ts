@@ -196,7 +196,10 @@ describe('matters tables', () => {
 
     // The indexed search must find exactly what comparing every name in full would (review M1).
     it('finds the same matches as comparing every stored name in full', async () => {
-      const names = ['Jane Doe', 'Acme Trading Ltd'];
+      const token = uniqueName();
+      await clientNamed(`Jane ${token}`, 'Doe');
+      await clientNamed(`Acme ${token}`, 'Trading Ltd');
+      const names = [`Jane ${token} Doe`, `Acme ${token} Trading Ltd`];
 
       expect((await check(names)).matches.length).toBeGreaterThan(0);
       // One snapshot for every count: other test files add similar names while this runs.

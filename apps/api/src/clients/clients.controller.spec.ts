@@ -26,6 +26,14 @@ describe('Clients', () => {
   let feeEarner: TestAccount;
   let token: string;
 
+  const failAudit = (action: string) => {
+    const service = app.get(AuditService);
+    const record = service.record.bind(service);
+    return vi.spyOn(service, 'record').mockImplementation((event, transaction) =>
+      event.action === action ? Promise.reject(new Error('audit unavailable')) : record(event, transaction),
+    );
+  };
+
   const as = (sessionToken: string) => {
     const server = request(app.getHttpServer());
     const cookie = `__Host-session=${sessionToken}`;
@@ -135,9 +143,15 @@ describe('Clients', () => {
     });
 
     it('creates nothing when the audit record cannot be written', async () => {
-      vi.spyOn(app.get(AuditService), 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+      const audit = failAudit('client.created');
+      let response: request.Response;
+      try {
+        response = await as(token).post('/clients', INDIVIDUAL);
+      } finally {
+        audit.mockRestore();
+      }
 
-      expect((await as(token).post('/clients', INDIVIDUAL)).status).toBe(500);
+      expect(response!.status).toBe(500);
       expect(await clientsCreatedBy(feeEarner.id)).toEqual([]);
     });
 
@@ -472,9 +486,15 @@ describe('Clients', () => {
     });
 
     it('changes nothing when the audit record cannot be written', async () => {
-      vi.spyOn(app.get(AuditService), 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+      const audit = failAudit('client.updated');
+      let response: request.Response;
+      try {
+        response = await as(token).patch(`/clients/${clientId}`, { kind: 'individual', familyName: 'Smith' });
+      } finally {
+        audit.mockRestore();
+      }
 
-      expect((await as(token).patch(`/clients/${clientId}`, { kind: 'individual', familyName: 'Smith' })).status).toBe(500);
+      expect(response!.status).toBe(500);
       expect((await as(token).get(`/clients/${clientId}`)).body.familyName).toBe('Doe');
     });
 

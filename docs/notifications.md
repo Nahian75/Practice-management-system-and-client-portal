@@ -94,7 +94,9 @@ The payload is the exact recipient, subject and plain-text body. It is cleared
 after success, discard or final expiry. The database permits only forward
 state changes. Queue workers claim due rows with `FOR UPDATE SKIP LOCKED`, so
 several API instances do not normally send the same row. A lease lets another
-worker retry after a crash.
+worker retry after a crash. Each API instance runs only one drain loop at a
+time. On shutdown it finishes any row it has claimed, but does not wait for a
+lease held by another instance.
 
 Retries use bounded exponential delays. A malformed message is failed without
 retry. Temporary SMTP/network failures retry; after the final limit of 24
@@ -179,9 +181,10 @@ retry period and at-least-once delivery.
   final expiry, wrong leases, unknown kinds, caller-supplied state, direct
   edits, deletion and truncation, unsafe audit/log content and immutable
   transition history.
-- Thirteen deliberate break cases were run and restored. They proved the
+- Fifteen deliberate break cases were run and restored. They proved the
   tests catch readable payload storage, missing authenticated account binding,
   sending stale or expired mail, provider text in logs, addresses in audit,
   lost retries, retrying corrupt ciphertext, caller-controlled database
   values, mutable queue rows, bypassed lease transitions, mutable transition
-  history and non-idempotent duplicate handling.
+  history, non-idempotent duplicate handling, overlapping drain loops and a
+  shutdown stuck waiting for another worker's lease.

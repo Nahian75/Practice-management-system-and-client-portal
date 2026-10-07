@@ -23,11 +23,12 @@ function harness(options: { send?: Mailer['send']; claim?: ClaimedEmail } = {}) 
     .mockResolvedValueOnce(options.claim)
     .mockResolvedValue(undefined);
   const finish = vi.fn(async () => true);
+  const hasDue = vi.fn(async () => false);
   const repository = {
     enqueue,
     claim,
     finish,
-    hasDue: vi.fn(async () => false),
+    hasDue,
     transaction: async <T>(work: (trx: never) => Promise<T>) => work({} as never),
   } as unknown as MailOutboxRepository;
   const send = vi.fn(options.send ?? (async () => undefined));
@@ -35,7 +36,7 @@ function harness(options: { send?: Mailer['send']; claim?: ClaimedEmail } = {}) 
   const record = vi.fn(async () => undefined);
   const audit = { record } as unknown as AuditService;
   const outbox = new MailOutbox(repository, cipher, mailer, audit);
-  return { outbox, cipher, enqueue, claim, finish, send, record };
+  return { outbox, cipher, enqueue, claim, finish, hasDue, send, record };
 }
 
 function claimed(cipher: MailCipher, overrides: Partial<ClaimedEmail> = {}): ClaimedEmail {
@@ -111,6 +112,37 @@ describe('MailOutbox worker', () => {
     expect(setup.send).toHaveBeenCalledWith(MESSAGE);
     expect(setup.finish).toHaveBeenCalledWith(ID, LEASE_ID, { outcome: 'sent' }, expect.anything());
     expect(JSON.stringify(setup.record.mock.calls)).toContain('email.sent');
+  });
+
+  it('uses one worker loop when drains overlap', async () => {
+    const setup = harness();
+    let releaseClaim: ((row: undefined) => void) | undefined;
+    setup.claim.mockReset().mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => {
+        releaseClaim = resolve;
+      }),
+    );
+
+    const first = setup.outbox.drain();
+    const second = setup.outbox.drain();
+    await vi.waitFor(() => expect(releaseClaim).toBeDefined());
+
+    expect(setup.claim).toHaveBeenCalledOnce();
+    releaseClaim!(undefined);
+    await Promise.all([first, second]);
+    expect(setup.claim).toHaveBeenCalledOnce();
+  });
+
+  it('stops waiting for another worker when the application shuts down', async () => {
+    const setup = harness();
+    setup.claim.mockReset().mockResolvedValue(undefined);
+    setup.hasDue.mockResolvedValue(true);
+
+    const draining = setup.outbox.drain();
+    await vi.waitFor(() => expect(setup.hasDue).toHaveBeenCalled());
+
+    await setup.outbox.onApplicationShutdown();
+    await draining;
   });
 
   it('fails a corrupted encrypted payload without sending or retrying', async () => {

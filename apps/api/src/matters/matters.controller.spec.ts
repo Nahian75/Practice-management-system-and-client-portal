@@ -29,6 +29,14 @@ describe('Matters', () => {
   let token: string;
   let partner: TestAccount;
   let client: { id: string; reference: string };
+
+  const failAudit = (action: string) => {
+    const service = app.get(AuditService);
+    const record = service.record.bind(service);
+    return vi.spyOn(service, 'record').mockImplementation((event, transaction) =>
+      event.action === action ? Promise.reject(new Error('audit unavailable')) : record(event, transaction),
+    );
+  };
   let clientName: { givenNames: string; familyName: string };
 
   const as = (sessionToken: string) => {
@@ -178,9 +186,15 @@ describe('Matters', () => {
 
     it('opens nothing when the audit record cannot be written', async () => {
       const check = await as(token).post('/conflict-checks', { clientId: client.id, names: [uniqueName()] });
-      vi.spyOn(app.get(AuditService), 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+      const audit = failAudit('matter.opened');
+      let response: request.Response;
+      try {
+        response = await as(token).post('/matters', matter({ conflictCheckId: check.body.id }));
+      } finally {
+        audit.mockRestore();
+      }
 
-      expect((await as(token).post('/matters', matter({ conflictCheckId: check.body.id }))).status).toBe(500);
+      expect(response!.status).toBe(500);
       expect(await mattersOf(client.id)).toEqual([]);
     });
 

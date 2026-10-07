@@ -32,7 +32,7 @@ export interface EnqueueMailOptions {
 @Injectable()
 export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(MailOutbox.name);
-  private readonly active = new Set<Promise<void>>();
+  private draining: Promise<void> | undefined;
   private timer: NodeJS.Timeout | undefined;
   private stopping = false;
 
@@ -79,12 +79,14 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
   }
 
   async drain(): Promise<void> {
-    const running = this.processDue();
-    this.active.add(running);
+    const running = this.draining ?? this.processDue();
+    this.draining = running;
     try {
       await running;
     } finally {
-      this.active.delete(running);
+      if (this.draining === running) {
+        this.draining = undefined;
+      }
     }
   }
 
@@ -92,8 +94,9 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
     this.stopping = true;
     if (this.timer) {
       clearTimeout(this.timer);
+      this.timer = undefined;
     }
-    await Promise.all(this.active);
+    await this.draining;
   }
 
   private schedule(delay: number): void {
@@ -110,12 +113,21 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
 
   private async processDue(): Promise<void> {
     for (;;) {
+      if (this.stopping) {
+        return;
+      }
       const message = await this.repository.claim();
       if (message) {
         await this.deliver(message);
         continue;
       }
+      if (this.stopping) {
+        return;
+      }
       if (!(await this.repository.hasDue())) {
+        return;
+      }
+      if (this.stopping) {
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, OTHER_WORKER_POLL_MS));

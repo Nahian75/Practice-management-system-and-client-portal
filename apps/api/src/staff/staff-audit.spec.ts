@@ -71,7 +71,10 @@ describe('Auditing staff changes', () => {
     it('granting a role', async () => {
       await staffService.grantRole(staff.id, 'partner', by);
 
-      expect(audit.calls).toEqual([{ action: 'staff.role_granted', inTransaction: true }]);
+      expect(audit.calls).toEqual([
+        { action: 'staff.role_granted', inTransaction: true },
+        { action: 'email.queued', inTransaction: true },
+      ]);
     });
 
     it('revoking a role', async () => {
@@ -79,7 +82,10 @@ describe('Auditing staff changes', () => {
 
       await staffService.revokeRole(staff.id, 'partner', by);
 
-      expect(audit.calls).toEqual([{ action: 'staff.role_revoked', inTransaction: true }]);
+      expect(audit.calls).toEqual([
+        { action: 'staff.role_revoked', inTransaction: true },
+        { action: 'email.queued', inTransaction: true },
+      ]);
     });
 
     it('disabling an account', async () => {

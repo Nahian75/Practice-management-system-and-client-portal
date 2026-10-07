@@ -54,6 +54,11 @@ lease, state-machine and owner-immutability tests run as
 `mail-outbox.migration.exclusive.spec.ts`, after ordinary tests, so their
 deliberately held leases cannot delay another test's worker.
 
+The Playwright API server and invitation command run in separate processes
+but share the `pms_e2e` outbox. They use the same deterministic test-only mail
+key; `pms_e2e` is recreated before every browser run, so no older payload is
+kept under that key.
+
 ## Offline by default
 
 `createTestApp` replaces the breached-password service with one that answers
@@ -67,7 +72,9 @@ every email due now has reached a terminal outcome or a future retry time,
 including rows leased by another test worker. Thus "no email was sent" is a
 real result, not a timeout that happened to be too short. Integration tests
 have a 20-second limit (`vitest.config.ts`); Vitest's 5-second default is meant
-for unit tests.
+for unit tests. Overlapping calls on one app share one worker loop. App
+shutdown stops that loop after any already-claimed message, so closing one
+test app cannot be held up by a lease belonging to another app.
 
 ## Network addresses in tests
 

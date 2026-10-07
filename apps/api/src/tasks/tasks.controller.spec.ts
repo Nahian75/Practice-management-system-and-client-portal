@@ -24,6 +24,14 @@ describe('Tasks', () => {
   let partner: TestAccount;
   let feeEarner: TestAccount;
   let token: string;
+
+  const failAudit = (action: string) => {
+    const service = app.get(AuditService);
+    const record = service.record.bind(service);
+    return vi.spyOn(service, 'record').mockImplementation((event, transaction) =>
+      event.action === action ? Promise.reject(new Error('audit unavailable')) : record(event, transaction),
+    );
+  };
   let matterId: string;
 
   const uniqueName = () => randomUUID().replaceAll('-', '').slice(0, 16);
@@ -138,7 +146,7 @@ describe('Tasks', () => {
     });
 
     it('rolls the task back if its audit record cannot be written', async () => {
-      const audit = vi.spyOn(app.get(AuditService), 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+      const audit = failAudit('task.created');
       let response: request.Response;
       try {
         response = await createTask(token, matterId, { title: 'Must roll back' });
@@ -323,7 +331,7 @@ describe('Tasks', () => {
 
     it('rolls a change and its history back if audit cannot be written', async () => {
       const created = await createTask();
-      const audit = vi.spyOn(app.get(AuditService), 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+      const audit = failAudit('task.updated');
       let response: request.Response;
       try {
         response = await as(token).patch(`/tasks/${created.body.id}`, { title: 'Must roll back' });
