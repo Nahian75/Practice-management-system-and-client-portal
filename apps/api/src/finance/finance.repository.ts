@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely, type Selectable } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { Database, MatterStatus, TimeEntryCorrectionsTable } from '../database/schema.js';
+import type { Database, FinancePostingAccount, FinanceTransactionKind, MatterStatus, TimeEntryCorrectionsTable } from '../database/schema.js';
 import { visibleTo } from '../matters/matters.repository.js';
-import type { BillDraft, BillLine, BillLineInput, CreditNote, IssuedBill, IssuedBillSummary, StaffRate, SupplierSnapshot, TimeCorrection, TimeEntry } from './finance.js';
+import type { SealedBankDetails } from './bank-account-cipher.js';
+import type { BankAccount, BillDraft, BillLine, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, LedgerEntry, MatterLedger, MoneySide, StaffRate, SupplierSnapshot, TimeCorrection, TimeEntry } from './finance.js';
 
 interface RateRow {
   id: string;
@@ -27,6 +28,23 @@ interface TimeRow {
   hourly_rate_pence: string;
   voided: boolean;
   recorded_at: Date;
+}
+
+interface LedgerRow {
+  id: string;
+  transaction_id: string;
+  kind: FinanceTransactionKind;
+  account: FinancePostingAccount;
+  direction: 'debit' | 'credit';
+  amount_pence: string;
+  matter_id: string;
+  transaction_matter_id: string;
+  related_matter_id: string | null;
+  bank_account_id: string | null;
+  reference: string | null;
+  purpose: string;
+  occurred_on: string;
+  posted_at: Date;
 }
 
 type CorrectionRow = Selectable<TimeEntryCorrectionsTable> & { corrected_by_name: string };
@@ -161,6 +179,111 @@ export class FinanceRepository {
         } }),
       })),
     };
+  }
+
+  async createBankAccount(details: {
+    kind: 'client' | 'business'; name: string; openedOn: string; actorId: string; sealed: SealedBankDetails;
+  }, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_bank_account(
+      ${details.kind}, ${details.name}, ${details.sealed.lastFour}, ${details.sealed.context}::uuid,
+      ${details.sealed.fingerprint}, ${details.sealed.keyVersion}::smallint, ${details.sealed.nonce},
+      ${details.sealed.ciphertext}, ${details.sealed.authTag}, ${details.openedOn}::date, ${details.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async closeBankAccount(id: string, closedOn: string, reason: string, actorId: string, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.close_bank_account(
+      ${id}, ${closedOn}::date, ${reason}, ${actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async findBankAccount(id: string, executor: Kysely<Database> = this.db): Promise<BankAccount | undefined> {
+    const row = await executor.selectFrom('bank_accounts')
+      .leftJoin('bank_account_closures', 'bank_account_closures.bank_account_id', 'bank_accounts.id')
+      .select([
+        'bank_accounts.id', 'bank_accounts.kind', 'bank_accounts.name', 'bank_accounts.last_four',
+        'bank_accounts.opened_on', 'bank_accounts.created_at', 'bank_account_closures.closed_on',
+      ]).where('bank_accounts.id', '=', id).executeTakeFirst();
+    return row && toBankAccount(row);
+  }
+
+  async listBankAccounts(): Promise<BankAccount[]> {
+    const rows = await this.db.selectFrom('bank_accounts')
+      .leftJoin('bank_account_closures', 'bank_account_closures.bank_account_id', 'bank_accounts.id')
+      .select([
+        'bank_accounts.id', 'bank_accounts.kind', 'bank_accounts.name', 'bank_accounts.last_four',
+        'bank_accounts.opened_on', 'bank_accounts.created_at', 'bank_account_closures.closed_on',
+      ]).orderBy('bank_accounts.id').execute();
+    return rows.map(toBankAccount);
+  }
+
+  async recordReceipt(details: {
+    bankAccountId: string; matterId: string; receivedOn: string; amountPence: string;
+    reference: string; purpose: string; actorId: string;
+  }, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_finance_receipt(
+      ${details.bankAccountId}, ${details.matterId}, ${details.receivedOn}::date,
+      ${details.amountPence}::bigint, ${details.reference}, ${details.purpose}, ${details.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async recordAllocation(details: {
+    side: MoneySide; sourceMatterId: string; targetMatterId: string;
+    amountPence: string; reason: string; actorId: string;
+  }, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_finance_allocation(
+      ${details.side}, ${details.sourceMatterId}, ${details.targetMatterId},
+      ${details.amountPence}::bigint, ${details.reason}, ${details.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async findFinanceTransaction(id: string, executor: Kysely<Database> = this.db): Promise<FinanceTransaction | undefined> {
+    const row = await executor.selectFrom('finance_transactions').selectAll().where('id', '=', id).executeTakeFirst();
+    return row && {
+      id: row.id, kind: row.kind, side: transactionSide(row.kind), clientId: row.client_id,
+      matterId: row.matter_id, relatedMatterId: row.related_matter_id, bankAccountId: row.bank_account_id,
+      reference: row.reference, purpose: row.purpose, amountPence: row.amount_pence,
+      occurredOn: row.occurred_on, postedAt: row.posted_at,
+    };
+  }
+
+  async matterLedger(matterId: string, page: { before?: string; limit: number }): Promise<MatterLedger | undefined> {
+    if (!(await this.db.selectFrom('matters').select('id').where('id', '=', matterId).executeTakeFirst())) return undefined;
+    const totals = (await sql<{ client_balance: string; business_balance: string }>`
+      select
+        coalesce(sum(case when account = 'client_ledger' then
+          case direction when 'credit' then amount_pence else -amount_pence end else 0 end), 0) as client_balance,
+        coalesce(sum(case when account = 'business_ledger' then
+          case direction when 'debit' then amount_pence else -amount_pence end else 0 end), 0) as business_balance
+      from finance_postings where matter_id = ${matterId}
+    `.execute(this.db)).rows[0]!;
+    const rows = await this.ledgerRows()
+      .where('finance_postings.matter_id', '=', matterId)
+      .where('finance_postings.account', 'in', ['client_ledger', 'business_ledger'])
+      .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
+      .orderBy('finance_postings.id', 'desc').limit(page.limit).execute();
+    return {
+      matterId, clientBalancePence: totals.client_balance, businessBalancePence: totals.business_balance,
+      entries: rows.map(toLedgerEntry),
+    };
+  }
+
+  async cashBook(bankAccountId: string, page: { before?: string; limit: number }): Promise<CashBook | undefined> {
+    const bankAccount = await this.findBankAccount(bankAccountId);
+    if (!bankAccount) return undefined;
+    const total = (await sql<{ balance: string }>`
+      select coalesce(sum(case direction when 'debit' then amount_pence else -amount_pence end), 0) as balance
+      from finance_postings where bank_account_id = ${bankAccountId}
+    `.execute(this.db)).rows[0]!.balance;
+    const rows = await this.ledgerRows()
+      .where('finance_postings.bank_account_id', '=', bankAccountId)
+      .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
+      .orderBy('finance_postings.id', 'desc').limit(page.limit).execute();
+    return { bankAccount, balancePence: total, entries: rows.map(toLedgerEntry) };
   }
 
   async eligibleRateAccount(accountId: string): Promise<boolean> {
@@ -301,6 +424,19 @@ export class FinanceRepository {
       ]);
   }
 
+  private ledgerRows() {
+    return this.db.selectFrom('finance_postings')
+      .innerJoin('finance_transactions', 'finance_transactions.id', 'finance_postings.transaction_id')
+      .select([
+        'finance_postings.id', 'finance_postings.transaction_id', 'finance_postings.account',
+        'finance_postings.direction', 'finance_postings.amount_pence', 'finance_postings.matter_id',
+        'finance_postings.bank_account_id', 'finance_transactions.kind',
+        'finance_transactions.matter_id as transaction_matter_id', 'finance_transactions.related_matter_id',
+        'finance_transactions.reference', 'finance_transactions.purpose', 'finance_transactions.occurred_on',
+        'finance_transactions.posted_at',
+      ]);
+  }
+
   private async withCorrections(rows: TimeRow[], executor: Kysely<Database> = this.db): Promise<TimeEntry[]> {
     if (rows.length === 0) {
       return [];
@@ -403,5 +539,32 @@ function toTime(row: TimeRow, corrections: CorrectionRow[]): TimeEntry {
       correctedBy: { accountId: correction.corrected_by, displayName: correction.corrected_by_name },
       correctedAt: correction.corrected_at,
     })),
+  };
+}
+
+function toBankAccount(row: {
+  id: string; kind: 'client' | 'business'; name: string; last_four: string;
+  opened_on: string; created_at: Date; closed_on: string | null;
+}): BankAccount {
+  return {
+    id: row.id, kind: row.kind, name: row.name, lastFour: row.last_four,
+    openedOn: row.opened_on, closedOn: row.closed_on, createdAt: row.created_at,
+  };
+}
+
+function transactionSide(kind: FinanceTransactionKind): MoneySide {
+  return kind.startsWith('client_') ? 'client' : 'business';
+}
+
+function toLedgerEntry(row: LedgerRow): LedgerEntry {
+  const relatedMatterId = row.related_matter_id === null
+    ? null
+    : row.matter_id === row.transaction_matter_id ? row.related_matter_id : row.transaction_matter_id;
+  return {
+    id: row.id, transactionId: row.transaction_id, kind: row.kind,
+    side: row.account.startsWith('client_') ? 'client' : 'business',
+    direction: row.direction, amountPence: row.amount_pence, matterId: row.matter_id,
+    relatedMatterId, bankAccountId: row.bank_account_id,
+    reference: row.reference, purpose: row.purpose, occurredOn: row.occurred_on, postedAt: row.posted_at,
   };
 }

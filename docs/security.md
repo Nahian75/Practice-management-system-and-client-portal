@@ -1,6 +1,6 @@
 # Security
 
-**Current state (2026-10-08):** Core API, staff-web, client-portal, task and
+**Current state (2026-10-09):** Core API, staff-web, client-portal, task and
 notification controls are built and reviewed. Notifications steps 13a to 13d add the
 persistent encrypted email outbox, insert-only staff task notifications,
 database-controlled one-way reads, live matter-access checks, staff-only
@@ -9,11 +9,11 @@ The worker rechecks the recipient address, current assignee, task state, due
 date, team membership and account before delivery. The database refuses a
 future London reminder window. Staff screens use only the filtered API answer;
 client accounts are sent back to the separate portal. The Notifications module
-review fixed N1 and N2. Finance steps 14a and 14b add database-enforced
-immutable rates, time history and issued billing records, exact integer-pence
-limits, live role/team checks, private list responses, permanent numbering,
-snapshot downloads and transactional audit. Finance has not had its final
-security review yet.
+review fixed N1 and N2. Finance steps 14a to 14c add database-enforced
+immutable rates, time, billing and posting records, exact integer-pence limits,
+live role/team checks, encrypted bank details, balanced postings, nonnegative
+client ledgers, fixed downloads and transactional audit. Finance has not had
+its final security review yet.
 
 This file lists only the controls that are actually in place.
 
@@ -251,6 +251,13 @@ neither the limit nor the recorded address.
 - Finance API tests separately prove permission checks, record filters,
   strict request/response schemas, safe attachment headers, private audit
   metadata and transactional rollback.
+- Bank details are AES-GCM encrypted before PostgreSQL under a separate key;
+  the database stores only ciphertext, integrity material, a keyed duplicate
+  fingerprint and the last four account-number digits. Narrow security-definer
+  functions recheck the live Accounts role and create balanced postings. The
+  application cannot write register or ledger tables directly, and owner-level
+  triggers reject changes and truncation. Stable matter locks and a deferred
+  balance check stop concurrent client allocations creating a debit balance.
 
 ## Application secrets
 
@@ -258,6 +265,7 @@ neither the limit nor the recorded address.
 |---|---|---|---|
 | `TOTP_ENCRYPTION_KEY` | Encrypts 2FA secrets | Every account must re-enrol 2FA | With a copy of the database, an attacker could generate 2FA codes. Rotate the key and require re-enrolment |
 | `MAIL_ENCRYPTION_KEY` | Encrypts queued email addresses, subjects and bodies | Pending mail cannot be delivered; people may need a new invitation or reset link | With a copy of the database, an attacker could read pending email, including one-time links. Rotate the key; old pending rows fail their integrity check and must be requested again |
+| `FINANCE_ENCRYPTION_KEY` | Encrypts bank details and keys their duplicate fingerprint | Full bank details become unreadable; safe register and ledger history remain | With a copy of the database, an attacker could read bank details and test guessed details. Replace the key through a designed re-encryption migration; do not silently discard old key material |
 
 Locally in `apps/api/.env` (git-ignored). In production from the secret manager,
 never from a file in the image.

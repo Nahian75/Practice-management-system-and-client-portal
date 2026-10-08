@@ -138,3 +138,67 @@ export interface CreditNote {
   issuedAt: Date;
   lines: CreditNoteLine[];
 }
+
+export type BankAccountKind = 'client' | 'business';
+export type MoneySide = 'client' | 'business';
+export type FinanceTransactionKind =
+  | 'bill'
+  | 'credit_note'
+  | 'client_receipt'
+  | 'business_receipt'
+  | 'client_allocation'
+  | 'business_allocation';
+
+export interface BankAccount {
+  id: string;
+  kind: BankAccountKind;
+  name: string;
+  lastFour: string;
+  openedOn: string;
+  closedOn: string | null;
+  createdAt: Date;
+}
+
+export interface FinanceTransaction {
+  id: string;
+  kind: FinanceTransactionKind;
+  side: MoneySide;
+  clientId: string;
+  matterId: string;
+  relatedMatterId: string | null;
+  bankAccountId: string | null;
+  reference: string | null;
+  purpose: string;
+  amountPence: string;
+  occurredOn: string;
+  postedAt: Date;
+}
+
+export interface LedgerEntry {
+  id: string;
+  transactionId: string;
+  kind: FinanceTransactionKind;
+  side: MoneySide;
+  direction: 'debit' | 'credit';
+  amountPence: string;
+  matterId: string;
+  relatedMatterId: string | null;
+  bankAccountId: string | null;
+  reference: string | null;
+  purpose: string;
+  occurredOn: string;
+  postedAt: Date;
+}
+
+export interface MatterLedger {
+  matterId: string;
+  clientBalancePence: string;
+  businessBalancePence: string;
+  entries: LedgerEntry[];
+}
+
+export interface CashBook {
+  bankAccount: BankAccount;
+  balancePence: string;
+  entries: LedgerEntry[];
+}

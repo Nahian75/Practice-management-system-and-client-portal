@@ -1,8 +1,8 @@
 # Audit
 
-**Current state (2026-10-08):** The protected audit table and `AuditService`
+**Current state (2026-10-09):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications and Finance steps 14a and 14b.
+Tasks, Notifications and Finance steps 14a to 14c.
 
 ## Purpose
 
@@ -76,3 +76,12 @@ Finance records rate and time actions and the billing events
 metadata contains only ids, references, counts, methods and pence totals; it
 does not copy supplier/client addresses, line descriptions, credit reasons or
 delivery notes. Every billing change and its audit event share one transaction.
+
+Finance step 14c records `finance.bank_account_created`,
+`finance.bank_account_closed`, `finance.client_money_received`,
+`finance.business_money_received`, `finance.client_money_allocated` and
+`finance.business_money_allocated`. Metadata contains only ids, bank kind,
+dates, ledger side and exact pence amounts. It never contains a full or partial
+bank account number, sort code, bank-account name, receipt reference/purpose,
+allocation reason or encryption material. Each change and audit event shares
+one database transaction.

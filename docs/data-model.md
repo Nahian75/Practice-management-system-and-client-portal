@@ -1,8 +1,8 @@
 # Data Model
 
-**Current state (2026-10-07):** The database foundation through Tasks step
-12b exists, with separate owner and application roles and forward-only
-migrations through `0032`.
+**Current state (2026-10-09):** The database foundation through Finance step
+14c exists, with separate owner and application roles and forward-only
+migrations through `0044`.
 
 ## Database
 
@@ -72,6 +72,11 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | (client text) | `0015_client_text_safe.sql` | `app.is_safe_text()` checks every client text column and the takeover reason: no control characters, line separators or direction overrides. `pms_app` is granted `EXECUTE` on it, since new functions carry no rights by default | [review C4](reviews/2026-10-04-clients.md) |
 | `tasks` | `0029_tasks.sql` to `0032_task_changes.sql` | `SELECT`; `INSERT` of matter, text, due date, priority, assignee and creator only. The database supplies id, open status and creation time. No direct `UPDATE` or `DELETE`; owner-level triggers allow only the nested current-value update made by the history trigger. Creation locks and checks the open matter, active creator membership and active assignee membership | [tasks.md](tasks.md) |
 | `task_changes` | `0032_task_changes.sql` | `SELECT`; app `INSERT` of task, kind, requested new values and actor only. A `SECURITY DEFINER` trigger locks and checks the open matter, task, actor and assignee, supplies trusted before values, updates the task, and removes no-ops. No `UPDATE`, `DELETE` or `TRUNCATE`, including for the owner. Matter closure uses the same matter lock and refuses open tasks | [tasks.md](tasks.md) |
+| `staff_rates`, `time_entries`, `time_entry_corrections` | `0042_finance_time.sql` | Rates and posted time history are insert-only. Narrow grants and triggers supply trusted rate snapshots, recheck live actors/team/matter state and reject owner changes | [finance.md](finance.md#step-14a-api) |
+| `bill_drafts`, `bill_draft_lines` | `0043_finance_billing.sql` | Draft writes use narrow security-definer functions and require live Accounts staff. Drafts can change only before issue; issue freezes their source rows | [finance.md](finance.md#step-14b-api) |
+| `issued_bills`, `issued_bill_lines`, `credit_notes`, `credit_note_lines`, `bill_deliveries` | `0043_finance_billing.sql` | No direct application writes. Database functions serialise numbering and snapshot trusted client, supplier, time, VAT and totals. Posted rows reject update, deletion and truncation even by the owner | [finance.md](finance.md#step-14b-api) |
+| `bank_accounts`, `bank_account_closures` | `0044_finance_ledgers.sql` | Full details are encrypted by the API; PostgreSQL receives ciphertext, integrity fields, a keyed fingerprint and last four digits. Accounts-only functions add register/closure rows. No direct app writes or later owner changes | [finance.md](finance.md#step-14c-api) |
+| `finance_transactions`, `finance_postings` | `0044_finance_ledgers.sql` | Narrow functions and bill/credit triggers create immutable headers and exactly two balanced postings. Deferred checks enforce client/matter/account shape and nonnegative client balances; the app has no direct write rights | [finance.md](finance.md#step-14c-api) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

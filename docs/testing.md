@@ -1,8 +1,8 @@
 # Testing
 
-**Current state (2026-10-08):** Unit, HTTP and database integration tests for
+**Current state (2026-10-09):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-Finance steps 14a and 14b, plus Playwright end-to-end tests for the staff app,
+Finance steps 14a to 14c, plus Playwright end-to-end tests for the staff app,
 Tasks, Notifications and the client portal.
 
 ## Tools
@@ -188,13 +188,21 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   race orders matter closure against time insertion. Deliberate breaks of the
   application and migration safeguards are recorded in the
   [step 14a](finance.md#step-14a-verification) and
-  [step 14b](finance.md#step-14b-verification) verification notes.
+  [step 14b](finance.md#step-14b-verification) and
+  [step 14c](finance.md#step-14c-verification) verification notes.
 - Billing tests cover exact positive amounts, VAT rounding, draft replacement,
   issue snapshots and numbering, linked-time use, credit-note remaining
   balances, delivery records, fixed downloads, permissions, record visibility,
   strict inputs, safe summary and attachment responses, audit privacy and
   rollback. Database tests exercise narrow functions and owner-level
   immutability; controlled races cover issue, numbering and over-crediting.
+- Finance-ledger tests cover authenticated encryption and context binding,
+  safe bank-register responses, live Accounts permission checks, permanent
+  closures, exact receipts, same-client allocation corrections, signed
+  balances and stable 100-row paging. Database tests prove balanced
+  double-entry shapes, automatic bill/credit postings, client nonnegative
+  balances, direct-write denial and owner immutability; a controlled race
+  proves concurrent allocations cannot overspend one client balance.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

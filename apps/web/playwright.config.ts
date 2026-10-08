@@ -20,6 +20,7 @@ export const E2E_NO_API_WEB_URL = 'http://localhost:3102';
 const E2E_API_PORT = '3101';
 // Playwright workers are separate processes but share one queue and therefore one test-only key.
 export const E2E_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 12).toString('base64');
+export const E2E_FINANCE_ENCRYPTION_KEY = Buffer.alloc(32, 13).toString('base64');
 
 export default defineConfig({
   testDir: './e2e',
@@ -49,6 +50,7 @@ export default defineConfig({
         APP_BASE_URL: E2E_WEB_URL,
         SMTP_URL: required('SMTP_URL'),
         MAIL_ENCRYPTION_KEY: E2E_MAIL_ENCRYPTION_KEY,
+        FINANCE_ENCRYPTION_KEY: E2E_FINANCE_ENCRYPTION_KEY,
         MAIL_FROM_ADDRESS: required('MAIL_FROM_ADDRESS'),
         MAIL_FROM_NAME: required('MAIL_FROM_NAME'),
         TRUSTED_PROXIES: 'loopback',

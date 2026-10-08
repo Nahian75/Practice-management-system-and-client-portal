@@ -1,10 +1,11 @@
 # Finance
 
-**Current state (2026-10-08):** First-version design approved by the project
-owner. Steps 14a and 14b are built: exact GBP money strings, immutable staff
-rates and time entries, permanent corrections, draft and issued bills, credit
-notes, delivery records, permissions, audit and the staff API. There are no
-client-money records or Finance screens yet.
+**Current state (2026-10-09):** First-version design approved by the project
+owner. Steps 14a to 14c are built: exact GBP money strings, immutable staff
+rates and time entries, permanent corrections, billing, an encrypted bank
+register, balanced client/business postings, receipts, allocation corrections,
+derived ledgers, permissions, audit and the staff API. Withdrawals, bank
+outcomes, reconciliation and Finance screens are later steps.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -112,8 +113,9 @@ again during the Finance security review and before production.
 
 ## Permissions
 
-The first four permissions are built in step 14a and `bills.manage` in step
-14b. The remaining permissions are added only with their implementation step.
+The first four permissions are built in step 14a, `bills.manage` in step 14b
+and `client_money.record` in step 14c. The remaining permissions are added
+only with their implementation step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -206,11 +208,14 @@ Event families:
 - `rate.created`, `time.recorded`, `time.corrected`, `bill.draft_created`,
   `bill.draft_updated`, `bill.issued`, `bill.credited`, `bill.delivered`,
   `bill.downloaded` and `bill.credit_downloaded` are built;
-- `client_money.received`, `client_money.allocated`,
-  `client_money.payment_requested`, `client_money.payment_approved`,
-  `client_money.payment_rejected`, `client_money.paid`;
-- `bank_statement.imported`, `bank_transaction.matched`;
-- `reconciliation.prepared`, `reconciliation.signed_off`.
+- `finance.bank_account_created`, `finance.bank_account_closed`,
+  `finance.client_money_received`, `finance.business_money_received`,
+  `finance.client_money_allocated` and `finance.business_money_allocated` are built;
+- later payment events include `finance.client_money_payment_requested`,
+  `finance.client_money_payment_approved`,
+  `finance.client_money_payment_rejected` and `finance.client_money_paid`;
+- `finance.bank_statement_imported`, `finance.bank_transaction_matched`;
+- `finance.reconciliation_prepared`, `finance.reconciliation_signed_off`.
 
 Audit metadata uses ids, event kinds, pence amounts and safe states. It does
 not contain bank details, payee names, time descriptions, bill narratives,
@@ -292,6 +297,33 @@ exceed a line. The application cannot write billing tables directly. Once a
 draft is issued, its source rows and every issued bill, credit note and delivery
 row resist update, deletion and truncation even by the table owner.
 
+### Step 14c API
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| POST | `/finance/bank-accounts` | `client_money.record` | Add a permanent client or business bank-account record; full details are encrypted before PostgreSQL and never returned |
+| GET | `/finance/bank-accounts` | `finance.view_all` | List safe names, kinds, opening/closure dates and last four account-number digits |
+| POST | `/finance/bank-accounts/:bankAccountId/close` | `client_money.record` | Add a permanent closure event; the register row is not edited |
+| POST | `/finance/receipts` | `client_money.record` | Record one bank-confirmed client or business receipt and its two balanced postings |
+| POST | `/finance/allocations` | `client_money.record` | Correct an allocation between two matters of the same client on one ledger side |
+| GET | `/finance/matters/:matterId/ledger` | `finance.view_all` | Return derived client/business balances and 100 newest matter postings; `before` continues the list |
+| GET | `/finance/bank-accounts/:bankAccountId/cash-book` | `finance.view_all` | Return the derived bank balance and 100 newest bank postings; `before` continues the list |
+
+Accounts alone records bank accounts, receipts and allocations. Accounts and
+Compliance can read the firm-wide bank register, cash books and matter
+ledgers. Full sort codes and account numbers are AES-GCM encrypted under the
+separate `FINANCE_ENCRYPTION_KEY`; list and change responses expose only the
+safe name and last four digits, and audit contains neither.
+
+PostgreSQL rechecks the live Accounts role, account and matter state. Receipts
+derive their client/business side from the bank-account kind. Allocations lock
+both matters in a stable order, require the same client and cannot take a
+client ledger below zero. Bills and credit notes automatically add their
+balanced business-ledger/control postings, including a migration backfill for
+records issued in step 14b. All register, closure, transaction and posting
+rows reject direct application writes and resist update, deletion and
+truncation even by the table owner.
+
 ## Not in the first version
 
 - Open Banking, bank credentials, bank payment initiation or automatic feeds.
@@ -321,8 +353,10 @@ of each safeguard and updated documentation before the next step.
   lines, credit notes, delivery records and fixed bill/credit-note downloads.
   Migration `0043`; API implementation in `apps/api/src/finance/`. No screens,
   client portal finance or money movement.
-- **14c.** Encrypted bank-account register, balanced client/business postings,
-  matter ledgers, receipts and allocation corrections.
+- **14c. Done.** Encrypted bank-account register, balanced client/business
+  postings, matter ledgers, cash books, receipts and same-client allocation
+  corrections. Migration `0044`; API implementation in
+  `apps/api/src/finance/`. Withdrawals and bank outcomes remain step 14d.
 - **14d.** Client-money payment requests, encrypted payee details, reservations,
   four-eyes approval and recorded bank outcomes, including billed-cost
   transfers.
@@ -391,3 +425,31 @@ the six-step build order above.
   checks, direct application writes, mutable issued drafts or posted records,
   missing issue, numbering, linked-time or credit locks, incorrect VAT and
   final-penny credits, over-crediting and invalid delivery targets.
+
+## Step 14c verification
+
+- Positive tests cover authenticated bank-detail encryption, keyed duplicate
+  detection, safe register fields, permanent closure, exact client/business
+  receipts, same-client allocation corrections, automatic bill/credit
+  postings, signed derived balances, allocation counterpart ids and stable
+  100-row ledger/cash-book paging.
+- Negative tests cover missing permissions, clients and non-Accounts staff,
+  unknown input, malformed bank details, duplicate accounts and references,
+  invalid dates, inactive or role-lost actors, awaiting-clearance matters,
+  cross-client, same-matter and excessive client allocations, direct writes,
+  unbalanced/mismatched postings and every owner mutation or truncation.
+- Transaction tests prove receipts roll back when audit fails. Audit uses ids,
+  kinds, dates, sides and pence only; bank names/details, references, purposes
+  and allocation reasons stay out. Encryption tests prove random nonces and
+  contexts, context-bound integrity and failure under another finance key.
+- A controlled race holds the first allocation transaction open, proves the
+  second waits on the ordered matter locks, then proves it sees the committed
+  balance and is refused. Database tests run through application and owner
+  roles.
+- Thirty-one deliberate break cases were run and restored. They proved the
+  tests catch missing permission mappings and route guards, loose input or
+  paging, unsafe audit data or failure handling, broken encryption randomness,
+  context binding, key use or keyed fingerprints, incorrect signed amounts or
+  allocation counterpart ids, invalid audit actions, missing Accounts/date/
+  duplicate/closure/matter/client/balance/posting checks, lost allocation
+  locking, automatic posting, direct-write denial and owner immutability.

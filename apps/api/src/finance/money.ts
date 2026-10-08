@@ -35,3 +35,10 @@ export function billAmountToPence(value: string): string {
   }
   return pence.toString();
 }
+
+export function signedPenceToPounds(value: string): string {
+  if (!/^-?\d+$/.test(value)) throw new Error('Invalid signed pence amount');
+  const pence = BigInt(value);
+  const absolute = pence < 0n ? -pence : pence;
+  return `${pence < 0n ? '-' : ''}${absolute / 100n}.${(absolute % 100n).toString().padStart(2, '0')}`;
+}

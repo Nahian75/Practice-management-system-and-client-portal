@@ -1,10 +1,11 @@
 # API
 
-**Current state (2026-10-08):** Health, authentication, staff management,
+**Current state (2026-10-09):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
-are built. Tasks and Notifications are built. Finance steps 14a and 14b add
-rates, time recording and correction, and draft, issued bill, credit-note,
-delivery-record and fixed-download APIs; they do not add money movement.
+are built. Tasks and Notifications are built. Finance steps 14a to 14c add
+rates, time and billing plus the encrypted bank register, receipts, allocation
+corrections and derived ledger/cash-book APIs. Withdrawals and reconciliation
+are not built.
 
 ## Endpoints
 
@@ -36,6 +37,13 @@ delivery-record and fixed-download APIs; they do not add money movement.
 | POST | `/credit-notes/:creditNoteId/deliveries` | `bills.manage` | Record a permanent delivery event with `{method, note}`; does not send the credit note |
 | GET | `/bills/:billId/content` | Same record rule as the bill | Audited UTF-8 text attachment generated from the fixed snapshot, with no-store and restrictive content headers |
 | GET | `/credit-notes/:creditNoteId/content` | Same record rule as the credit note | Audited UTF-8 text attachment generated from the fixed snapshots, with the same safe headers |
+| POST | `/finance/bank-accounts` | `client_money.record` | `{kind,name,sortCode,accountNumber,openedOn}` -> 201 with safe register fields only. Full details are encrypted and never returned; 409 for a duplicate or invalid live state |
+| GET | `/finance/bank-accounts` | `finance.view_all` | `{bankAccounts}` with safe name, kind, last four digits and opening/closure dates; no full bank details |
+| POST | `/finance/bank-accounts/:bankAccountId/close` | `client_money.record` | `{closedOn,reason}` -> 201 with the permanently closed safe register record; 409 if already closed or the date is invalid |
+| POST | `/finance/receipts` | `client_money.record` | `{bankAccountId,matterId,receivedOn,amount,reference,purpose}` -> 201 with the immutable client/business transaction and exact amount string |
+| POST | `/finance/allocations` | `client_money.record` | `{side,sourceMatterId,targetMatterId,amount,reason}` -> 201 with the immutable same-client correction; client money cannot be over-allocated |
+| GET | `/finance/matters/:matterId/ledger` | `finance.view_all` | Derived client/business balances and 100 newest postings. `before` continues the list |
+| GET | `/finance/bank-accounts/:bankAccountId/cash-book` | `finance.view_all` | Safe bank register record, derived balance and 100 newest bank postings. `before` continues the list |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |
 | POST | `/auth/two-factor` | Public, but needs a session waiting for 2FA | `{"code"}`: a 6-digit authenticator code or a backup code. 200 `{"account"}` with a new session cookie. 401 `The code is incorrect` (try again) or `Please sign in again` (no waiting sign-in, 5 wrong codes, or account blocked) |

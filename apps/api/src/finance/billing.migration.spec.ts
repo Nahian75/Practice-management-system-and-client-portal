@@ -381,7 +381,7 @@ describe('bill database rules', () => {
       await expect(sql`select app.record_bill_delivery(${billId}, null, 'email', null, ${feeEarner.id})`.execute(db)).rejects.toThrow(/active accounts/i);
       await expect(sql`update credit_notes set reason = 'Changed' where id = ${creditId}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
       await expect(sql`delete from bill_deliveries where id = ${billDelivery}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
-      await expect(sql`truncate bill_deliveries, credit_note_lines, credit_notes`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+      await expect(sql`truncate finance_postings, finance_transactions, bill_deliveries, credit_note_lines, credit_notes`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
     });
   });
 });

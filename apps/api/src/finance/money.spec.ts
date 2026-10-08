@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billAmountToPence, penceToPounds, poundsToPence } from './money.js';
+import { billAmountToPence, penceToPounds, poundsToPence, signedPenceToPounds } from './money.js';
 
 describe('money strings', () => {
   it.each([
@@ -29,5 +29,11 @@ describe('money strings', () => {
 
   it.each(['0.00', '01.00', '-1.00', '1000000.01', '1e3'])('refuses invalid bill amount %s', (value) => {
     expect(() => billAmountToPence(value)).toThrow(/money amount/i);
+  });
+
+  it.each([
+    ['0', '0.00'], ['50', '0.50'], ['-50', '-0.50'], ['-2500', '-25.00'],
+  ])('formats signed ledger balance %s', (pence, pounds) => {
+    expect(signedPenceToPounds(pence)).toBe(pounds);
   });
 });

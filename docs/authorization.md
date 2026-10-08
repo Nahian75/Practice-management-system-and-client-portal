@@ -1,9 +1,10 @@
 # Authorization
 
-**Current state (2026-10-08):** Layers 1 and 2 built, including the
+**Current state (2026-10-09):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
-issued billing records.
+issued billing records. Finance-wide bank, cash-book and ledger reads are
+restricted to Accounts and Compliance; step 14c writes are Accounts-only.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -83,6 +84,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `finance.view_all` - read Finance records across matters | | | | ✓ | ✓ |
 | `rates.manage` - create permanent effective staff rates | | | | ✓ | |
 | `bills.manage` - prepare, issue, credit and record delivery of bills | | | | ✓ | |
+| `client_money.record` - record bank accounts, receipts and allocation corrections | | | | ✓ | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.

@@ -622,6 +622,75 @@ export interface BillDeliveriesTable {
   delivered_at: DatabaseSet<Date>;
 }
 
+export type BankAccountKind = 'client' | 'business';
+export type FinanceTransactionKind =
+  | 'bill'
+  | 'credit_note'
+  | 'client_receipt'
+  | 'business_receipt'
+  | 'client_allocation'
+  | 'business_allocation';
+export type FinancePostingAccount =
+  | 'client_bank'
+  | 'business_bank'
+  | 'client_ledger'
+  | 'business_ledger'
+  | 'business_control';
+
+export interface BankAccountsTable {
+  id: DatabaseSet<string>;
+  kind: DatabaseSet<BankAccountKind>;
+  name: DatabaseSet<string>;
+  last_four: DatabaseSet<string>;
+  encryption_context: DatabaseSet<string>;
+  fingerprint: DatabaseSet<Buffer>;
+  key_version: DatabaseSet<number>;
+  nonce: DatabaseSet<Buffer>;
+  ciphertext: DatabaseSet<Buffer>;
+  auth_tag: DatabaseSet<Buffer>;
+  opened_on: DatabaseSet<string>;
+  created_by: DatabaseSet<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface BankAccountClosuresTable {
+  id: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string>;
+  closed_on: DatabaseSet<string>;
+  reason: DatabaseSet<string>;
+  closed_by: DatabaseSet<string>;
+  closed_at: DatabaseSet<Date>;
+}
+
+export interface FinanceTransactionsTable {
+  id: DatabaseSet<string>;
+  kind: DatabaseSet<FinanceTransactionKind>;
+  client_id: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  related_matter_id: DatabaseSet<string | null>;
+  bank_account_id: DatabaseSet<string | null>;
+  source_bill_id: DatabaseSet<string | null>;
+  source_credit_note_id: DatabaseSet<string | null>;
+  reference: DatabaseSet<string | null>;
+  purpose: DatabaseSet<string>;
+  amount_pence: DatabaseSet<string>;
+  occurred_on: DatabaseSet<string>;
+  posted_by: DatabaseSet<string>;
+  posted_at: DatabaseSet<Date>;
+}
+
+export interface FinancePostingsTable {
+  id: DatabaseSet<string>;
+  transaction_id: DatabaseSet<string>;
+  position: DatabaseSet<number>;
+  account: DatabaseSet<FinancePostingAccount>;
+  direction: DatabaseSet<'debit' | 'credit'>;
+  amount_pence: DatabaseSet<string>;
+  client_id: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string | null>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -638,6 +707,8 @@ export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
+  bank_account_closures: BankAccountClosuresTable;
+  bank_accounts: BankAccountsTable;
   bill_deliveries: BillDeliveriesTable;
   bill_draft_lines: BillDraftLinesTable;
   bill_drafts: BillDraftsTable;
@@ -656,6 +727,8 @@ export interface Database {
   documents: DocumentsTable;
   email_outbox: EmailOutboxTable;
   email_outbox_changes: EmailOutboxChangesTable;
+  finance_postings: FinancePostingsTable;
+  finance_transactions: FinanceTransactionsTable;
   invitations: InvitationsTable;
   issued_bill_lines: IssuedBillLinesTable;
   issued_bills: IssuedBillsTable;

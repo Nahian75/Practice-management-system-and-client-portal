@@ -78,6 +78,8 @@ const envSchema = z
     MAIL_FROM_NAME: z.string().min(1).max(100).default('Practice Portal'),
     /** Seals queued email addresses, subjects and bodies before they enter PostgreSQL. */
     MAIL_ENCRYPTION_KEY: encryptionKeySchema,
+    /** Seals firm and client bank details before they enter PostgreSQL. */
+    FINANCE_ENCRYPTION_KEY: encryptionKeySchema,
     TRUSTED_PROXIES: trustedProxiesSchema,
     /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
     DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),

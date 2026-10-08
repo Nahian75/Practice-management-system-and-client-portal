@@ -5,7 +5,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { PermissionsService } from '../auth/permissions/permissions.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { Database } from '../database/schema.js';
-import type { BillDraft, BillLineInput, CreditNote, IssuedBill, IssuedBillSummary, StaffRate, SupplierSnapshot, TimeEntry } from './finance.js';
+import { BankAccountCipher } from './bank-account-cipher.js';
+import type { BankAccount, BillDraft, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, MatterLedger, MoneySide, StaffRate, SupplierSnapshot, TimeEntry } from './finance.js';
 import { FinanceRepository } from './finance.repository.js';
 
 export const FINANCE_PAGE_SIZE = 100;
@@ -40,6 +41,7 @@ export class FinanceService {
     private readonly finance: FinanceRepository,
     private readonly audit: AuditService,
     private readonly permissions: PermissionsService,
+    private readonly bankCipher: BankAccountCipher,
   ) {}
 
   async createBillDraft(matterId: string, details: BillDraftValues, by: FinanceActor): Promise<BillingChangeResult<BillDraft>> {
@@ -168,6 +170,120 @@ export class FinanceService {
       }, trx);
       return { fileName: `${credit.reference}.txt`, content: Buffer.from(creditText(credit, bill), 'utf8') };
     });
+  }
+
+  async createBankAccount(details: {
+    kind: 'client' | 'business'; name: string; sortCode: string; accountNumber: string; openedOn: string;
+  }, by: FinanceActor): Promise<BillingChangeResult<BankAccount>> {
+    const sealed = this.bankCipher.seal({ sortCode: details.sortCode, accountNumber: details.accountNumber });
+    try {
+      const value = await this.finance.transaction(async (trx) => {
+        const id = await this.finance.createBankAccount({
+          kind: details.kind, name: details.name, openedOn: details.openedOn,
+          actorId: by.accountId, sealed,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor, action: 'finance.bank_account_created', outcome: 'success',
+          resource: { type: 'bank_account', id }, metadata: { kind: details.kind, openedOn: details.openedOn },
+          ...by.context,
+        }, trx);
+        return this.finance.findBankAccount(id, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'changed_meanwhile' };
+    } catch (error) {
+      return billingDatabaseOutcome(error);
+    }
+  }
+
+  listBankAccounts(): Promise<BankAccount[]> {
+    return this.finance.listBankAccounts();
+  }
+
+  async closeBankAccount(id: string, closedOn: string, reason: string, by: FinanceActor): Promise<BillingChangeResult<BankAccount>> {
+    try {
+      const value = await this.finance.transaction(async (trx) => {
+        const closureId = await this.finance.closeBankAccount(id, closedOn, reason, by.accountId, trx);
+        await this.audit.record({
+          actor: by.actor, action: 'finance.bank_account_closed', outcome: 'success',
+          resource: { type: 'bank_account', id }, metadata: { closureId, closedOn }, ...by.context,
+        }, trx);
+        return this.finance.findBankAccount(id, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'changed_meanwhile' };
+    } catch (error) {
+      return billingDatabaseOutcome(error);
+    }
+  }
+
+  async recordReceipt(details: {
+    bankAccountId: string; matterId: string; receivedOn: string; amountPence: string;
+    reference: string; purpose: string;
+  }, by: FinanceActor): Promise<BillingChangeResult<FinanceTransaction>> {
+    try {
+      const value = await this.finance.transaction(async (trx) => {
+        const id = await this.finance.recordReceipt({ ...details, actorId: by.accountId }, trx);
+        const transaction = await this.finance.findFinanceTransaction(id, trx);
+        if (!transaction) return undefined;
+        await this.audit.record({
+          actor: by.actor,
+          action: transaction.side === 'client' ? 'finance.client_money_received' : 'finance.business_money_received',
+          outcome: 'success', resource: { type: 'finance_transaction', id },
+          metadata: {
+            bankAccountId: details.bankAccountId, matterId: details.matterId,
+            side: transaction.side, amountPence: details.amountPence,
+          },
+          ...by.context,
+        }, trx);
+        return transaction;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'changed_meanwhile' };
+    } catch (error) {
+      return billingDatabaseOutcome(error);
+    }
+  }
+
+  async recordAllocation(details: {
+    side: MoneySide; sourceMatterId: string; targetMatterId: string; amountPence: string; reason: string;
+  }, by: FinanceActor): Promise<BillingChangeResult<FinanceTransaction>> {
+    try {
+      const value = await this.finance.transaction(async (trx) => {
+        const id = await this.finance.recordAllocation({ ...details, actorId: by.accountId }, trx);
+        const transaction = await this.finance.findFinanceTransaction(id, trx);
+        if (!transaction) return undefined;
+        await this.audit.record({
+          actor: by.actor,
+          action: details.side === 'client' ? 'finance.client_money_allocated' : 'finance.business_money_allocated',
+          outcome: 'success', resource: { type: 'finance_transaction', id },
+          metadata: {
+            sourceMatterId: details.sourceMatterId, targetMatterId: details.targetMatterId,
+            side: details.side, amountPence: details.amountPence,
+          },
+          ...by.context,
+        }, trx);
+        return transaction;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'changed_meanwhile' };
+    } catch (error) {
+      return billingDatabaseOutcome(error);
+    }
+  }
+
+  async matterLedger(matterId: string, before?: string): Promise<(MatterLedger & { next: string | null }) | undefined> {
+    const ledger = await this.finance.matterLedger(matterId, { before, limit: FINANCE_PAGE_SIZE });
+    if (!ledger) return undefined;
+    return {
+      ...ledger,
+      next: ledger.entries.length === FINANCE_PAGE_SIZE ? (ledger.entries.at(-1)?.id ?? null) : null,
+    };
+  }
+
+  async cashBook(bankAccountId: string, before?: string): Promise<(CashBook & { next: string | null }) | undefined> {
+    const book = await this.finance.cashBook(bankAccountId, { before, limit: FINANCE_PAGE_SIZE });
+    if (!book) return undefined;
+    return {
+      ...book,
+      next: book.entries.length === FINANCE_PAGE_SIZE ? (book.entries.at(-1)?.id ?? null) : null,
+    };
   }
 
   async createRate(
