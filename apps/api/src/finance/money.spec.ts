@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { penceToPounds, poundsToPence } from './money.js';
+import { billAmountToPence, penceToPounds, poundsToPence } from './money.js';
 
 describe('money strings', () => {
   it.each([
@@ -17,5 +17,17 @@ describe('money strings', () => {
 
   it('formats large database integers without converting them to floating point', () => {
     expect(penceToPounds('9007199254740993')).toBe('90071992547409.93');
+  });
+
+  it.each([
+    ['0.01', '1'],
+    ['123456.78', '12345678'],
+    ['1000000.00', '100000000'],
+  ])('converts bill amount %s without floating point', (pounds, pence) => {
+    expect(billAmountToPence(pounds)).toBe(pence);
+  });
+
+  it.each(['0.00', '01.00', '-1.00', '1000000.01', '1e3'])('refuses invalid bill amount %s', (value) => {
+    expect(() => billAmountToPence(value)).toThrow(/money amount/i);
   });
 });

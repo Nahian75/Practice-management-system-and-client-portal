@@ -2,8 +2,8 @@
 
 **Current state (2026-10-08):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-Finance step 14a, plus Playwright end-to-end tests for the staff app, Tasks,
-Notifications and the client portal.
+Finance steps 14a and 14b, plus Playwright end-to-end tests for the staff app,
+Tasks, Notifications and the client portal.
 
 ## Tools
 
@@ -186,8 +186,15 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   and 100-row keyset paging. Database tests use both application and owner
   roles for column grants, constraints and permanent history. A controlled
   race orders matter closure against time insertion. Deliberate breaks of the
-  application and migration safeguards are recorded in
-  [finance.md](finance.md#step-14a-verification).
+  application and migration safeguards are recorded in the
+  [step 14a](finance.md#step-14a-verification) and
+  [step 14b](finance.md#step-14b-verification) verification notes.
+- Billing tests cover exact positive amounts, VAT rounding, draft replacement,
+  issue snapshots and numbering, linked-time use, credit-note remaining
+  balances, delivery records, fixed downloads, permissions, record visibility,
+  strict inputs, safe summary and attachment responses, audit privacy and
+  rollback. Database tests exercise narrow functions and owner-level
+  immutability; controlled races cover issue, numbering and over-crediting.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

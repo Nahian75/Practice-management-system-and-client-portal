@@ -1,8 +1,8 @@
 # Audit
 
-**Current state (2026-10-07):** The protected audit table and `AuditService`
-are used by authentication, staff, clients, matters, documents, portal access
-and Tasks steps 12a and 12b.
+**Current state (2026-10-08):** The protected audit table and `AuditService`
+are used by authentication, staff, clients, matters, documents, portal access,
+Tasks, Notifications and Finance steps 14a and 14b.
 
 ## Purpose
 
@@ -69,3 +69,10 @@ new account ids. Status uses `task.completed`, `task.cancelled` or
 same transaction as the task and its history, and never copy the title,
 description, names or due date into audit metadata. No-op requests create no
 event.
+
+Finance records rate and time actions and the billing events
+`bill.draft_created`, `bill.draft_updated`, `bill.issued`, `bill.credited`,
+`bill.delivered`, `bill.downloaded` and `bill.credit_downloaded`. Bill audit
+metadata contains only ids, references, counts, methods and pence totals; it
+does not copy supplier/client addresses, line descriptions, credit reasons or
+delivery notes. Every billing change and its audit event share one transaction.

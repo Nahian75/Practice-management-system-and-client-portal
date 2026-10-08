@@ -285,7 +285,7 @@ describe('finance time database rules', () => {
       await expect(sql`delete from time_entries where id = ${entry.id}`.execute(db)).rejects.toThrow(/permission denied/i);
       await expect(sql`update time_entries set minutes = 1 where id = ${entry.id}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
       await expect(sql`delete from time_entries where id = ${entry.id}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
-      await expect(sql`truncate time_entry_corrections, time_entries`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+      await expect(sql`truncate time_entry_corrections, time_entries cascade`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
     });
   });
 

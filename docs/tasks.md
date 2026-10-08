@@ -173,7 +173,8 @@ fails, the task creation or change and its notification all roll back.
 - Client portal tasks.
 - Automatic reminders and email: built in Notifications, not Tasks
   ([notifications.md](notifications.md)).
-- Time recording and billing: Finance later.
+- Time recording and billing: built in Finance, not Tasks
+  ([finance.md](finance.md)).
 - General tasks which have no matter.
 
 ## Build order

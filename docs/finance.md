@@ -1,9 +1,10 @@
 # Finance
 
 **Current state (2026-10-08):** First-version design approved by the project
-owner. Step 14a is built: exact GBP money strings, immutable staff rates and
-time entries, permanent corrections, permissions, audit and the staff API.
-There are no bills, client-money records or Finance screens yet.
+owner. Steps 14a and 14b are built: exact GBP money strings, immutable staff
+rates and time entries, permanent corrections, draft and issued bills, credit
+notes, delivery records, permissions, audit and the staff API. There are no
+client-money records or Finance screens yet.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -32,6 +33,14 @@ Authority in England and Wales.
   firm's own service. A true disbursement is passed on at the exact amount and
   itemised separately; a recharge normally forms part of the firm's taxable
   supply.
+- [HMRC VAT Notice 700](https://www.gov.uk/guidance/vat-guide-notice-700)
+  requires a unique sequential invoice number, tax point and issue date,
+  supplier and customer identities and addresses, descriptions, VAT treatment
+  and totals. A credit note identifies the original bill and the reason and
+  amount of the correction.
+- [HMRC VAT rates](https://www.gov.uk/vat-rates) are represented explicitly as
+  standard 20%, reduced 5%, zero-rated, exempt or outside scope. Exempt and
+  outside-scope lines both calculate no VAT but remain different records.
 
 The rules can change. These links and the assumptions below must be checked
 again during the Finance security review and before production.
@@ -103,8 +112,8 @@ again during the Finance security review and before production.
 
 ## Permissions
 
-The first four permissions are built in step 14a. The remaining permissions
-are added only with their implementation step.
+The first four permissions are built in step 14a and `bills.manage` in step
+14b. The remaining permissions are added only with their implementation step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -141,8 +150,15 @@ by the design.
 - A draft belongs to one matter and has fee, recharge and true-disbursement
   lines. Each line states its VAT treatment; Stass does not infer tax treatment
   from the word “disbursement”.
-- Issue assigns a database sequence number and snapshots the client and matter
-  reference, lines, net, VAT and gross totals. The number is never reused.
+- Accounts supplies the firm's name, billing address and VAT registration on
+  the draft because Stass does not yet have a firm-settings record. Issue
+  refuses taxable lines without a VAT registration number. The operational
+  deployment checklist must make these values part of controlled firm setup,
+  rather than asking staff to retype them on every future screen.
+- Issue assigns a database-serialised sequence number and snapshots its London
+  issue date, the supplier and client names and addresses, client and matter
+  references, lines, linked time facts, net, VAT and gross totals. The number
+  is never reused.
 - Delivery is a separate permanent event recording method and time. Email is
   not in the first version; staff can download the fixed bill for controlled
   delivery and record how it was provided.
@@ -187,8 +203,9 @@ by the design.
 
 Event families:
 
-- `rate.created`, `time.recorded`, `time.corrected` are built;
-- `bill.issued`, `bill.delivered`, `bill.credited`;
+- `rate.created`, `time.recorded`, `time.corrected`, `bill.draft_created`,
+  `bill.draft_updated`, `bill.issued`, `bill.credited`, `bill.delivered`,
+  `bill.downloaded` and `bill.credit_downloaded` are built;
 - `client_money.received`, `client_money.allocated`,
   `client_money.payment_requested`, `client_money.payment_approved`,
   `client_money.payment_rejected`, `client_money.paid`;
@@ -210,8 +227,8 @@ attempts are audited without storing the sensitive request body.
   sign-off.
 - Totals are returned as decimal strings such as `"123.45"`, not JavaScript
   numbers. Dates are UK calendar dates and timestamps are UTC ISO strings.
-- Lists use stable keyset paging. Exports are generated from fixed posted
-  records, carry no spreadsheet formula cells and are audited.
+- Rate and time lists use stable keyset paging. Exports are generated from
+  fixed posted records, carry no spreadsheet formula cells and are audited.
 - There are no client portal finance routes or screens in this version.
 
 ### Step 14a API
@@ -238,6 +255,43 @@ delete or truncate posted records. The table owner is also stopped by triggers.
 Correction rows keep the before and after values; a void keeps the original
 entry and marks it void. An identical replacement creates no correction.
 
+### Step 14b API
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| POST | `/matters/:matterId/bill-drafts` | `bills.manage`, open matter | Create a complete draft with supplier details and 1 to 100 fee, recharge or disbursement lines |
+| GET | `/bill-drafts/:draftId` | `bills.manage` | Read a mutable draft; an issued draft is no longer returned as a draft |
+| PUT | `/bill-drafts/:draftId` | `bills.manage` | Replace the complete draft before issue |
+| POST | `/bill-drafts/:draftId/issue` | `bills.manage` | Create and return the permanent numbered bill snapshot |
+| GET | `/matters/:matterId/bills` | `finance.matter.view`; current team unless `finance.view_all` | List safe issued-bill summaries, newest number first; descriptions and client details are omitted |
+| GET | `/bills/:billId` | Same record rule as the list | Read one complete issued bill snapshot |
+| POST | `/bills/:billId/credit-notes` | `bills.manage` | Issue a permanent numbered credit against named bill lines and their remaining balances |
+| GET | `/credit-notes/:creditNoteId` | Same record rule as its bill | Read one complete credit note |
+| POST | `/bills/:billId/deliveries` | `bills.manage` | Record how a bill was delivered; no message is sent |
+| POST | `/credit-notes/:creditNoteId/deliveries` | `bills.manage` | Record how a credit note was delivered; no message is sent |
+| GET | `/bills/:billId/content` | Same record rule as the bill | Download an audited fixed UTF-8 text rendering with safe attachment headers |
+| GET | `/credit-notes/:creditNoteId/content` | Same record rule as the credit note | Download an audited fixed UTF-8 text rendering with safe attachment headers |
+
+Bill line amounts are positive decimal strings up to `"1000000.00"`; all
+arithmetic remains integer pence. VAT is 20% for standard, 5% for reduced and
+zero for zero-rated, exempt and outside-scope lines, rounded to the nearest
+penny per line. A final credit for a line takes its exact remaining VAT so
+rounding cannot leave a penny behind.
+
+Only an active Accounts holder can manage billing. Draft creation requires an
+open matter, a non-future tax point, a due date on or after it, controlled
+supplier details and, for taxable lines, a VAT registration number. Linked
+time must be unvoided, belong to the matter and appear only on a fee line. An
+existing draft may still be issued after matter closure.
+
+PostgreSQL serialises bill and credit-note numbering and snapshots London issue
+date, client and supplier identities and addresses, references, line facts,
+linked time facts, VAT and totals. It locks linked time so one entry cannot be
+billed twice and locks bills while crediting so concurrent credits cannot
+exceed a line. The application cannot write billing tables directly. Once a
+draft is issued, its source rows and every issued bill, credit note and delivery
+row resist update, deletion and truncation even by the table owner.
+
 ## Not in the first version
 
 - Open Banking, bank credentials, bank payment initiation or automatic feeds.
@@ -263,8 +317,10 @@ of each safeguard and updated documentation before the next step.
 - **14a. Done.** Money and time primitives, permissions, immutable staff rates
   and time recording/correction API. Migration `0042`; implementation in
   `apps/api/src/finance/`. No bills or money movement yet.
-- **14b.** Draft bills, immutable issue snapshots, VAT/disbursement lines,
-  credit notes, delivery records and bill download.
+- **14b. Done.** Draft bills, immutable issue snapshots, VAT/disbursement
+  lines, credit notes, delivery records and fixed bill/credit-note downloads.
+  Migration `0043`; API implementation in `apps/api/src/finance/`. No screens,
+  client portal finance or money movement.
 - **14c.** Encrypted bank-account register, balanced client/business postings,
   matter ledgers, receipts and allocation corrections.
 - **14d.** Client-money payment requests, encrypted payee details, reservations,
@@ -306,3 +362,32 @@ the six-step build order above.
   missing rate creator/worker/team/role/status/future/effective-rate checks,
   missing closure locking and no-op suppression, widened database constraints
   or insert rights, and mutable rate, time or correction history.
+
+## Step 14b verification
+
+- Positive tests cover exact bill-money conversion, per-line VAT and rounding,
+  draft creation and replacement, immutable issue snapshots and consecutive
+  numbering, linked time facts, issue after closure, partial and final credits,
+  delivery events, fixed bill and credit-note downloads, Accounts and
+  Compliance visibility, matter-team visibility and private bill summaries.
+- Negative tests cover missing permissions, unknown fields, malformed, zero or
+  excessive amounts, dates, supplier and VAT details, line count and shape,
+  foreign, void, reused or non-fee time, missing client address, repeated issue,
+  over-crediting, duplicate or foreign credit lines, invalid reasons and
+  deliveries, hidden records, direct table writes and every posted mutation.
+- Transaction tests prove issue rolls back when its audit event fails. Audit
+  uses ids, references, counts, delivery methods and pence totals; supplier and
+  client addresses, line descriptions, credit reasons and delivery notes stay
+  out. Downloads are audited and use no-store, nosniff, sandboxed attachment
+  responses.
+- Controlled concurrency tests prove two issue attempts cannot issue one draft,
+  simultaneous different bills receive consecutive numbers, one time entry
+  cannot be billed twice, and concurrent credits cannot exceed the remaining
+  line balance. Database tests run through both application and owner roles.
+- Twenty-two deliberate break cases were run and restored. They proved the
+  tests catch a missing permission mapping or route guard, a widened bill-money
+  bound, lost record visibility, leaked list or audit text, unsafe download
+  headers, detached audit, missing Accounts/matter/date/supplier/VAT/line/time
+  checks, direct application writes, mutable issued drafts or posted records,
+  missing issue, numbering, linked-time or credit locks, incorrect VAT and
+  final-penny credits, over-crediting and invalid delivery targets.

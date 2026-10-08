@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Kysely, Selectable } from 'kysely';
+import { sql, type Kysely, type Selectable } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, MatterStatus, TimeEntryCorrectionsTable } from '../database/schema.js';
 import { visibleTo } from '../matters/matters.repository.js';
-import type { StaffRate, TimeCorrection, TimeEntry } from './finance.js';
+import type { BillDraft, BillLine, BillLineInput, CreditNote, IssuedBill, IssuedBillSummary, StaffRate, SupplierSnapshot, TimeCorrection, TimeEntry } from './finance.js';
 
 interface RateRow {
   id: string;
@@ -37,6 +37,130 @@ export class FinanceRepository {
 
   transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {
     return this.db.transaction().execute(work);
+  }
+
+  async createBillDraft(details: {
+    matterId: string; taxPoint: string; dueOn: string; supplier: SupplierSnapshot;
+    lines: BillLineInput[]; actorId: string;
+  }, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_bill_draft(
+      ${details.matterId}, ${details.taxPoint}::date, ${details.dueOn}::date,
+      ${JSON.stringify(toSupplierJson(details.supplier))}::jsonb,
+      ${JSON.stringify(details.lines.map(toLineJson))}::jsonb, ${details.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async replaceBillDraft(id: string, details: {
+    taxPoint: string; dueOn: string; supplier: SupplierSnapshot; lines: BillLineInput[]; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    await sql`select app.replace_bill_draft(
+      ${id}, ${details.taxPoint}::date, ${details.dueOn}::date,
+      ${JSON.stringify(toSupplierJson(details.supplier))}::jsonb,
+      ${JSON.stringify(details.lines.map(toLineJson))}::jsonb, ${details.actorId}
+    )`.execute(trx);
+  }
+
+  async issueBill(draftId: string, actorId: string, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.issue_bill(${draftId}, ${actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async issueCreditNote(billId: string, reason: string, lines: { billLineId: string; netPence: string }[], actorId: string, trx: Kysely<Database>): Promise<string> {
+    const values = lines.map((line) => ({ bill_line_id: line.billLineId, net_pence: line.netPence }));
+    const result = await sql<{ id: string }>`select app.issue_credit_note(
+      ${billId}, ${reason}, ${JSON.stringify(values)}::jsonb, ${actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async recordBillDelivery(target: { billId: string | null; creditNoteId: string | null; method: string; note: string | null; actorId: string }, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_bill_delivery(
+      ${target.billId}, ${target.creditNoteId}, ${target.method}, ${target.note}, ${target.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async findBillDraft(id: string, executor: Kysely<Database> = this.db): Promise<BillDraft | undefined> {
+    const row = await executor.selectFrom('bill_drafts')
+      .selectAll().where('id', '=', id)
+      .where((eb) => eb.not(eb.exists(eb.selectFrom('issued_bills').select('id').whereRef('issued_bills.draft_id', '=', 'bill_drafts.id'))))
+      .executeTakeFirst();
+    if (!row) return undefined;
+    const lines = await executor.selectFrom('bill_draft_lines').selectAll().where('draft_id', '=', id).orderBy('position').execute();
+    const mapped = lines.map((line) => toDraftLine(line));
+    const totals = sumLines(mapped);
+    return {
+      id: row.id, matterId: row.matter_id, status: 'draft', taxPoint: row.tax_point, dueOn: row.due_on,
+      supplier: supplierFromRow(row), ...totals, lines: mapped, createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+
+  async findBill(id: string, viewerId: string, viewAll: boolean, executor: Kysely<Database> = this.db): Promise<IssuedBill | undefined> {
+    const row = await executor.selectFrom('issued_bills').innerJoin('matters', 'matters.id', 'issued_bills.matter_id')
+      .selectAll('issued_bills').where('issued_bills.id', '=', id)
+      .$if(!viewAll, (query) => query.where(visibleTo(viewerId))).executeTakeFirst();
+    return row && this.billFromRow(row, executor);
+  }
+
+  async listBills(matterId: string, viewerId: string, viewAll: boolean): Promise<IssuedBillSummary[] | undefined> {
+    if (!(await this.matterAccess(matterId, viewerId, viewAll))) return undefined;
+    const rows = await this.db.selectFrom('issued_bills').innerJoin('matters', 'matters.id', 'issued_bills.matter_id')
+      .selectAll('issued_bills').where('issued_bills.matter_id', '=', matterId)
+      .$if(!viewAll, (query) => query.where(visibleTo(viewerId))).orderBy('issued_bills.number', 'desc').execute();
+    return rows.map((row) => ({
+      id: row.id, reference: row.reference, matterId: row.matter_id, taxPoint: row.tax_point, dueOn: row.due_on,
+      netPence: row.net_pence, vatPence: row.vat_pence, grossPence: row.gross_pence,
+      issuedOn: row.issued_on, issuedAt: row.issued_at,
+    }));
+  }
+
+  async findCreditNote(id: string, viewerId: string, viewAll: boolean, executor: Kysely<Database> = this.db): Promise<CreditNote | undefined> {
+    const row = await executor.selectFrom('credit_notes')
+      .innerJoin('issued_bills', 'issued_bills.id', 'credit_notes.bill_id')
+      .innerJoin('matters', 'matters.id', 'issued_bills.matter_id')
+      .selectAll('credit_notes').select(['issued_bills.reference as bill_reference', 'issued_bills.matter_id'])
+      .where('credit_notes.id', '=', id)
+      .$if(!viewAll, (query) => query.where(visibleTo(viewerId))).executeTakeFirst();
+    if (!row) return undefined;
+    const lines = await executor.selectFrom('credit_note_lines')
+      .innerJoin('issued_bill_lines', 'issued_bill_lines.id', 'credit_note_lines.bill_line_id')
+      .selectAll('credit_note_lines').select('issued_bill_lines.description')
+      .where('credit_note_id', '=', id).orderBy('credit_note_lines.position').execute();
+    return {
+      id: row.id, reference: row.reference, billId: row.bill_id, billReference: row.bill_reference,
+      matterId: row.matter_id, reason: row.reason, netPence: row.net_pence, vatPence: row.vat_pence,
+      grossPence: row.gross_pence, issuedAt: row.issued_at,
+      issuedOn: row.issued_on,
+      lines: lines.map((line) => ({
+        id: line.id, position: line.position, billLineId: line.bill_line_id, description: line.description,
+        netPence: line.net_pence, vatPence: line.vat_pence, grossPence: line.gross_pence,
+      })),
+    };
+  }
+
+  private async billFromRow(row: Selectable<Database['issued_bills']>, executor: Kysely<Database>): Promise<IssuedBill> {
+    const lines = await executor.selectFrom('issued_bill_lines').selectAll().where('bill_id', '=', row.id).orderBy('position').execute();
+    return {
+      id: row.id, draftId: row.draft_id, reference: row.reference, matterId: row.matter_id,
+      matterReference: row.matter_reference, clientReference: row.client_reference, clientName: row.client_name,
+      clientAddress: {
+        addressLine1: row.client_address_line1, addressLine2: row.client_address_line2, town: row.client_town,
+        postcode: row.client_postcode, country: row.client_country,
+      },
+      supplier: supplierFromRow(row), taxPoint: row.tax_point, dueOn: row.due_on,
+      netPence: row.net_pence, vatPence: row.vat_pence, grossPence: row.gross_pence,
+      issuedOn: row.issued_on, issuedAt: row.issued_at,
+      lines: lines.map((line) => ({
+        id: line.id, position: line.position, kind: line.kind, description: line.description,
+        netPence: line.net_pence, vatTreatment: line.vat_treatment, timeEntryId: line.source_time_entry_id,
+        vatPence: line.vat_pence, grossPence: line.gross_pence,
+        ...(line.time_worker_name === null ? {} : { time: {
+          workerName: line.time_worker_name, workedOn: line.time_worked_on!, minutes: line.time_minutes!,
+          hourlyRatePence: line.time_hourly_rate_pence!,
+        } }),
+      })),
+    };
   }
 
   async eligibleRateAccount(accountId: string): Promise<boolean> {
@@ -190,6 +314,53 @@ export class FinanceRepository {
       .execute();
     return rows.map((row) => toTime(row, corrections.filter((correction) => correction.time_entry_id === row.id)));
   }
+}
+
+function toSupplierJson(supplier: SupplierSnapshot) {
+  return {
+    name: supplier.name, address_line1: supplier.addressLine1, address_line2: supplier.addressLine2,
+    town: supplier.town, postcode: supplier.postcode, country: supplier.country,
+    vat_registration_number: supplier.vatRegistrationNumber,
+  };
+}
+
+function toLineJson(line: BillLineInput) {
+  return {
+    kind: line.kind, description: line.description, net_pence: line.netPence,
+    vat_treatment: line.vatTreatment, time_entry_id: line.timeEntryId,
+  };
+}
+
+function vatFor(netPence: string, treatment: BillLine['vatTreatment']): string {
+  const rate = treatment === 'standard' ? 20n : treatment === 'reduced' ? 5n : 0n;
+  return ((BigInt(netPence) * rate + 50n) / 100n).toString();
+}
+
+function toDraftLine(row: Selectable<Database['bill_draft_lines']>): BillLine {
+  const vatPence = vatFor(row.net_pence, row.vat_treatment);
+  return {
+    id: row.id, position: row.position, kind: row.kind, description: row.description,
+    netPence: row.net_pence, vatTreatment: row.vat_treatment, timeEntryId: row.time_entry_id,
+    vatPence, grossPence: (BigInt(row.net_pence) + BigInt(vatPence)).toString(),
+  };
+}
+
+function sumLines(lines: BillLine[]) {
+  const net = lines.reduce((sum, line) => sum + BigInt(line.netPence), 0n);
+  const vat = lines.reduce((sum, line) => sum + BigInt(line.vatPence), 0n);
+  return { netPence: net.toString(), vatPence: vat.toString(), grossPence: (net + vat).toString() };
+}
+
+function supplierFromRow(row: {
+  supplier_name: string; supplier_address_line1: string; supplier_address_line2: string | null;
+  supplier_town: string; supplier_postcode: string | null; supplier_country: string;
+  supplier_vat_registration_number: string | null;
+}): SupplierSnapshot {
+  return {
+    name: row.supplier_name, addressLine1: row.supplier_address_line1, addressLine2: row.supplier_address_line2,
+    town: row.supplier_town, postcode: row.supplier_postcode, country: row.supplier_country,
+    vatRegistrationNumber: row.supplier_vat_registration_number,
+  };
 }
 
 function toRate(row: RateRow): StaffRate {

@@ -508,6 +508,120 @@ export interface TimeEntryCorrectionsTable {
   corrected_at: DatabaseSet<Date>;
 }
 
+export interface BillDraftsTable {
+  id: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  tax_point: DatabaseSet<string>;
+  due_on: DatabaseSet<string>;
+  supplier_name: DatabaseSet<string>;
+  supplier_address_line1: DatabaseSet<string>;
+  supplier_address_line2: DatabaseSet<string | null>;
+  supplier_town: DatabaseSet<string>;
+  supplier_postcode: DatabaseSet<string | null>;
+  supplier_country: DatabaseSet<string>;
+  supplier_vat_registration_number: DatabaseSet<string | null>;
+  created_by: DatabaseSet<string>;
+  created_at: DatabaseSet<Date>;
+  updated_by: DatabaseSet<string>;
+  updated_at: DatabaseSet<Date>;
+}
+
+export interface BillDraftLinesTable {
+  id: DatabaseSet<string>;
+  draft_id: DatabaseSet<string>;
+  position: DatabaseSet<number>;
+  kind: DatabaseSet<'fee' | 'recharge' | 'disbursement'>;
+  description: DatabaseSet<string>;
+  net_pence: DatabaseSet<string>;
+  vat_treatment: DatabaseSet<'standard' | 'reduced' | 'zero' | 'exempt' | 'outside_scope'>;
+  time_entry_id: DatabaseSet<string | null>;
+}
+
+export interface IssuedBillsTable {
+  id: DatabaseSet<string>;
+  draft_id: DatabaseSet<string>;
+  number: DatabaseSet<string>;
+  reference: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  client_id: DatabaseSet<string>;
+  matter_reference: DatabaseSet<string>;
+  client_reference: DatabaseSet<string>;
+  client_name: DatabaseSet<string>;
+  client_address_line1: DatabaseSet<string>;
+  client_address_line2: DatabaseSet<string | null>;
+  client_town: DatabaseSet<string>;
+  client_postcode: DatabaseSet<string | null>;
+  client_country: DatabaseSet<string>;
+  supplier_name: DatabaseSet<string>;
+  supplier_address_line1: DatabaseSet<string>;
+  supplier_address_line2: DatabaseSet<string | null>;
+  supplier_town: DatabaseSet<string>;
+  supplier_postcode: DatabaseSet<string | null>;
+  supplier_country: DatabaseSet<string>;
+  supplier_vat_registration_number: DatabaseSet<string | null>;
+  tax_point: DatabaseSet<string>;
+  due_on: DatabaseSet<string>;
+  net_pence: DatabaseSet<string>;
+  vat_pence: DatabaseSet<string>;
+  gross_pence: DatabaseSet<string>;
+  issued_by: DatabaseSet<string>;
+  issued_on: DatabaseSet<string>;
+  issued_at: DatabaseSet<Date>;
+}
+
+export interface IssuedBillLinesTable {
+  id: DatabaseSet<string>;
+  bill_id: DatabaseSet<string>;
+  position: DatabaseSet<number>;
+  kind: DatabaseSet<'fee' | 'recharge' | 'disbursement'>;
+  description: DatabaseSet<string>;
+  net_pence: DatabaseSet<string>;
+  vat_treatment: DatabaseSet<'standard' | 'reduced' | 'zero' | 'exempt' | 'outside_scope'>;
+  vat_rate_percent: DatabaseSet<number>;
+  vat_pence: DatabaseSet<string>;
+  gross_pence: DatabaseSet<string>;
+  source_time_entry_id: DatabaseSet<string | null>;
+  time_worker_name: DatabaseSet<string | null>;
+  time_worked_on: DatabaseSet<string | null>;
+  time_minutes: DatabaseSet<number | null>;
+  time_hourly_rate_pence: DatabaseSet<string | null>;
+}
+
+export interface CreditNotesTable {
+  id: DatabaseSet<string>;
+  number: DatabaseSet<string>;
+  reference: DatabaseSet<string>;
+  bill_id: DatabaseSet<string>;
+  reason: DatabaseSet<string>;
+  net_pence: DatabaseSet<string>;
+  vat_pence: DatabaseSet<string>;
+  gross_pence: DatabaseSet<string>;
+  issued_by: DatabaseSet<string>;
+  issued_on: DatabaseSet<string>;
+  issued_at: DatabaseSet<Date>;
+}
+
+export interface CreditNoteLinesTable {
+  id: DatabaseSet<string>;
+  credit_note_id: DatabaseSet<string>;
+  position: DatabaseSet<number>;
+  bill_line_id: DatabaseSet<string>;
+  net_pence: DatabaseSet<string>;
+  vat_pence: DatabaseSet<string>;
+  gross_pence: DatabaseSet<string>;
+}
+
+export interface BillDeliveriesTable {
+  id: DatabaseSet<string>;
+  bill_id: DatabaseSet<string | null>;
+  credit_note_id: DatabaseSet<string | null>;
+  document_type: DatabaseSet<'bill' | 'credit_note'>;
+  method: DatabaseSet<'email' | 'post' | 'hand' | 'other'>;
+  note: DatabaseSet<string | null>;
+  delivered_by: DatabaseSet<string>;
+  delivered_at: DatabaseSet<Date>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -524,12 +638,17 @@ export interface Database {
   accounts: AccountsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
+  bill_deliveries: BillDeliveriesTable;
+  bill_draft_lines: BillDraftLinesTable;
+  bill_drafts: BillDraftsTable;
   client_contacts: ClientContactsTable;
   client_individuals: ClientIndividualsTable;
   client_organisations: ClientOrganisationsTable;
   client_responsibility_changes: ClientResponsibilityChangesTable;
   conflict_checks: ConflictChecksTable;
   conflict_clearances: ConflictClearancesTable;
+  credit_note_lines: CreditNoteLinesTable;
+  credit_notes: CreditNotesTable;
   clients: ClientsTable;
   document_versions: DocumentVersionsTable;
   document_sharing_changes: DocumentSharingChangesTable;
@@ -538,6 +657,8 @@ export interface Database {
   email_outbox: EmailOutboxTable;
   email_outbox_changes: EmailOutboxChangesTable;
   invitations: InvitationsTable;
+  issued_bill_lines: IssuedBillLinesTable;
+  issued_bills: IssuedBillsTable;
   matter_closures: MatterClosuresTable;
   matter_compliance_accesses: MatterComplianceAccessesTable;
   matter_parties: MatterPartiesTable;

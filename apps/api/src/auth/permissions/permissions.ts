@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   'finance.matter.view',
   'finance.view_all',
   'rates.manage',
+  'bills.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -97,7 +98,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'time.record',
     'finance.matter.view',
   ],
-  accounts: ['finance.matter.view', 'finance.view_all', 'rates.manage'],
+  accounts: ['finance.matter.view', 'finance.view_all', 'rates.manage', 'bills.manage'],
   compliance: ['staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view', 'finance.view_all'],
 };
 

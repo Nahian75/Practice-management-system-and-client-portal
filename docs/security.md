@@ -9,9 +9,10 @@ The worker rechecks the recipient address, current assignee, task state, due
 date, team membership and account before delivery. The database refuses a
 future London reminder window. Staff screens use only the filtered API answer;
 client accounts are sent back to the separate portal. The Notifications module
-review fixed N1 and N2. Finance step 14a adds database-enforced immutable
-rates, time entries and correction history, exact integer-pence limits, live
-role/team checks and private list responses. Finance has not had its final
+review fixed N1 and N2. Finance steps 14a and 14b add database-enforced
+immutable rates, time history and issued billing records, exact integer-pence
+limits, live role/team checks, private list responses, permanent numbering,
+snapshot downloads and transactional audit. Finance has not had its final
 security review yet.
 
 This file lists only the controls that are actually in place.
@@ -235,13 +236,21 @@ neither the limit nor the recorded address.
   or write, so the app cannot fake an applied migration.
 - Role privileges are covered by integration tests
   (`apps/api/src/database/database.module.spec.ts`).
-- Finance posting tables grant the application only the columns it may supply.
-  PostgreSQL supplies ids and times, chooses the effective rate snapshot,
+- Finance tables grant the application only the operations and columns it
+  needs. PostgreSQL supplies ids and times, chooses effective rate snapshots,
   checks active roles, accounts, matter state and team membership, and orders
-  matter closure against time insertion with a row lock. Rates, time entries
-  and corrections cannot be updated, deleted or truncated even by their
-  owner. API tests separately prove permission checks, record filters, strict
-  request/response schemas, private audit metadata and transactional rollback.
+  matter closure against time insertion with a row lock. Billing writes use
+  narrow database functions: the application has no direct table writes,
+  drafts require an active Accounts actor and an open matter, and issue takes
+  fixed client, supplier, reference, time, VAT and total snapshots.
+- Rates and posted time history cannot be updated, deleted or truncated even
+  by their owner. Drafts are mutable only until issue; issued bill and
+  credit-note headers and lines, delivery events and their source drafts are
+  then owner-immutable. Advisory and row locks serialise invoice and credit
+  numbering, one-time issue, linked-time use and concurrent credits.
+- Finance API tests separately prove permission checks, record filters,
+  strict request/response schemas, safe attachment headers, private audit
+  metadata and transactional rollback.
 
 ## Application secrets
 

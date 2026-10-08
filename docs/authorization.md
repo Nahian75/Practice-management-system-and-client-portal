@@ -2,7 +2,8 @@
 
 **Current state (2026-10-08):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
-compliance access with a reason, client portal links, matter tasks and time.
+compliance access with a reason, client portal links, matter tasks, time and
+issued billing records.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -81,6 +82,7 @@ Each module adds its own permissions when it is built. These exist now:
 | `finance.matter.view` - read time for a matter allowed by the record rule | | ✓ | ✓ | ✓ | ✓ |
 | `finance.view_all` - read Finance records across matters | | | | ✓ | ✓ |
 | `rates.manage` - create permanent effective staff rates | | | | ✓ | |
+| `bills.manage` - prepare, issue, credit and record delivery of bills | | | | ✓ | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.
@@ -169,7 +171,7 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters, clients, tasks, time and portal links (built)
+## Layer 3: matters, clients, tasks, time, bills and portal links (built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 
@@ -188,6 +190,11 @@ Decided by the project owner: **only people assigned to a matter can open it.**
   Compliance hold `finance.view_all` and may read time across matters; only
   Accounts creates rates. Live account, role and team checks are repeated by
   PostgreSQL when a time or correction row is inserted.
+- Partners and fee earners read issued bill and credit-note records only for
+  matters on whose current team they serve. Accounts and Compliance can read
+  them firm-wide. Only an active Accounts holder can create or replace drafts,
+  issue or credit a bill, and record delivery. PostgreSQL rechecks that live
+  role and freezes a draft when it is issued.
 - Staff notification routes need a signed-in staff account rather than a role
   permission. Each row is restricted to its named recipient and joined through
   the task's current active matter team; losing membership hides it at once.

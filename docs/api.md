@@ -2,8 +2,9 @@
 
 **Current state (2026-10-08):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
-are built. Tasks and Notifications are built. Finance step 14a adds rates and
-the time recording and correction API; it does not add bills or money movement.
+are built. Tasks and Notifications are built. Finance steps 14a and 14b add
+rates, time recording and correction, and draft, issued bill, credit-note,
+delivery-record and fixed-download APIs; they do not add money movement.
 
 ## Endpoints
 
@@ -23,6 +24,18 @@ the time recording and correction API; it does not add bills or money movement.
 | GET | `/matters/:matterId/time-entries` | `finance.matter.view` + team, or `finance.view_all` | `{timeEntries, next}`: 100 safe summaries at a time. Private descriptions and correction reasons are omitted |
 | GET | `/time-entries/:entryId` | Same record rule as the matter list | Full entry and oldest-first correction history; 404 when hidden |
 | POST | `/time-entries/:entryId/corrections` | `time.record` + original worker and current team | `{reason, replacement}` where replacement is a full date/minutes/description value or `null` to void. Returns the full current entry; a no-op adds no history |
+| POST | `/matters/:matterId/bill-drafts` | `bills.manage`, open matter | `{taxPoint, dueOn, supplier, lines[1..100]}` -> 201 with the draft and exact net, VAT and gross strings. A line may link available time from the same matter |
+| GET | `/bill-drafts/:draftId` | `bills.manage` | The mutable draft with lines and totals; 404 once it has been issued |
+| PUT | `/bill-drafts/:draftId` | `bills.manage` | Replace the complete mutable draft. 409 if it was issued or state changed meanwhile |
+| POST | `/bill-drafts/:draftId/issue` | `bills.manage` | Create the permanent numbered bill snapshot. 201 with the bill; 409 if already issued, linked time was voided/reused, or required billing data is missing |
+| GET | `/matters/:matterId/bills` | `finance.matter.view` + team, or `finance.view_all` | All issued bill summaries for the matter, newest number first. Narratives and client details are omitted; 404 when hidden |
+| GET | `/bills/:billId` | Same record rule as the matter bill list | Full permanent bill snapshot; 404 when hidden |
+| POST | `/bills/:billId/credit-notes` | `bills.manage` | `{reason, lines[1..100]}` -> 201 with a permanent numbered credit note. Each exact net amount names an original bill line and cannot exceed its uncredited balance |
+| GET | `/credit-notes/:creditNoteId` | Same record rule as its bill | Full permanent credit note; 404 when hidden |
+| POST | `/bills/:billId/deliveries` | `bills.manage` | Record a permanent delivery event with `{method, note}`; does not send the bill |
+| POST | `/credit-notes/:creditNoteId/deliveries` | `bills.manage` | Record a permanent delivery event with `{method, note}`; does not send the credit note |
+| GET | `/bills/:billId/content` | Same record rule as the bill | Audited UTF-8 text attachment generated from the fixed snapshot, with no-store and restrictive content headers |
+| GET | `/credit-notes/:creditNoteId/content` | Same record rule as the credit note | Audited UTF-8 text attachment generated from the fixed snapshots, with the same safe headers |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |
 | POST | `/auth/two-factor` | Public, but needs a session waiting for 2FA | `{"code"}`: a 6-digit authenticator code or a backup code. 200 `{"account"}` with a new session cookie. 401 `The code is incorrect` (try again) or `Please sign in again` (no waiting sign-in, 5 wrong codes, or account blocked) |

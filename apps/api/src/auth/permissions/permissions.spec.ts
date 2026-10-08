@@ -33,6 +33,7 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'finance.matter.view': { administrator: false, partner: true, fee_earner: true, accounts: true, compliance: true },
   'finance.view_all': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: true },
   'rates.manage': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
+  'bills.manage': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
 };
 
 describe('role permissions', () => {
