@@ -180,14 +180,14 @@ describe('task reminder service', () => {
       resourceType: 'task',
       resourceId: taskId,
       deduplicationKey: `task-email:assignment:${taskId}`,
-    })).toBe(true);
+    }, assignee.email)).toBe(true);
     expect(await policy.taskEmailIsCurrent({
       kind: 'task_reminder',
       recipientAccountId: assignee.id,
       resourceType: 'task',
       resourceId: taskId,
       deduplicationKey: `task-email:reminder:${taskId}:${startsOn}:today:${assignee.id}`,
-    })).toBe(true);
+    }, assignee.email)).toBe(true);
   });
 
   it('rejects stale task email after due-date, assignment, status, team or account changes', async () => {
@@ -245,10 +245,11 @@ describe('task reminder service', () => {
       deduplicationKey: `task-email:reminder:${taskId}:${startsOn}:today:${assignee.id}`,
     });
 
-    expect(await policy.taskEmailIsCurrent(reminder(dueChanged))).toBe(false);
-    expect(await policy.taskEmailIsCurrent(assignment(reassigned))).toBe(false);
-    expect(await policy.taskEmailIsCurrent(assignment(completed))).toBe(false);
-    expect(await policy.taskEmailIsCurrent(assignment(removed, removedAssignee.id))).toBe(false);
-    expect(await policy.taskEmailIsCurrent(assignment(disabled, disabledAssignee.id))).toBe(false);
+    expect(await policy.taskEmailIsCurrent(reminder(dueChanged), assignee.email)).toBe(false);
+    expect(await policy.taskEmailIsCurrent(assignment(reassigned), assignee.email)).toBe(false);
+    expect(await policy.taskEmailIsCurrent(assignment(completed), assignee.email)).toBe(false);
+    expect(await policy.taskEmailIsCurrent(assignment(removed, removedAssignee.id), removedAssignee.email)).toBe(false);
+    expect(await policy.taskEmailIsCurrent(assignment(disabled, disabledAssignee.id), disabledAssignee.email)).toBe(false);
+    expect(await policy.taskEmailIsCurrent(assignment(await addTask()), 'different@example.com')).toBe(false);
   });
 });

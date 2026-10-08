@@ -43,10 +43,10 @@ function harness(options: { send?: Mailer['send']; claim?: ClaimedEmail } = {}) 
 
 function claimed(cipher: MailCipher, overrides: Partial<ClaimedEmail> = {}): ClaimedEmail {
   const metadata = {
-    kind: 'password_reset' as const,
-    recipientAccountId: '0199bd34-8400-7000-8000-000000000003',
-    resourceType: 'password_reset',
-    resourceId: '0199bd34-8400-7000-8000-000000000004',
+    kind: overrides.kind ?? 'password_reset',
+    recipientAccountId: overrides.recipientAccountId ?? '0199bd34-8400-7000-8000-000000000003',
+    resourceType: overrides.resourceType ?? 'password_reset',
+    resourceId: overrides.resourceId ?? '0199bd34-8400-7000-8000-000000000004',
     deduplicationKey: null,
   };
   return {
@@ -112,6 +112,7 @@ describe('MailOutbox worker', () => {
 
     await setup.outbox.drain();
 
+    expect(setup.taskEmailIsCurrent).toHaveBeenCalledWith(expect.anything(), MESSAGE.to);
     expect(setup.send).toHaveBeenCalledWith(MESSAGE);
     expect(setup.finish).toHaveBeenCalledWith(ID, LEASE_ID, { outcome: 'sent' }, expect.anything());
     expect(JSON.stringify(setup.record.mock.calls)).toContain('email.sent');

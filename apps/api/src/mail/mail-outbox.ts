@@ -150,17 +150,17 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
       await this.complete(row, { outcome: 'failed', failureClass: 'delivery_expired' });
       return;
     }
-    if (!(await this.repository.taskEmailIsCurrent(row))) {
-      await this.complete(row, { outcome: 'discarded' });
-      return;
-    }
-
     let message: MailMessage;
     try {
       message = this.cipher.open(row, row);
     } catch (error) {
       const failureClass = error instanceof SecretBoxError ? 'invalid_payload' : 'malformed';
       await this.complete(row, { outcome: 'failed', failureClass });
+      return;
+    }
+
+    if (!(await this.repository.taskEmailIsCurrent(row, message.to))) {
+      await this.complete(row, { outcome: 'discarded' });
       return;
     }
 

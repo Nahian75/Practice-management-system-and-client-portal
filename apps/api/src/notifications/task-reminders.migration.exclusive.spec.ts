@@ -146,15 +146,18 @@ describe('task reminder database rules', () => {
     expect((await run()).filter((row) => taskIds.includes(row.task_id))).toEqual([]);
   });
 
-  it('catches up each calendar day missed since the last successful run', async () => {
-    const taskId = await addTask(addDays(startsOn, 8));
+  it('processes every reminder point through the supplied current date', async () => {
+    const londonToday = (await sql<{ today: string }>`
+      select (clock_timestamp() at time zone 'Europe/London')::date::text as today
+    `.execute(db)).rows[0]!.today;
+    const taskId = await addTask(addDays(londonToday, 7));
 
-    const rows = (await run(addDays(startsOn, 3))).filter((row) => row.task_id === taskId);
+    const rows = (await run(londonToday)).filter((row) => row.task_id === taskId);
 
     expect(rows).toEqual([
-      expect.objectContaining({ task_id: taskId, due_on: addDays(startsOn, 8), reminder_point: '7_days' }),
+      expect.objectContaining({ task_id: taskId, due_on: addDays(londonToday, 7), reminder_point: '7_days' }),
     ]);
-    expect((await run(addDays(startsOn, 3))).filter((row) => row.task_id === taskId)).toEqual([]);
+    expect((await run(londonToday)).filter((row) => row.task_id === taskId)).toEqual([]);
   });
 
   it('skips tasks without a due date and assignees who are no longer active on the matter', async () => {
@@ -201,6 +204,15 @@ describe('task reminder database rules', () => {
     await expect(sql`update notification_reminder_settings set starts_on = DATE '2099-01-01'`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
     await expect(sql`delete from notification_reminder_settings`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
     await expect(sql`truncate notification_reminder_settings`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+  });
+
+  it('refuses to create reminders for a future London calendar date', async () => {
+    const londonToday = (await sql<{ today: string }>`
+      select (clock_timestamp() at time zone 'Europe/London')::date::text as today
+    `.execute(db)).rows[0]!.today;
+    await addTask(addDays(londonToday, 8));
+
+    await expect(run(addDays(londonToday, 1))).rejects.toThrow(/future London calendar date/i);
   });
 
   it('waits for the single reminder-batch advisory lock', async () => {

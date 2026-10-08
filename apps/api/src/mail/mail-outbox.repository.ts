@@ -155,7 +155,7 @@ export class MailOutboxRepository {
 
   async taskEmailIsCurrent(message: Pick<ClaimedEmail,
     'kind' | 'recipientAccountId' | 'resourceType' | 'resourceId' | 'deduplicationKey'
-  >): Promise<boolean> {
+  >, recipientEmail: string): Promise<boolean> {
     if (message.kind !== 'task_assignment' && message.kind !== 'task_reminder') {
       return true;
     }
@@ -191,7 +191,8 @@ export class MailOutboxRepository {
       .where('matters.status', '=', 'open')
       .where('matter_team.removed_at', 'is', null)
       .where('accounts.kind', '=', 'staff')
-      .where('accounts.status', '=', 'active');
+      .where('accounts.status', '=', 'active')
+      .where('accounts.email', '=', recipientEmail);
     if (expectedDueOn) {
       query = query.where('tasks.due_on', '=', expectedDueOn);
     }

@@ -1,9 +1,9 @@
 # Testing
 
 **Current state (2026-10-08):** Unit, HTTP and database integration tests for
-the API, including the security-reviewed Tasks module and Notifications steps
-13a to 13c, and Playwright end-to-end tests for the staff app, Notifications
-step 13d, Tasks step 12c and the client portal.
+the API, including the security-reviewed Tasks and Notifications modules, and
+Playwright end-to-end tests for the staff app, Tasks, Notifications and the
+client portal.
 
 ## Tools
 
@@ -53,6 +53,11 @@ one row; and audit metadata stays free of message content. The database-wide
 lease, state-machine and owner-immutability tests run as
 `mail-outbox.migration.exclusive.spec.ts`, after ordinary tests, so their
 deliberately held leases cannot delay another test's worker.
+
+The reminder migration test runs as
+`task-reminders.migration.exclusive.spec.ts`. Its database function scans all
+eligible tasks, so running it after ordinary files prevents it from consuming
+a reminder created by a service transaction test.
 
 The Playwright API server and invitation command run in separate processes
 but share the `pms_e2e` outbox. They use the same deterministic test-only mail

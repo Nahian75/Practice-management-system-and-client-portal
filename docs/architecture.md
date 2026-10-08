@@ -2,11 +2,14 @@
 
 **Current state (2026-10-08):** The API foundation and the Clients, Matters,
 Documents and client portal modules are built, with separate staff and client
-screens. The client portal and Tasks module are security-reviewed. Tasks steps
+screens. The client portal, Tasks and Notifications modules are
+security-reviewed. Tasks steps
 12a to 12c include protected history, the complete staff API and staff
 screens. Notifications steps 13a to 13d add the persistent encrypted email
 outbox, insert-only staff task notifications, list/read API routes, generic
 assignment email, database-deduplicated due-date reminders and staff screens.
+The notification review fixes future reminder windows and mismatched task-mail
+recipient addresses.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -50,7 +53,7 @@ authorization decisions.
 | Documents | Built (10a to 10d, and portal 11b): API and staff screens, including sharing with the client ([documents.md](documents.md)) |
 | Client portal | Steps 11a to 11d built and security-reviewed: portal access for clients' people, document sharing, staff controls, the read-only client API and separate client screens ([portal.md](portal.md), [review](reviews/2026-10-07-portal.md)) |
 | Tasks | Steps 12a to 12c built and security-reviewed: database safeguards and insert-only history, permissions, audit, create/read/change staff API and staff screens (`apps/api/src/tasks/`, `apps/web/src/app/(staff)/tasks/`, [tasks.md](tasks.md), [review](reviews/2026-10-07-tasks.md)) |
-| Notifications | Steps 13a to 13d built: persistent encrypted email outbox, leased worker and retries; insert-only staff task notifications, transactional audit and list/read API; generic assignment email and 09:00 Europe/London due reminders with catch-up and final live-state checks; staff header count and inbox. Security review is next ([notifications.md](notifications.md)) |
+| Notifications | Steps 13a to 13d built and security-reviewed: persistent encrypted email outbox, leased worker and retries; insert-only staff task notifications, transactional audit and list/read API; generic assignment email and 09:00 Europe/London due reminders with database-bounded catch-up and final live-state/address checks; staff header count and inbox ([notifications.md](notifications.md), [review](reviews/2026-10-08-notifications.md)) |
 | Finance | Not started |
 | Compliance / AML | Not started |
 | HR | Not started |

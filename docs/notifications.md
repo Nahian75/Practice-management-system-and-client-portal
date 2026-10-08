@@ -1,8 +1,8 @@
 # Notifications
 
 **Current state (2026-10-08):** First-version design approved by the project
-owner. Steps 13a to 13d are built and tested; the Notifications security
-review is next.
+owner. Steps 13a to 13d are built, tested and security-reviewed. Review items
+N1 and N2 are fixed in migration `0041` and the mail worker.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -41,9 +41,10 @@ client information into email or losing messages when the API restarts.
   membership. Losing matter access removes the notification from the next
   response even though its record remains.
 - A task email is queued only for the current active assignee. The worker
-  rechecks the account, membership, assignment, task status and due date just
-  before sending. A reassignment, completion, cancellation, team removal or
-  account disable therefore suppresses a stale reminder.
+  decrypts it, then rechecks the recipient address, account, membership,
+  assignment, task status and due date just before sending. An address
+  mismatch, reassignment, completion, cancellation, team removal or account
+  disable therefore suppresses a stale reminder.
 - Emails contain a normal Stass task URL, never an access token. A recipient
   must sign in with two factors and still pass the task API's 404 rule.
 - Email address, subject and body are encrypted in the outbox with AES-256-GCM
@@ -122,6 +123,8 @@ truthfully attach an email failure to a task.
   injected clock for deciding which due-date window is being processed.
 - Startup processes any reminder point missed while Stass was stopped. The
   unique key prevents resending a point that was already recorded.
+- The database refuses a catch-up date after its own current Europe/London
+  date. A caller cannot move the reminder window into the future.
 - Catch-up starts on the London calendar date when migration `0038` is first
   installed. That database-owned date cannot be changed or removed, so the
   first run cannot send reminders for the time before this feature existed.
@@ -188,7 +191,10 @@ breaks of every safeguard and updated documentation before the next.
 - **13d. Done.** Staff header unread count and `/notifications` inbox with
   current task facts, read action and 50-row paging. Implementation in
   `apps/web/src/app/(staff)/notifications/` and the shared staff layout.
-- Security review of Notifications.
+- **Security review done.** Two low-severity findings fixed: future reminder
+  windows are refused by migration `0041`, and task email must still name the
+  account's current address immediately before delivery
+  ([review](reviews/2026-10-08-notifications.md)).
 
 ## Approval
 
@@ -261,3 +267,13 @@ retry period and at-least-once delivery.
   catch a false unread count, private content in an item, stale text after
   access loss, a read request for the wrong notification, a dropped page
   cursor, an unhandled invalid cursor and a missing client-to-portal redirect.
+
+## Security review verification
+
+- Database and integration tests refuse a future London catch-up date and a
+  task email whose decrypted address does not match the current account.
+- Three deliberate breaks were run and restored. They proved the tests catch
+  a missing future-date guard, a missing recipient-address database filter and
+  a worker that fails to pass the decrypted address into its final check.
+- The production dependency tree was checked from npm's local advisory cache;
+  no cached vulnerability was found.

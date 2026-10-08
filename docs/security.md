@@ -1,14 +1,15 @@
 # Security
 
-**Current state (2026-10-08):** Core API, staff-web, client-portal and task
-controls are built and reviewed. Notifications steps 13a to 13d add the
+**Current state (2026-10-08):** Core API, staff-web, client-portal, task and
+notification controls are built and reviewed. Notifications steps 13a to 13d add the
 persistent encrypted email outbox, insert-only staff task notifications,
 database-controlled one-way reads, live matter-access checks, staff-only
 list/read routes, generic task email and database-deduplicated reminders.
-The worker rechecks the current assignee, task state, due date, team membership
-and account before delivery. Staff screens use only the filtered API answer;
+The worker rechecks the recipient address, current assignee, task state, due
+date, team membership and account before delivery. The database refuses a
+future London reminder window. Staff screens use only the filtered API answer;
 client accounts are sent back to the separate portal. The Notifications module
-review is next.
+review fixed N1 and N2.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning
