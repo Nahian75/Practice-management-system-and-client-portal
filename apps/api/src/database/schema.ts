@@ -470,6 +470,44 @@ export interface NotificationReadsTable {
   read_at: DatabaseSet<Date>;
 }
 
+export interface StaffRatesTable {
+  id: DatabaseSet<string>;
+  account_id: InsertOnly<string>;
+  hourly_rate_pence: InsertOnly<string>;
+  effective_from: InsertOnly<string>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface TimeEntriesTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  worker_id: InsertOnly<string>;
+  worked_on: InsertOnly<string>;
+  minutes: InsertOnly<number>;
+  description: InsertOnly<string>;
+  hourly_rate_pence: DatabaseSet<string>;
+  voided: DatabaseSet<boolean>;
+  recorded_by: InsertOnly<string>;
+  recorded_at: DatabaseSet<Date>;
+}
+
+export interface TimeEntryCorrectionsTable {
+  id: DatabaseSet<string>;
+  time_entry_id: InsertOnly<string>;
+  from_worked_on: DatabaseSet<string>;
+  to_worked_on: InsertOnly<string | null>;
+  from_minutes: DatabaseSet<number>;
+  to_minutes: InsertOnly<number | null>;
+  from_description: DatabaseSet<string>;
+  to_description: InsertOnly<string | null>;
+  from_hourly_rate_pence: DatabaseSet<string>;
+  to_hourly_rate_pence: DatabaseSet<string | null>;
+  reason: InsertOnly<string>;
+  corrected_by: InsertOnly<string>;
+  corrected_at: DatabaseSet<Date>;
+}
+
 export interface PortalLinksTable {
   id: DatabaseSet<string>;
   account_id: InsertOnly<string>;
@@ -512,7 +550,10 @@ export interface Database {
   portal_links: PortalLinksTable;
   sessions: SessionsTable;
   sign_in_failures: SignInFailuresTable;
+  staff_rates: StaffRatesTable;
   task_changes: TaskChangesTable;
   tasks: TasksTable;
+  time_entries: TimeEntriesTable;
+  time_entry_corrections: TimeEntryCorrectionsTable;
   totp_credentials: TotpCredentialsTable;
 }

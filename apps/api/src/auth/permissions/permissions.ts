@@ -28,6 +28,10 @@ export const PERMISSIONS = [
   'tasks.view',
   'tasks.create',
   'tasks.manage',
+  'time.record',
+  'finance.matter.view',
+  'finance.view_all',
+  'rates.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -71,6 +75,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'tasks.view',
     'tasks.create',
     'tasks.manage',
+    'time.record',
+    'finance.matter.view',
   ],
   fee_earner: [
     'clients.create',
@@ -88,9 +94,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'tasks.view',
     'tasks.create',
     'tasks.manage',
+    'time.record',
+    'finance.matter.view',
   ],
-  accounts: [],
-  compliance: ['staff.view', 'audit.view', 'matters.access_with_reason'],
+  accounts: ['finance.matter.view', 'finance.view_all', 'rates.manage'],
+  compliance: ['staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view', 'finance.view_all'],
 };
 
 export function permissionsFor(roles: Iterable<StaffRole>): ReadonlySet<Permission> {

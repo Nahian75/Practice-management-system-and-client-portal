@@ -1,8 +1,8 @@
 # Authorization
 
-**Current state (2026-10-07):** Layers 1 and 2 built, including the
+**Current state (2026-10-08):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
-compliance access with a reason, client portal links, and matter tasks.
+compliance access with a reason, client portal links, matter tasks and time.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -77,6 +77,10 @@ Each module adds its own permissions when it is built. These exist now:
 | `tasks.view` - read tasks on matters you are on the team of ([rules](tasks.md)) | | ✓ | ✓ | | |
 | `tasks.create` - create and assign tasks on open matters you are on the team of | | ✓ | ✓ | | |
 | `tasks.manage` - edit, reassign and change status under the task rules | | ✓ | ✓ | | |
+| `time.record` - record and correct your own time on a visible matter | | ✓ | ✓ | | |
+| `finance.matter.view` - read time for a matter allowed by the record rule | | ✓ | ✓ | ✓ | ✓ |
+| `finance.view_all` - read Finance records across matters | | | | ✓ | ✓ |
+| `rates.manage` - create permanent effective staff rates | | | | ✓ | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.
@@ -165,7 +169,7 @@ The command-line invitation gains `--role administrator`, so the first
 account can be created with the role it needs. After that, staff are
 invited through the API by an administrator.
 
-## Layer 3: matters, clients, tasks and portal links (built)
+## Layer 3: matters, clients, tasks, time and portal links (built)
 
 Decided by the project owner: **only people assigned to a matter can open it.**
 
@@ -179,6 +183,11 @@ Decided by the project owner: **only people assigned to a matter can open it.**
   changes additionally require the current assignee or active supervising
   partner. PostgreSQL applies the same rules while holding the matter and task
   locks.
+- Partners and fee earners see time only through current matter-team
+  membership. They record and correct only their own time. Accounts and
+  Compliance hold `finance.view_all` and may read time across matters; only
+  Accounts creates rates. Live account, role and team checks are repeated by
+  PostgreSQL when a time or correction row is inserted.
 - Staff notification routes need a signed-in staff account rather than a role
   permission. Each row is restricted to its named recipient and joined through
   the task's current active matter team; losing membership hides it at once.

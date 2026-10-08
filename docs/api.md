@@ -1,9 +1,9 @@
 # API
 
-**Current state (2026-10-07):** Health, authentication, staff management,
+**Current state (2026-10-08):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
-are built. Tasks steps 12a and 12b add create, list, details with history,
-editing, reassignment and status changes for matter tasks.
+are built. Tasks and Notifications are built. Finance step 14a adds rates and
+the time recording and correction API; it does not add bills or money movement.
 
 ## Endpoints
 
@@ -17,6 +17,12 @@ editing, reassignment and status changes for matter tasks.
 | POST | `/tasks/:taskId/complete` | `tasks.manage` + assignee or supervising partner, open matter | Mark open task completed. 204; repeating the current state is a no-op |
 | POST | `/tasks/:taskId/cancel` | `tasks.manage` + assignee or supervising partner, open matter | Mark open task cancelled. 204; a completed task must be reopened first |
 | POST | `/tasks/:taskId/reopen` | `tasks.manage` + assignee or supervising partner, open matter | Reopen a completed or cancelled task. 204; repeating the current state is a no-op |
+| POST | `/finance/rates` | `rates.manage` | `{accountId, hourlyRate, effectiveFrom}` -> 201 with the permanent rate. Money is an exact string such as `"250.00"`; 409 for a duplicate date or ineligible account |
+| GET | `/finance/rates` | `finance.view_all` | `{rates, next}`: 100 at a time, newest first. Optional `accountId`; `before` continues the list |
+| POST | `/matters/:matterId/time-entries` | `time.record` + current team, open matter | `{workedOn, minutes, description}` -> 201 with the entry and database-selected rate. Records only the caller's own time; 409 if no rate applies or state changed |
+| GET | `/matters/:matterId/time-entries` | `finance.matter.view` + team, or `finance.view_all` | `{timeEntries, next}`: 100 safe summaries at a time. Private descriptions and correction reasons are omitted |
+| GET | `/time-entries/:entryId` | Same record rule as the matter list | Full entry and oldest-first correction history; 404 when hidden |
+| POST | `/time-entries/:entryId/corrections` | `time.record` + original worker and current team | `{reason, replacement}` where replacement is a full date/minutes/description value or `null` to void. Returns the full current entry; a no-op adds no history |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |
 | POST | `/auth/two-factor` | Public, but needs a session waiting for 2FA | `{"code"}`: a 6-digit authenticator code or a backup code. 200 `{"account"}` with a new session cookie. 401 `The code is incorrect` (try again) or `Please sign in again` (no waiting sign-in, 5 wrong codes, or account blocked) |

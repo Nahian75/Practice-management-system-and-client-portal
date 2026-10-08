@@ -1,7 +1,9 @@
 # Finance
 
 **Current state (2026-10-08):** First-version design approved by the project
-owner. Step 14a is next; nothing in this document is implemented yet.
+owner. Step 14a is built: exact GBP money strings, immutable staff rates and
+time entries, permanent corrections, permissions, audit and the staff API.
+There are no bills, client-money records or Finance screens yet.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -99,9 +101,10 @@ again during the Finance security review and before production.
   private time descriptions and supporting documents do not leak into list
   responses, audit metadata, email or logs.
 
-## Planned permissions
+## Permissions
 
-These names are not added until their implementation step.
+The first four permissions are built in step 14a. The remaining permissions
+are added only with their implementation step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -182,9 +185,9 @@ by the design.
 
 ## Audit
 
-Planned event families:
+Event families:
 
-- `time.recorded`, `time.corrected`;
+- `rate.created`, `time.recorded`, `time.corrected` are built;
 - `bill.issued`, `bill.delivered`, `bill.credited`;
 - `client_money.received`, `client_money.allocated`,
   `client_money.payment_requested`, `client_money.payment_approved`,
@@ -211,6 +214,30 @@ attempts are audited without storing the sensitive request body.
   records, carry no spreadsheet formula cells and are audited.
 - There are no client portal finance routes or screens in this version.
 
+### Step 14a API
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| POST | `/finance/rates` | `rates.manage` | Create one permanent effective-dated rate for an active partner or fee earner |
+| GET | `/finance/rates` | `finance.view_all` | List rates, optionally for one account, 100 at a time |
+| POST | `/matters/:matterId/time-entries` | `time.record`, current team, open matter | Record the caller's own time using the database-selected effective rate |
+| GET | `/matters/:matterId/time-entries` | `finance.matter.view`; current team unless `finance.view_all` | List safe summaries, newest first, 100 at a time. Descriptions and correction reasons are omitted |
+| GET | `/time-entries/:entryId` | Same record rule as the list | Read one full entry and its permanent correction history |
+| POST | `/time-entries/:entryId/corrections` | `time.record`, original worker, current team | Replace or void the caller's own entry. Closed matters may still be corrected |
+
+Rates are decimal strings such as `"250.00"` at the boundary and integer pence
+in PostgreSQL. A rate applies from its UK calendar date until a later rate.
+Partners and fee earners record and correct only their own time on a matter
+they can currently see. Accounts creates rates and, with Compliance, can read
+finance across matters. The administrator role has no Finance permission.
+
+PostgreSQL creates ids and times, chooses rate snapshots, locks matter closure
+against new time, and rechecks live accounts, roles and team membership. The
+application role cannot write the protected snapshot/history columns or edit,
+delete or truncate posted records. The table owner is also stopped by triggers.
+Correction rows keep the before and after values; a void keeps the original
+entry and marks it void. An identical replacement creates no correction.
+
 ## Not in the first version
 
 - Open Banking, bank credentials, bank payment initiation or automatic feeds.
@@ -233,8 +260,9 @@ partial record as a compliant complete ledger.
 Every implementation step gets positive and negative tests, deliberate breaks
 of each safeguard and updated documentation before the next step.
 
-- **14a.** Money and time primitives, permissions, immutable staff rates and
-  time recording/correction API. No bills or money movement yet.
+- **14a. Done.** Money and time primitives, permissions, immutable staff rates
+  and time recording/correction API. Migration `0042`; implementation in
+  `apps/api/src/finance/`. No bills or money movement yet.
 - **14b.** Draft bills, immutable issue snapshots, VAT/disbursement lines,
   credit notes, delivery records and bill download.
 - **14c.** Encrypted bank-account register, balanced client/business postings,
@@ -255,3 +283,26 @@ money, manual CSV statements and bank references, two different active
 `accounts` role holders for every client-account withdrawal, `compliance`
 sign-off of reconciliations, no client-portal finance in the first version and
 the six-step build order above.
+
+## Step 14a verification
+
+- Positive tests cover exact pound/pence conversion without floating point,
+  effective rates and snapshots, own-time recording, replacement and void
+  corrections, correction after closure, Accounts and Compliance visibility,
+  private detail access and stable 100-row paging.
+- Negative tests cover malformed and excessive money, duplicate or ineligible
+  rates, missing and future rates, invalid time and correction text, another
+  worker, inactive accounts, lost roles or team access, awaiting and closed
+  matters, repeated voiding, unknown input, client and missing sessions,
+  caller-supplied protected values, direct changes, deletion and truncation.
+- Transaction tests prove that rate, time and correction changes roll back
+  with their audit event in both failure directions. Audit contains ids,
+  minutes and pence only; private descriptions and correction reasons stay out.
+- Controlled locking proves a matter closure and a new time entry cannot both
+  win. Database tests run through both the application and owner roles.
+- Seventeen deliberate break cases were run and restored. They proved the
+  tests catch a missing permission mapping or route guard, a widened money
+  bound, missing record visibility, private list or audit text, detached audit,
+  missing rate creator/worker/team/role/status/future/effective-rate checks,
+  missing closure locking and no-op suppression, widened database constraints
+  or insert rights, and mutable rate, time or correction history.

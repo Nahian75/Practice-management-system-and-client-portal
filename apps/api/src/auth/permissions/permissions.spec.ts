@@ -29,6 +29,10 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'tasks.view': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'tasks.create': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'tasks.manage': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
+  'time.record': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
+  'finance.matter.view': { administrator: false, partner: true, fee_earner: true, accounts: true, compliance: true },
+  'finance.view_all': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: true },
+  'rates.manage': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
 };
 
 describe('role permissions', () => {
@@ -48,7 +52,7 @@ describe('role permissions', () => {
   });
 
   it('combines the permissions of every role held', () => {
-    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view']);
+    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.view_all', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
   });
 
   it('gives no permissions without roles', () => {

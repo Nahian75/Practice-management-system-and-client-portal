@@ -9,7 +9,8 @@ screens. Notifications steps 13a to 13d add the persistent encrypted email
 outbox, insert-only staff task notifications, list/read API routes, generic
 assignment email, database-deduplicated due-date reminders and staff screens.
 The notification review fixes future reminder windows and mismatched task-mail
-recipient addresses.
+recipient addresses. Finance step 14a adds exact money conversion, permanent
+staff rates, time recording and insert-only correction history.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -54,7 +55,7 @@ authorization decisions.
 | Client portal | Steps 11a to 11d built and security-reviewed: portal access for clients' people, document sharing, staff controls, the read-only client API and separate client screens ([portal.md](portal.md), [review](reviews/2026-10-07-portal.md)) |
 | Tasks | Steps 12a to 12c built and security-reviewed: database safeguards and insert-only history, permissions, audit, create/read/change staff API and staff screens (`apps/api/src/tasks/`, `apps/web/src/app/(staff)/tasks/`, [tasks.md](tasks.md), [review](reviews/2026-10-07-tasks.md)) |
 | Notifications | Steps 13a to 13d built and security-reviewed: persistent encrypted email outbox, leased worker and retries; insert-only staff task notifications, transactional audit and list/read API; generic assignment email and 09:00 Europe/London due reminders with database-bounded catch-up and final live-state/address checks; staff header count and inbox ([notifications.md](notifications.md), [review](reviews/2026-10-08-notifications.md)) |
-| Finance | First-version design approved; step 14a time and money primitives is next ([finance.md](finance.md)) |
+| Finance | Step 14a built: exact GBP strings, permissions, immutable effective staff rates, time recording/correction API and audit (`apps/api/src/finance/`, [finance.md](finance.md)). Bills, money movement and screens are later steps |
 | Compliance / AML | Not started |
 | HR | Not started |
 | AI | Not started |

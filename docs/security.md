@@ -9,7 +9,11 @@ The worker rechecks the recipient address, current assignee, task state, due
 date, team membership and account before delivery. The database refuses a
 future London reminder window. Staff screens use only the filtered API answer;
 client accounts are sent back to the separate portal. The Notifications module
-review fixed N1 and N2.
+review fixed N1 and N2. Finance step 14a adds database-enforced immutable
+rates, time entries and correction history, exact integer-pence limits, live
+role/team checks and private list responses. Finance has not had its final
+security review yet.
+
 This file lists only the controls that are actually in place.
 
 ## Secret scanning
@@ -231,6 +235,13 @@ neither the limit nor the recorded address.
   or write, so the app cannot fake an applied migration.
 - Role privileges are covered by integration tests
   (`apps/api/src/database/database.module.spec.ts`).
+- Finance posting tables grant the application only the columns it may supply.
+  PostgreSQL supplies ids and times, chooses the effective rate snapshot,
+  checks active roles, accounts, matter state and team membership, and orders
+  matter closure against time insertion with a row lock. Rates, time entries
+  and corrections cannot be updated, deleted or truncated even by their
+  owner. API tests separately prove permission checks, record filters, strict
+  request/response schemas, private audit metadata and transactional rollback.
 
 ## Application secrets
 

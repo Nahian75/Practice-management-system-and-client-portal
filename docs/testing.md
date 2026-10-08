@@ -1,9 +1,9 @@
 # Testing
 
 **Current state (2026-10-08):** Unit, HTTP and database integration tests for
-the API, including the security-reviewed Tasks and Notifications modules, and
-Playwright end-to-end tests for the staff app, Tasks, Notifications and the
-client portal.
+the API, including the security-reviewed Tasks and Notifications modules and
+Finance step 14a, plus Playwright end-to-end tests for the staff app, Tasks,
+Notifications and the client portal.
 
 ## Tools
 
@@ -180,6 +180,14 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   facts, one-way read action, task navigation, 50-row paging, empty state and
   axe accessibility. Negative cases cover private text, immediate loss of
   matter access and the client/staff layout boundary.
+- Finance tests cover exact decimal-string conversion, permissions, effective
+  rates, rate snapshots, own-time recording, corrections and voids, safe
+  list/detail responses, live record visibility, audit privacy and rollback,
+  and 100-row keyset paging. Database tests use both application and owner
+  roles for column grants, constraints and permanent history. A controlled
+  race orders matter closure against time insertion. Deliberate breaks of the
+  application and migration safeguards are recorded in
+  [finance.md](finance.md#step-14a-verification).
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.
