@@ -17,6 +17,9 @@ test('sends clients to their portal and keeps staff and client pages separate', 
   await expect(page.getByText('Client portal')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Clients', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Staff', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Notifications/ })).toHaveCount(0);
+  await page.goto('/notifications');
+  await expect(page).toHaveURL(/\/portal$/);
   await page.goto('/');
   await expect(page).toHaveURL(/\/portal$/);
 

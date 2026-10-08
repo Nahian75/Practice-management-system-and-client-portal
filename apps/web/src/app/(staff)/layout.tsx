@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { appName } from '@/config';
-import { currentAccount } from '@/lib/api';
+import { apiGet, currentAccount } from '@/lib/api';
+import type { NotificationPage } from '@/lib/notifications';
 import { NavLinks } from '@/components/nav-links';
 import { SignOutButton } from '@/components/sign-out-button';
 
@@ -18,6 +19,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   if (account.kind !== 'staff') {
     redirect('/portal');
   }
+  const { body: notifications } = await apiGet<NotificationPage>('/notifications');
 
   return (
     <>
@@ -26,7 +28,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
           <Link className="header-name" href="/">
             {appName()}
           </Link>
-          <NavLinks />
+          <NavLinks unreadCount={notifications?.unreadCount ?? 0} />
           <span>{account.displayName}</span>
           <SignOutButton />
         </div>

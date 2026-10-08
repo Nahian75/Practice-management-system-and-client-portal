@@ -1,10 +1,10 @@
 # Web app
 
-**Current state (2026-10-07):** The staff app screens through Tasks step 12c
-and portal administration are built. Portal step 11d adds the read-only client
-screens, using the same secure pass-through and a separate client layout. The
-staff and client sides are security-reviewed through the portal work; the task
-screens were checked again with the Tasks module review.
+**Current state (2026-10-08):** The staff app screens through Notifications
+step 13d and portal administration are built. Portal step 11d adds the
+read-only client screens, using the same secure pass-through and a separate
+client layout. The staff and client sides are security-reviewed through the
+portal work; the task screens were checked again with the Tasks module review.
 
 The staff app and client portal, in the same browser app with separate layouts.
 
@@ -226,6 +226,20 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   screen. The API remains the security boundary and rechecks every operation;
   the screen's hidden controls are only for clarity.
 
+## Built in 13d
+
+- Every staff header links to `/notifications` and shows the API's current
+  unread count. Its accessible name states the count clearly.
+- `/notifications` shows the 50 newest visible records, their generic event
+  wording, current task title, status and due date, read state and creation
+  time. Older pages use the API cursor. Each title links to the task.
+- "Mark as read" posts through the same-site API pass-through and refreshes
+  both the item and header count. A 404 refreshes the page so access lost
+  between display and click leaves no stale item behind.
+- The page renders only fields returned by the filtered Notifications API. It
+  does not fetch descriptions, matter titles or client details. Client accounts
+  see no notification navigation and are redirected from the staff route.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
@@ -271,6 +285,7 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **10d** | Documents on the matter and document detail pages: upload, version, download, withdraw and client sharing |
 | **11a/11d** | Portal access administration and the separate read-only client portal |
 | **12c** | Tasks on the matter and task detail pages: create, list, edit, reassign, complete, cancel, reopen and history |
+| **13d** | Notifications: staff header unread count, inbox, mark read, task links and older pages |
 | | Security review of the web app |
 
 ## Testing

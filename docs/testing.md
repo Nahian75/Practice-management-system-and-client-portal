@@ -2,8 +2,8 @@
 
 **Current state (2026-10-08):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks module and Notifications steps
-13a to 13c, and Playwright end-to-end tests for the staff app, Tasks step 12c
-and the client portal.
+13a to 13c, and Playwright end-to-end tests for the staff app, Notifications
+step 13d, Tasks step 12c and the client portal.
 
 ## Tools
 
@@ -171,6 +171,10 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   last-moment rejection after a due date, assignee, status, membership or
   account change. Automatic scheduler startup stays off in test applications
   so parallel files cannot process each other's rows.
+- Notification browser tests cover the header unread count, safe current task
+  facts, one-way read action, task navigation, 50-row paging, empty state and
+  axe accessibility. Negative cases cover private text, immediate loss of
+  matter access and the client/staff layout boundary.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

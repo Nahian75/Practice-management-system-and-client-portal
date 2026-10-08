@@ -1,7 +1,8 @@
 # Notifications
 
 **Current state (2026-10-08):** First-version design approved by the project
-owner. Steps 13a to 13c are built and tested; step 13d is next.
+owner. Steps 13a to 13d are built and tested; the Notifications security
+review is next.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -143,7 +144,10 @@ notification record.
 
 The staff header shows an unread count and links to `/notifications`. The page
 lists safe current task text only after the API has rechecked access. Each item
-links to the task. There is no client navigation or portal route.
+links to the task and shows its current status and due date. Unread items can
+be marked read once. The page shows 50 newest records at a time and links to
+older records when there are more. There is no client navigation or portal
+route; a client who enters `/notifications` is sent back to `/portal`.
 
 ## Audit
 
@@ -181,7 +185,9 @@ breaks of every safeguard and updated documentation before the next.
   startup catch-up, database-deduplicated reminders and last-moment delivery
   checks. Migrations `0038` to `0040`; implementation in
   `apps/api/src/notifications/` and the mail worker.
-- **13d.** Staff notification header and inbox screens.
+- **13d. Done.** Staff header unread count and `/notifications` inbox with
+  current task facts, read action and 50-row paging. Implementation in
+  `apps/web/src/app/(staff)/notifications/` and the shared staff layout.
 - Security review of Notifications.
 
 ## Approval
@@ -242,3 +248,16 @@ retry period and at-least-once delivery.
   final worker check, and missing due-date, assignee, status, membership or
   account checks. Separate database breaks proved the owner edit and truncate
   guards, unique de-duplication constraint and advisory batch lock.
+
+## Step 13d verification
+
+- Browser tests cover the header count, current task title/status/due date,
+  generic event wording, one-way read action, task navigation, empty state,
+  newest-first 50-row paging and the older-page link. Axe checks the inbox.
+- Negative browser tests prove task descriptions and matter titles are absent,
+  notifications disappear immediately after matter access ends, and client
+  accounts have neither notification navigation nor a usable staff route.
+- Seven deliberate break cases were run and restored. They proved the tests
+  catch a false unread count, private content in an item, stale text after
+  access loss, a read request for the wrong notification, a dropped page
+  cursor, an unhandled invalid cursor and a missing client-to-portal redirect.
