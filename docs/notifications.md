@@ -1,7 +1,7 @@
 # Notifications
 
 **Current state (2026-10-08):** First-version design approved by the project
-owner. Steps 13a and 13b are built and tested; step 13c is next.
+owner. Steps 13a to 13c are built and tested; step 13d is next.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -121,6 +121,12 @@ truthfully attach an email failure to a task.
   injected clock for deciding which due-date window is being processed.
 - Startup processes any reminder point missed while Stass was stopped. The
   unique key prevents resending a point that was already recorded.
+- Catch-up starts on the London calendar date when migration `0038` is first
+  installed. That database-owned date cannot be changed or removed, so the
+  first run cannot send reminders for the time before this feature existed.
+- Automatic scheduler startup is disabled only under `NODE_ENV=test`, where
+  several application instances share one test database. The service and its
+  production startup path are tested directly.
 
 ## API and screens
 
@@ -171,7 +177,10 @@ breaks of every safeguard and updated documentation before the next.
   created task assignment and status events; transactional audit; list/read
   API with recipient and current matter access rechecked. Migration `0037`;
   implementation in `apps/api/src/notifications/` and the Tasks service.
-- **13c.** Due-date scheduler, deduplicated reminders and generic task email.
+- **13c. Done.** Assignment email, the 09:00 Europe/London due-date scheduler,
+  startup catch-up, database-deduplicated reminders and last-moment delivery
+  checks. Migrations `0038` to `0040`; implementation in
+  `apps/api/src/notifications/` and the mail worker.
 - **13d.** Staff notification header and inbox screens.
 - Security review of Notifications.
 
@@ -215,3 +224,21 @@ retry period and at-least-once delivery.
   validation, excess application-role insert rights, missing truncation
   guards, missing deduplication, missing live-access and recipient filters,
   a missing staff route boundary, and missing creation or read audit.
+
+## Step 13c verification
+
+- Positive tests cover generic assignment email, all four reminder points,
+  repeat-safe and missed-day catch-up, GMT and British Summer Time scheduling,
+  production startup catch-up, encrypted reminder email, transactionally
+  matched notification/email audit records and the single database batch lock.
+- Negative tests cover tasks without dates, completed and cancelled tasks,
+  removed team members, disabled accounts, private task/client text in email,
+  immutable scheduler settings, audit rollback, malformed task-mail identity,
+  and stale email after a due-date, assignee, status, membership or account
+  change.
+- Sixteen deliberate break cases were run and restored. They proved the
+  tests catch UTC scheduling, skipped startup catch-up, missing assignment or
+  reminder email, private text in email, missing reminder audit, a bypassed
+  final worker check, and missing due-date, assignee, status, membership or
+  account checks. Separate database breaks proved the owner edit and truncate
+  guards, unique de-duplication constraint and advisory batch lock.

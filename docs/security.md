@@ -1,11 +1,13 @@
 # Security
 
 **Current state (2026-10-08):** Core API, staff-web, client-portal and task
-controls are built and reviewed. The persistent encrypted email outbox is
-built as Notifications step 13a. Step 13b adds insert-only staff task
-notifications, database-controlled one-way reads, live matter-access checks
-and staff-only list/read routes. The Notifications module review comes after
-steps 13c and 13d.
+controls are built and reviewed. Notifications steps 13a to 13c add the
+persistent encrypted email outbox, insert-only staff task notifications,
+database-controlled one-way reads, live matter-access checks, staff-only
+list/read routes, generic task email and database-deduplicated reminders.
+The worker rechecks the current assignee, task state, due date, team membership
+and account before delivery. The Notifications module review comes after step
+13d.
 This file lists only the controls that are actually in place.
 
 ## Secret scanning

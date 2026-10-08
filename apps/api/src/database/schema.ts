@@ -40,7 +40,12 @@ export interface AuditEventsTable {
 
 export type AuditMetadataValue = string | number | boolean | null;
 
-export type EmailKind = 'account_invitation' | 'password_reset' | 'security_notice';
+export type EmailKind =
+  | 'account_invitation'
+  | 'password_reset'
+  | 'security_notice'
+  | 'task_assignment'
+  | 'task_reminder';
 export type EmailOutboxStatus = 'pending' | 'sent' | 'discarded' | 'failed';
 export type EmailFailureClass =
   | 'temporary'

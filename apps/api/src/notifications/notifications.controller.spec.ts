@@ -6,10 +6,12 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
+import { waitForEmails } from '../../test/mailpit.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, StaffRole } from '../database/schema.js';
+import { MailOutbox } from '../mail/mail-outbox.js';
 import { TasksModule } from '../tasks/tasks.module.js';
 import { NotificationsModule } from './notifications.module.js';
 
@@ -194,6 +196,26 @@ describe('Notifications', () => {
     ]);
   });
 
+  it('emails each new assignee without task or client details', async () => {
+    const created = await createTask();
+    expect(created.status).toBe(201);
+    await app.get(MailOutbox).drain();
+
+    const [assigned] = await waitForEmails(assignee.email, 1);
+    expect(assigned?.subject).toBe('A task needs your attention');
+    expect(assigned?.text).toContain(`/tasks/${created.body.id}`);
+    expect(`${assigned?.subject}\n${assigned?.text}`).not.toMatch(/Review draft contract|termination provisions|Notification test matter|2027-02-12/);
+
+    const next = await staffWith('fee_earner');
+    await addToTeam(next.id);
+    expect((await as(creatorToken).put(`/tasks/${created.body.id}/assignee`, { assigneeId: next.id })).status).toBe(200);
+    await app.get(MailOutbox).drain();
+
+    const [reassigned] = await waitForEmails(next.email, 1);
+    expect(reassigned?.subject).toBe('A task needs your attention');
+    expect(reassigned?.text).toContain(`/tasks/${created.body.id}`);
+  });
+
   it('notifies the assignee only when someone else changes task status', async () => {
     const first = await createTask();
     await as(partnerToken).post(`/tasks/${first.body.id}/complete`);
@@ -331,6 +353,20 @@ describe('Notifications', () => {
 
     expect(response!.status).toBe(500);
     expect(await db.selectFrom('tasks').select('id').where('matter_id', '=', matterId).execute()).toEqual([]);
+  });
+
+  it('rolls task creation back when assignment email cannot be audited', async () => {
+    const audit = failAudit('email.queued');
+    let response: request.Response;
+    try {
+      response = await createTask();
+    } finally {
+      audit.mockRestore();
+    }
+
+    expect(response!.status).toBe(500);
+    expect(await db.selectFrom('tasks').select('id').where('matter_id', '=', matterId).execute()).toEqual([]);
+    expect(await db.selectFrom('email_outbox').select('id').where('recipient_account_id', '=', assignee.id).execute()).toEqual([]);
   });
 
   it('rolls reassignment and its notifications back when notification creation cannot be audited', async () => {

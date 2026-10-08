@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
 import type { Database } from '../database/schema.js';
 import { visibleTo } from '../matters/matters.repository.js';
-import type { CreatedNotification, Notification } from './notification.js';
+import type { CreatedNotification, CreatedTaskReminder, Notification } from './notification.js';
 
 @Injectable()
 export class NotificationsRepository {
@@ -19,10 +19,40 @@ export class NotificationsRepository {
     }
     const rows = await trx
       .selectFrom('notifications')
-      .select(['id', 'recipient_id', 'kind', 'task_id'])
+      .innerJoin('accounts', 'accounts.id', 'notifications.recipient_id')
+      .select(['notifications.id', 'notifications.recipient_id', 'notifications.kind', 'notifications.task_id', 'accounts.email'])
       .where('deduplication_key', 'in', keys)
       .execute();
-    return rows.map((row) => ({ id: row.id, recipientId: row.recipient_id, kind: row.kind, taskId: row.task_id }));
+    return rows.map((row) => ({
+      id: row.id,
+      recipientId: row.recipient_id,
+      kind: row.kind,
+      taskId: row.task_id,
+      recipientEmail: row.email,
+    }));
+  }
+
+  async createReminders(throughDate: string, trx: Kysely<Database>): Promise<CreatedTaskReminder[]> {
+    const rows = (await sql<{
+      notification_id: string;
+      recipient_id: string;
+      kind: CreatedTaskReminder['kind'];
+      task_id: string;
+      due_on: string;
+      reminder_point: CreatedTaskReminder['reminderPoint'];
+      email: string;
+      deduplication_key: string;
+    }>`select * from create_task_reminders_through(${throughDate}::date)`.execute(trx)).rows;
+    return rows.map((row) => ({
+      id: row.notification_id,
+      recipientId: row.recipient_id,
+      kind: row.kind,
+      taskId: row.task_id,
+      recipientEmail: row.email,
+      dueOn: row.due_on,
+      reminderPoint: row.reminder_point,
+      deduplicationKey: row.deduplication_key,
+    }));
   }
 
   async list(recipientId: string, page: { before?: string; limit: number }): Promise<Notification[]> {

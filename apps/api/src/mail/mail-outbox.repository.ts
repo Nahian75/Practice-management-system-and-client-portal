@@ -23,6 +23,7 @@ export interface ClaimedEmail {
   recipientAccountId: string | null;
   resourceType: string | null;
   resourceId: string | null;
+  deduplicationKey: string | null;
   keyVersion: number;
   nonce: Buffer;
   ciphertext: Buffer;
@@ -46,6 +47,7 @@ interface ClaimedRow {
   recipient_account_id: string | null;
   resource_type: string | null;
   resource_id: string | null;
+  deduplication_key: string | null;
   key_version: number;
   nonce: Buffer;
   ciphertext: Buffer;
@@ -111,6 +113,7 @@ export class MailOutboxRepository {
       recipientAccountId: row.recipient_account_id,
       resourceType: row.resource_type,
       resourceId: row.resource_id,
+      deduplicationKey: row.deduplication_key,
       keyVersion: row.key_version,
       nonce: row.nonce,
       ciphertext: row.ciphertext,
@@ -148,6 +151,51 @@ export class MailOutboxRepository {
       .where('not_before', '<=', sql<Date>`clock_timestamp()`)
       .executeTakeFirstOrThrow();
     return Number(row.count) > 0;
+  }
+
+  async taskEmailIsCurrent(message: Pick<ClaimedEmail,
+    'kind' | 'recipientAccountId' | 'resourceType' | 'resourceId' | 'deduplicationKey'
+  >): Promise<boolean> {
+    if (message.kind !== 'task_assignment' && message.kind !== 'task_reminder') {
+      return true;
+    }
+    if (!message.recipientAccountId || message.resourceType !== 'task' || !message.resourceId || !message.deduplicationKey) {
+      return false;
+    }
+
+    let expectedDueOn: string | undefined;
+    if (message.kind === 'task_assignment') {
+      if (!/^task-email:assignment:[0-9a-f-]{36}$/.test(message.deduplicationKey)) {
+        return false;
+      }
+    } else {
+      const matched = /^task-email:reminder:([0-9a-f-]{36}):(\d{4}-\d{2}-\d{2}):(7_days|1_day|today|overdue):([0-9a-f-]{36})$/
+        .exec(message.deduplicationKey);
+      if (!matched || matched[1] !== message.resourceId || matched[4] !== message.recipientAccountId) {
+        return false;
+      }
+      expectedDueOn = matched[2];
+    }
+
+    let query = this.db
+      .selectFrom('tasks')
+      .innerJoin('matters', 'matters.id', 'tasks.matter_id')
+      .innerJoin('matter_team', (join) => join
+        .onRef('matter_team.matter_id', '=', 'tasks.matter_id')
+        .onRef('matter_team.account_id', '=', 'tasks.assigned_to'))
+      .innerJoin('accounts', 'accounts.id', 'tasks.assigned_to')
+      .select('tasks.id')
+      .where('tasks.id', '=', message.resourceId)
+      .where('tasks.assigned_to', '=', message.recipientAccountId)
+      .where('tasks.status', '=', 'open')
+      .where('matters.status', '=', 'open')
+      .where('matter_team.removed_at', 'is', null)
+      .where('accounts.kind', '=', 'staff')
+      .where('accounts.status', '=', 'active');
+    if (expectedDueOn) {
+      query = query.where('tasks.due_on', '=', expectedDueOn);
+    }
+    return (await query.executeTakeFirst()) !== undefined;
   }
 
   transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {

@@ -1,9 +1,10 @@
 import { Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import type { Kysely } from 'kysely';
 import type { AuditActor } from '../audit/audit-event.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SecretBoxError } from '../common/crypto/secret-box.js';
 import type { RequestContext } from '../common/http/request-context.js';
-import type { AuditMetadataValue, EmailKind } from '../database/schema.js';
+import type { AuditMetadataValue, Database, EmailKind } from '../database/schema.js';
 import { MailCipher, type MailEnvelopeMetadata } from './mail-cipher.js';
 import {
   type ClaimedEmail,
@@ -44,34 +45,40 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
   ) {}
 
   async enqueue(message: MailMessage, options: EnqueueMailOptions): Promise<string> {
+    return this.repository.transaction((trx) => this.enqueueInTransaction(message, options, trx));
+  }
+
+  async enqueueInTransaction(
+    message: MailMessage,
+    options: EnqueueMailOptions,
+    trx: Kysely<Database>,
+  ): Promise<string> {
     const metadata = metadataFor(options);
     const sealed = this.cipher.seal(message, metadata);
-    return this.repository.transaction(async (trx) => {
-      const queued = await this.repository.enqueue(
+    const queued = await this.repository.enqueue(
+      {
+        ...metadata,
+        deduplicationKey: options.deduplicationKey ?? null,
+        ...sealed,
+        notBefore: options.notBefore,
+        discardAfter: options.discardAfter ?? null,
+      },
+      trx,
+    );
+    if (queued.created) {
+      await this.audit.record(
         {
-          ...metadata,
-          deduplicationKey: options.deduplicationKey ?? null,
-          ...sealed,
-          notBefore: options.notBefore,
-          discardAfter: options.discardAfter ?? null,
+          actor: options.actor ?? { type: 'system' },
+          action: 'email.queued',
+          outcome: 'success',
+          resource: { type: 'email_outbox', id: queued.id },
+          metadata: safeMetadata(metadata),
+          ...options.context,
         },
         trx,
       );
-      if (queued.created) {
-        await this.audit.record(
-          {
-            actor: options.actor ?? { type: 'system' },
-            action: 'email.queued',
-            outcome: 'success',
-            resource: { type: 'email_outbox', id: queued.id },
-            metadata: safeMetadata(metadata),
-            ...options.context,
-          },
-          trx,
-        );
-      }
-      return queued.id;
-    });
+    }
+    return queued.id;
   }
 
   onModuleInit(): void {
@@ -141,6 +148,10 @@ export class MailOutbox implements OnModuleInit, OnApplicationShutdown {
     }
     if (row.databaseNow >= row.expiresAt) {
       await this.complete(row, { outcome: 'failed', failureClass: 'delivery_expired' });
+      return;
+    }
+    if (!(await this.repository.taskEmailIsCurrent(row))) {
+      await this.complete(row, { outcome: 'discarded' });
       return;
     }
 

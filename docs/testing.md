@@ -1,8 +1,8 @@
 # Testing
 
 **Current state (2026-10-08):** Unit, HTTP and database integration tests for
-the API, including the security-reviewed Tasks module and Notifications step
-13a and 13b, and Playwright end-to-end tests for the staff app, Tasks step 12c
+the API, including the security-reviewed Tasks module and Notifications steps
+13a to 13c, and Playwright end-to-end tests for the staff app, Tasks step 12c
 and the client portal.
 
 ## Tools
@@ -163,6 +163,14 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   access at first read and repeat-safe one-way read state. HTTP tests cover
   current task text, recipient and matter visibility, staff/client boundaries,
   paging, unread counts, strict input, private audit metadata and rollback.
+- Reminder tests cover all four calendar points, missed-day catch-up, repeat
+  de-duplication, the single-batch advisory lock, immutable feature start date,
+  and ineligible tasks and recipients. Unit tests cover GMT/BST scheduling and
+  production startup catch-up. Service and worker tests cover encrypted generic
+  task email, private-content exclusion, transactional audit rollback, and
+  last-moment rejection after a due date, assignee, status, membership or
+  account change. Automatic scheduler startup stays off in test applications
+  so parallel files cannot process each other's rows.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

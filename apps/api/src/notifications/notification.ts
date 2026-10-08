@@ -18,6 +18,13 @@ export interface CreatedNotification {
   recipientId: string;
   kind: NotificationKind;
   taskId: string;
+  recipientEmail: string;
+}
+
+export interface CreatedTaskReminder extends CreatedNotification {
+  dueOn: string;
+  reminderPoint: '7_days' | '1_day' | 'today' | 'overdue';
+  deduplicationKey: string;
 }
 
 export const taskCreatedNotificationKey = (taskId: string, recipientId: string) =>

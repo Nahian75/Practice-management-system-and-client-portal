@@ -24,11 +24,13 @@ function harness(options: { send?: Mailer['send']; claim?: ClaimedEmail } = {}) 
     .mockResolvedValue(undefined);
   const finish = vi.fn(async () => true);
   const hasDue = vi.fn(async () => false);
+  const taskEmailIsCurrent = vi.fn(async () => true);
   const repository = {
     enqueue,
     claim,
     finish,
     hasDue,
+    taskEmailIsCurrent,
     transaction: async <T>(work: (trx: never) => Promise<T>) => work({} as never),
   } as unknown as MailOutboxRepository;
   const send = vi.fn(options.send ?? (async () => undefined));
@@ -36,7 +38,7 @@ function harness(options: { send?: Mailer['send']; claim?: ClaimedEmail } = {}) 
   const record = vi.fn(async () => undefined);
   const audit = { record } as unknown as AuditService;
   const outbox = new MailOutbox(repository, cipher, mailer, audit);
-  return { outbox, cipher, enqueue, claim, finish, hasDue, send, record };
+  return { outbox, cipher, enqueue, claim, finish, hasDue, taskEmailIsCurrent, send, record };
 }
 
 function claimed(cipher: MailCipher, overrides: Partial<ClaimedEmail> = {}): ClaimedEmail {
@@ -45,6 +47,7 @@ function claimed(cipher: MailCipher, overrides: Partial<ClaimedEmail> = {}): Cla
     recipientAccountId: '0199bd34-8400-7000-8000-000000000003',
     resourceType: 'password_reset',
     resourceId: '0199bd34-8400-7000-8000-000000000004',
+    deduplicationKey: null,
   };
   return {
     id: ID,
@@ -214,6 +217,22 @@ describe('MailOutbox worker', () => {
 
     await setup.outbox.drain();
 
+    expect(setup.send).not.toHaveBeenCalled();
+    expect(setup.finish).toHaveBeenCalledWith(ID, LEASE_ID, { outcome: 'discarded' }, expect.anything());
+  });
+
+  it('discards a stale task email immediately before delivery', async () => {
+    const setup = harness();
+    setup.taskEmailIsCurrent.mockResolvedValue(false);
+    setup.claim.mockReset().mockResolvedValueOnce(claimed(setup.cipher, {
+      kind: 'task_reminder',
+      resourceType: 'task',
+      deduplicationKey: 'task-email:reminder:0199bd34-8400-7000-8000-000000000004:2026-10-08:today:0199bd34-8400-7000-8000-000000000003',
+    })).mockResolvedValue(undefined);
+
+    await setup.outbox.drain();
+
+    expect(setup.taskEmailIsCurrent).toHaveBeenCalledOnce();
     expect(setup.send).not.toHaveBeenCalled();
     expect(setup.finish).toHaveBeenCalledWith(ID, LEASE_ID, { outcome: 'discarded' }, expect.anything());
   });

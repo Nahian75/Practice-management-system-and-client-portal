@@ -6,6 +6,7 @@ import type { RequestContext } from '../common/http/request-context.js';
 import type { Database } from '../database/schema.js';
 import type { Notification } from './notification.js';
 import { NotificationsRepository } from './notifications.repository.js';
+import { TaskMailService } from './task-mail.service.js';
 
 export const NOTIFICATIONS_PAGE_SIZE = 50;
 
@@ -20,6 +21,7 @@ export class NotificationsService {
   constructor(
     private readonly notifications: NotificationsRepository,
     private readonly audit: AuditService,
+    private readonly taskMail: TaskMailService,
   ) {}
 
   async list(recipientId: string, before?: string): Promise<{ notifications: Notification[]; next: string | null; unreadCount: number }> {
@@ -86,6 +88,9 @@ export class NotificationsService {
         },
         trx,
       );
+      if (notification.kind === 'task_assigned') {
+        await this.taskMail.queueAssignment(notification, by, trx);
+      }
     }
   }
 }

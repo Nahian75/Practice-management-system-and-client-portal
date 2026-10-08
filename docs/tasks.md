@@ -7,7 +7,8 @@ API (`apps/api/src/tasks/`), and the matter and task screens. Review T1 makes
 supervisor-only status powers end with the partner role
 ([report](reviews/2026-10-07-tasks.md)). Tasks are not shown in the client
 portal. Notifications step 13b now records task assignment and qualifying
-status events for the staff inbox.
+status events for the staff inbox. Step 13c emails new assignees and creates
+the four approved due-date reminders.
 
 Work that the legal team must do on a matter. A task is part of the matter's
 record, not a personal reminder outside it.
@@ -95,6 +96,13 @@ reopening notify the current assignee only when somebody else made the change.
 These records are created by database triggers in the same transaction as the
 task or history row; no-op changes create nothing.
 
+Notifications migrations `0038` to `0040` add due-date reminders without
+putting email rules in the Tasks module. At 09:00 Europe/London they create one
+notice at seven days, one day, the due date and the next overdue day. Stable
+database keys prevent repeats. Assignment and reminder email contains only a
+generic message and a signed-in task link; the worker checks the task and its
+recipient again immediately before sending.
+
 ## Who can do what
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
@@ -163,7 +171,7 @@ fails, the task creation or change and its notification all roll back.
 ## Not in this module
 
 - Client portal tasks.
-- Automatic reminders and email: designed for Notifications
+- Automatic reminders and email: built in Notifications, not Tasks
   ([notifications.md](notifications.md)).
 - Time recording and billing: Finance later.
 - General tasks which have no matter.
