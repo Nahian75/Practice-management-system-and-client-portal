@@ -105,6 +105,10 @@ describe('Billing API', () => {
       lines: [{ position: 1, net: '100.03', vat: '20.01', gross: '120.04' }],
     });
     expect((await as(accountsToken).get(`/bill-drafts/${created.body.id}`)).body).toEqual(created.body);
+    const queue = await as(accountsToken).get('/finance/bill-drafts');
+    expect(queue.status).toBe(200);
+    expect(queue.body.drafts).toContainEqual(expect.objectContaining({ id: created.body.id, matterId, gross: '120.04' }));
+    expect((await as(await signedIn(compliance)).get('/finance/bill-drafts')).status).toBe(403);
 
     const changed = await as(accountsToken).put(`/bill-drafts/${created.body.id}`, body({
       lines: [{ kind: 'disbursement', description: 'Search fee', net: '25.00', vatTreatment: 'outside_scope', timeEntryId: null }],

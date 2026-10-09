@@ -19,7 +19,9 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   if (account.kind !== 'staff') {
     redirect('/portal');
   }
-  const { body: notifications } = await apiGet<NotificationPage>('/notifications');
+  const [{ body: notifications }, finance] = await Promise.all([
+    apiGet<NotificationPage>('/notifications'), apiGet('/finance/access'),
+  ]);
 
   return (
     <>
@@ -28,7 +30,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
           <Link className="header-name" href="/">
             {appName()}
           </Link>
-          <NavLinks unreadCount={notifications?.unreadCount ?? 0} />
+          <NavLinks unreadCount={notifications?.unreadCount ?? 0} canViewFinance={finance.status === 200} />
           <span>{account.displayName}</span>
           <SignOutButton />
         </div>

@@ -3,6 +3,10 @@ export interface FinancePerson {
   displayName: string;
 }
 
+export interface RateAccount extends FinancePerson {
+  roles: ('partner' | 'fee_earner')[];
+}
+
 export interface StaffRate {
   id: string;
   account: FinancePerson;
@@ -78,6 +82,18 @@ export interface BillDraft {
   grossPence: string;
   lines: BillLine[];
   createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BillDraftSummary {
+  id: string;
+  matterId: string;
+  matterReference: string;
+  matterTitle: string;
+  clientName: string;
+  taxPoint: string;
+  dueOn: string;
+  grossPence: string;
   updatedAt: Date;
 }
 

@@ -6,8 +6,10 @@ import { PermissionsService } from '../auth/permissions/permissions.service.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { Database } from '../database/schema.js';
 import { BankAccountCipher } from './bank-account-cipher.js';
-import type { BankAccount, BillDraft, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, MatterLedger, MoneySide, StaffRate, SupplierSnapshot, TimeEntry } from './finance.js';
+import type { BankAccount, BillDraft, BillDraftSummary, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, MatterLedger, MoneySide, RateAccount, StaffRate, SupplierSnapshot, TimeEntry } from './finance.js';
 import { FinanceRepository } from './finance.repository.js';
+import { financeCsv } from './finance-export.js';
+import { penceToPounds } from './money.js';
 
 export const FINANCE_PAGE_SIZE = 100;
 
@@ -62,6 +64,10 @@ export class FinanceService {
 
   findBillDraft(id: string): Promise<BillDraft | undefined> {
     return this.finance.findBillDraft(id);
+  }
+
+  listBillDrafts(before?: string): Promise<BillDraftSummary[]> {
+    return this.finance.listBillDrafts(before);
   }
 
   async replaceBillDraft(id: string, details: BillDraftValues, by: FinanceActor): Promise<BillingChangeResult<BillDraft>> {
@@ -286,6 +292,44 @@ export class FinanceService {
     };
   }
 
+  async exportMatterLedger(matterId: string, by: FinanceActor): Promise<{ fileName: string; content: Buffer } | undefined> {
+    const ledger = await this.finance.matterLedger(matterId, {});
+    if (!ledger) return undefined;
+    await this.audit.record({
+      actor: by.actor, action: 'finance.matter_ledger_exported', outcome: 'success',
+      resource: { type: 'matter', id: matterId }, metadata: { entryCount: ledger.entries.length }, ...by.context,
+    });
+    return {
+      fileName: `matter-ledger-${matterId}.csv`,
+      content: financeCsv([
+        ['Date', 'Side', 'Type', 'Direction', 'Amount GBP', 'Reference', 'Purpose', 'Posted at'],
+        ...ledger.entries.map((entry) => [
+          entry.occurredOn, entry.side, entry.kind, entry.direction, penceToPounds(entry.amountPence),
+          entry.reference, entry.purpose, entry.postedAt.toISOString(),
+        ]),
+      ]),
+    };
+  }
+
+  async exportCashBook(bankAccountId: string, by: FinanceActor): Promise<{ fileName: string; content: Buffer } | undefined> {
+    const book = await this.finance.cashBook(bankAccountId, {});
+    if (!book) return undefined;
+    await this.audit.record({
+      actor: by.actor, action: 'finance.cash_book_exported', outcome: 'success',
+      resource: { type: 'bank_account', id: bankAccountId }, metadata: { entryCount: book.entries.length }, ...by.context,
+    });
+    return {
+      fileName: `cash-book-${bankAccountId}.csv`,
+      content: financeCsv([
+        ['Date', 'Type', 'Direction', 'Amount GBP', 'Matter id', 'Reference', 'Purpose', 'Posted at'],
+        ...book.entries.map((entry) => [
+          entry.occurredOn, entry.kind, entry.direction, penceToPounds(entry.amountPence), entry.matterId,
+          entry.reference, entry.purpose, entry.postedAt.toISOString(),
+        ]),
+      ]),
+    };
+  }
+
   async createRate(
     details: { accountId: string; hourlyRatePence: string; effectiveFrom: string },
     by: FinanceActor,
@@ -316,6 +360,10 @@ export class FinanceService {
       }
       throw error;
     }
+  }
+
+  rateAccounts(): Promise<RateAccount[]> {
+    return this.finance.rateAccounts();
   }
 
   async listRates(accountId?: string, before?: string): Promise<{ rates: StaffRate[]; next: string | null }> {

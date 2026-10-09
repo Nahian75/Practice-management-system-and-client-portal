@@ -2,7 +2,7 @@
 
 **Current state (2026-10-09):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-Finance steps 14a to 14e, plus Playwright end-to-end tests for the staff app,
+Finance steps 14a to 14f, plus Playwright end-to-end tests for the staff app,
 Tasks, Notifications and the client portal.
 
 ## Tools
@@ -191,7 +191,8 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   [step 14b](finance.md#step-14b-verification) and
   [step 14c](finance.md#step-14c-verification) and
   [step 14d](finance.md#step-14d-verification) and
-  [step 14e](finance.md#step-14e-verification) verification notes.
+  [step 14e](finance.md#step-14e-verification) and
+  [step 14f](finance.md#step-14f-verification) verification notes.
 - Billing tests cover exact positive amounts, VAT rounding, draft replacement,
   issue snapshots and numbering, linked-time use, credit-note remaining
   balances, delivery records, fixed downloads, permissions, record visibility,
@@ -220,6 +221,17 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   signed-only 35-day status, safe responses, private audit and rollback.
   Twenty-two deliberate application and migration breaks were caught and
   restored before the full suite.
+- The whole-ledger reconciliation migration spec is in the serial exclusive
+  project, after the parallel API files, because its snapshot rules
+  intentionally observe every client-money posting in the test database.
+- Finance browser tests cover matter time entry, role-sensitive navigation,
+  Accounts queues and forms, cash-book CSV download, billing, four-eyes
+  payments, statement reconciliation, narrow mobile layout, Compliance
+  read-only/sign-off presentation, denied fee-earner access and axe WCAG 2.2
+  AA checks. The serial Finance journeys use a 60-second per-test budget for
+  multi-account setup, downloads and accessibility scans. API tests cover live
+  action capabilities, the draft queue, audited export headers/content, and
+  formula-safe CSV encoding.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

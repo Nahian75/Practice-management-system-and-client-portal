@@ -128,14 +128,21 @@ describe('bank statement and reconciliation API', () => {
       bankBalance: '100.00', cashbookBalance: '100.00', clientLedgerBalance: '100.00',
       bankCashbookDifference: '0.00', cashbookClientDifference: '0.00', items: [], signOff: null,
     });
+    expect((await api(accountsToken).get(`/finance/reconciliations/${prepared.body.id}/export`)).status).toBe(200);
     expect((await api(accountsToken).post(`/finance/reconciliations/${prepared.body.id}/sign-off`, {})).status).toBe(403);
     const signed = await api(complianceToken).post(`/finance/reconciliations/${prepared.body.id}/sign-off`, {});
     expect(signed.status).toBe(201);
     expect(signed.body.signOff.signedOffBy).toBe(compliance.id);
+    const exported = await api(complianceToken).get(`/finance/reconciliations/${prepared.body.id}/export`);
+    expect(exported.status).toBe(200);
+    expect(exported.headers['content-type']).toBe('text/csv; charset=utf-8');
+    expect(exported.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
+    expect(exported.text).toContain('"Client account reconciliation"');
+    expect(exported.text).toContain('"100.00"');
     const actions = await db.selectFrom('audit_events').select('action').where('resource_id', 'in', [imported.body.id, matched.body.id, prepared.body.id]).execute();
     expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining([
       'finance.bank_statement_imported', 'finance.bank_transaction_matched',
-      'finance.reconciliation_prepared', 'finance.reconciliation_signed_off',
+      'finance.reconciliation_prepared', 'finance.reconciliation_signed_off', 'finance.reconciliation_exported',
     ]));
   });
 

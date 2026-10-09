@@ -1,10 +1,11 @@
-import { Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Query, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import { Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
+import { PermissionsService } from '../auth/permissions/permissions.service.js';
 import { text } from '../common/validation/safe-text.js';
 import type { BankAccount, FinanceTransaction, LedgerEntry } from './finance.js';
 import { FinanceService, type BillingChangeResult, type FinanceActor } from './finance.service.js';
@@ -86,7 +87,22 @@ function responseEntry(entry: LedgerEntry) {
 
 @Controller('finance')
 export class LedgerController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(private readonly finance: FinanceService, private readonly permissions: PermissionsService) {}
+
+  @Get('access')
+  @RequirePermission('finance.view_all')
+  @ResponseSchema(z.object({
+    canManageBilling: z.boolean(), canRecordClientMoney: z.boolean(), canRequestPayment: z.boolean(),
+    canApprovePayment: z.boolean(), canReconcile: z.boolean(), canSignOffReconciliation: z.boolean(),
+  }))
+  async access(@CurrentSession() session: ResolvedSession) {
+    const has = (permission: Parameters<PermissionsService['has']>[1]) => this.permissions.has(session.account.id, permission);
+    const [canManageBilling, canRecordClientMoney, canRequestPayment, canApprovePayment, canReconcile, canSignOffReconciliation] = await Promise.all([
+      has('bills.manage'), has('client_money.record'), has('client_money.request'), has('client_money.approve'),
+      has('finance.reconcile'), has('finance.reconciliation_sign_off'),
+    ]);
+    return { canManageBilling, canRecordClientMoney, canRequestPayment, canApprovePayment, canReconcile, canSignOffReconciliation };
+  }
 
   @Post('bank-accounts')
   @RequirePermission('client_money.record')
@@ -142,6 +158,15 @@ export class LedgerController {
     };
   }
 
+  @Get('matters/:matterId/ledger/export')
+  @RequirePermission('finance.view_all')
+  @ResponseSchema(STREAMED)
+  async exportMatterLedger(@Param('matterId', { schema: z.uuid() }) matterId: string, @CurrentSession() session: ResolvedSession, @Req() request: Request, @Res() response: Response) {
+    const file = await this.finance.exportMatterLedger(matterId, actorFor(session, request));
+    if (!file) throw new NotFoundException('No matter with this id');
+    sendCsv(response, file);
+  }
+
   @Get('bank-accounts/:bankAccountId/cash-book')
   @RequirePermission('finance.view_all')
   @ResponseSchema(cashBookSchema)
@@ -153,4 +178,24 @@ export class LedgerController {
       entries: book.entries.map(responseEntry), next: book.next,
     };
   }
+
+  @Get('bank-accounts/:bankAccountId/cash-book/export')
+  @RequirePermission('finance.view_all')
+  @ResponseSchema(STREAMED)
+  async exportCashBook(@Param('bankAccountId', { schema: z.uuid() }) id: string, @CurrentSession() session: ResolvedSession, @Req() request: Request, @Res() response: Response) {
+    const file = await this.finance.exportCashBook(id, actorFor(session, request));
+    if (!file) throw new NotFoundException('No bank account with this id');
+    sendCsv(response, file);
+  }
+}
+
+function sendCsv(response: Response, file: { fileName: string; content: Buffer }): void {
+  response.status(200);
+  response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  response.setHeader('Content-Length', String(file.content.length));
+  response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+  response.end(file.content);
 }

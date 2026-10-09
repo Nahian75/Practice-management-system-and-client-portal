@@ -8,6 +8,8 @@ restricted to Accounts and Compliance; step 14d client-payment actions are
 Accounts-only and enforce different request and approval actors in PostgreSQL.
 Step 14e gives statement import, matching and preparation only to Accounts and
 fixed reconciliation sign-off only to a different Compliance holder.
+Step 14f exposes live Finance action capabilities to the staff UI, but those
+booleans are presentation only: route guards and PostgreSQL remain the controls.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.

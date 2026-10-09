@@ -1,0 +1,15 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { ErrorSummary } from '@/components/error-summary';
+import type { StatementImport } from '@/lib/finance';
+import { messagesOf, postJson } from '@/lib/requests';
+
+export function StatementActions({ statement }: { statement: StatementImport }) {
+  const router = useRouter(); const [transactionIds, setTransactionIds] = useState<Record<string, string>>({}); const [reasons, setReasons] = useState<Record<string, string>>({}); const [errors, setErrors] = useState<string[]>(); const [message, setMessage] = useState<string>(); const [busy, setBusy] = useState(false);
+  async function act(path: `/api/${string}`, body: Record<string, unknown>, success: string) { setBusy(true); setErrors(undefined); setMessage(undefined); try { const response = await postJson(path, body); if (!response.ok) { setErrors(await messagesOf(response)); return; } setMessage(success); router.refresh(); } finally { setBusy(false); } }
+  return <>{errors && <ErrorSummary messages={errors} />}{message && <p className="notice" role="status">{message}</p>}
+    <table className="table"><thead><tr><th scope="col">Row</th><th scope="col">Statement entry</th><th scope="col">Reconciliation source key</th><th scope="col">Match history</th><th scope="col">Action</th></tr></thead><tbody>{statement.rows.map((row) => { const current = row.matches.find((match) => !match.reversedAt); return <tr key={row.id}><td>{row.rowNumber}</td><td>{row.occurredOn}<br />{row.amount}<br />{row.reference}<br /><span className="secondary">{row.description}</span></td><td><code>{`statement:${row.id}`}</code></td><td>{!row.matches.length ? 'Unmatched' : row.matches.map((match) => <span key={match.id}>{match.financeTransactionId}{match.reversedAt ? ` — reversed: ${match.reversalReason}` : ' — current'}<br /></span>)}</td><td>{current ? <><label className="visually-hidden" htmlFor={`reason-${current.id}`}>Reversal reason for row {row.rowNumber}</label><input className="input" id={`reason-${current.id}`} value={reasons[current.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [current.id]: event.target.value })} /><button className="button button-secondary" disabled={busy || !reasons[current.id]?.trim()} onClick={() => act(`/api/finance/statement-matches/${current.id}/reverse`, { reason: reasons[current.id]!.trim() }, 'Match reversed.')}>Reverse match</button></> : <><label className="visually-hidden" htmlFor={`transaction-${row.id}`}>Finance transaction id for row {row.rowNumber}</label><input className="input" id={`transaction-${row.id}`} placeholder="Finance transaction id" value={transactionIds[row.id] ?? ''} onChange={(event) => setTransactionIds({ ...transactionIds, [row.id]: event.target.value })} /><button className="button" disabled={busy || !transactionIds[row.id]?.trim()} onClick={() => act(`/api/finance/statement-rows/${row.id}/matches`, { financeTransactionId: transactionIds[row.id]!.trim() }, 'Statement row matched.')}>Match</button></>}</td></tr>; })}</tbody></table>
+  </>;
+}

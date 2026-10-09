@@ -4,6 +4,8 @@ import type { FinanceActor } from './finance.service.js';
 import type { ClientAccountReconciliation, StatementImport } from './reconciliation.js';
 import { ReconciliationRepository } from './reconciliation.repository.js';
 import type { ParsedStatementCsv } from './statement-csv.js';
+import { financeCsv } from './finance-export.js';
+import { signedPenceToPounds } from './money.js';
 
 export type ReconciliationChange<T> =
   | { outcome: 'changed'; value: T }
@@ -112,6 +114,35 @@ export class ReconciliationService {
 
   findReconciliation(id: string): Promise<ClientAccountReconciliation | undefined> {
     return this.reconciliations.findReconciliation(id);
+  }
+
+  async exportReconciliation(id: string, by: FinanceActor): Promise<{ fileName: string; content: Buffer } | undefined> {
+    const reconciliation = await this.reconciliations.findReconciliation(id);
+    if (!reconciliation) return undefined;
+    await this.audit.record({
+      actor: by.actor, action: 'finance.reconciliation_exported', outcome: 'success',
+      resource: { type: 'client_account_reconciliation', id },
+      metadata: { asOf: reconciliation.asOf, itemCount: reconciliation.items.length, signedOff: reconciliation.signOff !== null },
+      ...by.context,
+    });
+    return {
+      fileName: `client-account-reconciliation-${reconciliation.asOf}.csv`,
+      content: financeCsv([
+        ['Client account reconciliation', reconciliation.asOf],
+        ['Bank balance GBP', signedPenceToPounds(reconciliation.bankBalancePence)],
+        ['Cash book balance GBP', signedPenceToPounds(reconciliation.cashbookBalancePence)],
+        ['Client ledger balance GBP', signedPenceToPounds(reconciliation.clientLedgerBalancePence)],
+        ['Bank / cash book difference GBP', signedPenceToPounds(reconciliation.bankCashbookDifferencePence)],
+        ['Cash book / client ledger difference GBP', signedPenceToPounds(reconciliation.cashbookClientDifferencePence)],
+        ['Prepared at', reconciliation.preparedAt.toISOString()],
+        ['Signed off at', reconciliation.signOff?.signedOffAt.toISOString() ?? 'Not signed off'],
+        [],
+        ['Item type', 'Date', 'Amount GBP', 'Reference', 'Explanation'],
+        ...reconciliation.items.map((item) => [
+          item.kind, item.occurredOn, signedPenceToPounds(item.amountPence), item.reference, item.explanation,
+        ]),
+      ]),
+    };
   }
 
   listReconciliations(before?: string): Promise<ClientAccountReconciliation[]> {

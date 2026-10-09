@@ -46,6 +46,9 @@ const timeBodySchema = z.strictObject({ workedOn: calendarDate, minutes: z.numbe
 const timeListQuerySchema = z.strictObject({ before: z.uuid().optional() });
 const timeListSchema = z.object({ timeEntries: z.array(timeListItemSchema), next: z.uuid().nullable() });
 const correctionBodySchema = z.strictObject({ replacement: timeBodySchema.nullable(), reason: text(500) });
+const rateAccountsSchema = z.object({ accounts: z.array(z.object({
+  accountId: z.uuid(), displayName: z.string(), roles: z.array(z.enum(['partner', 'fee_earner'])),
+})) });
 
 function actorFor(session: ResolvedSession, request: Request): FinanceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -104,6 +107,13 @@ export class FinanceController {
       case 'created':
         return responseRate(result.rate);
     }
+  }
+
+  @Get('finance/rate-accounts')
+  @RequirePermission('rates.manage')
+  @ResponseSchema(rateAccountsSchema)
+  async rateAccounts() {
+    return { accounts: await this.finance.rateAccounts() };
   }
 
   @Get('finance/rates')

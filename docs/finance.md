@@ -1,13 +1,13 @@
 # Finance
 
 **Current state (2026-10-09):** First-version design approved by the project
-owner. Steps 14a to 14e are built: exact GBP money strings, immutable staff
+owner. Steps 14a to 14f are built: exact GBP money strings, immutable staff
 rates and time entries, permanent corrections, billing, an encrypted bank
 register, balanced client/business postings, receipts, allocation corrections,
 derived ledgers, encrypted client-payment requests, reservations, four-eyes
 approval, recorded bank outcomes, safe statement imports, immutable matching,
-five-week client reconciliation, Compliance sign-off, permissions, audit and
-the staff API. Finance screens are a later step.
+five-week client reconciliation, Compliance sign-off, permissions, audit,
+staff APIs, role-sensitive staff screens and audited formula-safe exports.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -222,7 +222,9 @@ Event families:
   `finance.client_money_payment_payee_viewed` and `finance.client_money_paid`;
 - `finance.bank_statement_imported`, `finance.bank_transaction_matched`,
   `finance.bank_transaction_match_reversed`;
-- `finance.reconciliation_prepared`, `finance.reconciliation_signed_off`.
+- `finance.reconciliation_prepared`, `finance.reconciliation_signed_off`;
+- `finance.matter_ledger_exported`, `finance.cash_book_exported` and
+  `finance.reconciliation_exported`.
 
 Audit metadata uses ids, event kinds, pence amounts and safe states. It does
 not contain bank details, payee names, time descriptions, bill narratives,
@@ -394,6 +396,34 @@ records issued in step 14b. All register, closure, transaction and posting
 rows reject direct application writes and resist update, deletion and
 truncation even by the table owner.
 
+### Step 14f API and screens
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| GET | `/finance/access` | `finance.view_all` | Return live action capabilities for the role-sensitive workspace; action routes remain the security boundary |
+| GET | `/finance/rate-accounts` | `rates.manage` | Return active partners and fee earners eligible for the Accounts rate form |
+| GET | `/finance/bill-drafts` | `bills.manage` | Return 100 newest unissued drafts with safe matter/client labels and exact total strings |
+| GET | `/finance/matters/:matterId/ledger/export` | `finance.view_all` | Audited UTF-8 CSV of all posted matter-ledger entries |
+| GET | `/finance/bank-accounts/:bankAccountId/cash-book/export` | `finance.view_all` | Audited UTF-8 CSV of all posted cash-book entries |
+| GET | `/finance/reconciliations/:reconciliationId/export` | `finance.view_all` | Audited UTF-8 CSV generated from the immutable reconciliation snapshot |
+
+The ordinary matter screen shows time summaries, own-time recording and
+issued bills only when both finance endpoints pass the existing matter record
+rule. A time detail page shows private description/correction history and lets
+only the original worker submit a permanent correction. Accounts has a
+firm-wide workspace for deadline warnings, draft bills, bank accounts and
+cash books, receipts, payment requests and outcomes, statement import and
+matching, and reconciliation preparation. Bill detail covers issue, delivery,
+credit notes and the already-audited fixed downloads. Compliance gets the same
+firm-wide read views with only the reconciliation sign-off action.
+
+Every CSV field is quoted. Text beginning with `=`, `+`, `-`, `@`, tab or
+carriage return is prefixed with an apostrophe before quoting, so opening an
+authorised export in a spreadsheet does not turn stored text into a formula.
+Downloads use `no-store`, `nosniff` and sandboxed attachment headers, and their
+audit metadata contains ids and row counts rather than exported narratives.
+No Finance route or navigation was added to the client portal.
+
 ## Not in the first version
 
 - Open Banking, bank credentials, bank payment initiation or automatic feeds.
@@ -435,8 +465,9 @@ of each safeguard and updated documentation before the next step.
   matching/reversal, five-week reconciliation preparation, separate Compliance
   sign-off and overdue status. Migration `0046`; API implementation in
   `apps/api/src/finance/`.
-- **14f.** Staff matter-finance, Accounts and Compliance screens, exports and
-  accessibility tests.
+- **14f. Done.** Staff matter-finance, Accounts and Compliance screens,
+  audited formula-safe exports, narrow-screen behaviour and accessibility
+  tests.
 - Security review of Finance against the then-current SRA and HMRC rules.
 
 ## Approval
@@ -581,3 +612,25 @@ the six-step build order above.
   mutable history; repeated reversal; incomplete account coverage; missing
   outstanding explanations; wrong Compliance or self-sign-off; and counting
   an unsigned preparation as complete.
+
+## Step 14f verification
+
+- API tests cover live Accounts/Compliance UI capabilities, the unissued-draft
+  queue, audited ledger/cash-book/reconciliation exports, restrictive download
+  headers, exact decimal text and formula-safe CSV quoting.
+- Browser tests cover matter time entry and private detail navigation,
+  Accounts queues/forms/cash-book download, complete billing and client-payment
+  workflows, statement matching and reconciliation, Compliance read-only and
+  sign-off presentation, denied ordinary-staff access, role-sensitive
+  navigation, a 390-pixel view and axe checks against WCAG 2.2 AA.
+- A 22-change deliberate-break batch was caught and restored. It covered CSV
+  BOM, quoting and spreadsheet-formula safety; access, action-capability,
+  export, draft-queue and rate-candidate permissions; no-store/CSP attachment
+  headers; export auditing and complete unpaged export content; independent
+  reconciliation sign-off; Finance navigation and Compliance read-only UI;
+  unique form labels; and narrow-table overflow.
+- A clean test database passed the complete API suite: 76 files and 1,632
+  tests. API and web type-checks, the API production build, hidden-character
+  scan and `git diff --check` passed. The production web build and complete
+  Playwright suite passed all 77 tests using the configured four workers.
+- Finance's dedicated security review remains the next project step.

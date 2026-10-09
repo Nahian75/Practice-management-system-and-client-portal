@@ -1,7 +1,7 @@
 # Web app
 
-**Current state (2026-10-08):** The staff app screens through Notifications
-step 13d and portal administration are built. Portal step 11d adds the
+**Current state (2026-10-09):** The staff app screens through Finance step
+14f and portal administration are built. Portal step 11d adds the
 read-only client screens, using the same secure pass-through and a separate
 client layout. The staff and client sides are security-reviewed through the
 portal work; the task screens were checked again with the Tasks module review.
@@ -240,6 +240,35 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   does not fetch descriptions, matter titles or client details. Client accounts
   see no notification navigation and are redirected from the staff route.
 
+## Built in 14f
+
+- Visible matter pages include a Time and finance area with safe time
+  summaries, own-time entry, permanent correction history, issued bills and
+  fixed bill downloads. The API's matter record rule still decides whether
+  the section exists.
+- `/finance` is the firm-wide Accounts/Compliance workspace. It shows
+  five-week statement and signed-reconciliation deadlines, draft-bill,
+  payment-request, statement and reconciliation queues, and the safe bank
+  register. The Finance link appears only when the live API capability route
+  permits firm-wide finance.
+- Accounts can build and issue multi-line bills, record delivery and credit
+  notes, register bank accounts and receipts, request/approve/cancel client
+  payments, record bank outcomes, import inert CSV statements, match/reverse
+  rows and prepare reconciliations. Sensitive payee details are fetched only
+  on an explicit, audited reveal.
+- Compliance sees the same firm-wide ledgers, cash books, statements,
+  payments and fixed reconciliations read-only, with only the separate
+  reconciliation sign-off action. UI capabilities are for clarity; the API
+  rechecks every permission, actor separation and live accounting rule.
+- Matter ledgers, bank cash books and fixed reconciliations download as
+  audited UTF-8 CSV attachments. Every field is quoted and formula-like text
+  is prefixed as literal data. Statement rows and cash-book entries show their
+  exact reconciliation source keys for copying into an outstanding-item
+  explanation. There are no client-portal Finance routes.
+- Tables scroll on narrow screens; forms keep explicit labels, error/status
+  announcements and keyboard focus styling. Finance Playwright coverage runs
+  axe WCAG 2.2 AA checks and a 390-pixel viewport workflow.
+
 ## Security in the web app
 
 - **Content Security Policy** with a fresh nonce per page: scripts only from
@@ -286,6 +315,7 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **11a/11d** | Portal access administration and the separate read-only client portal |
 | **12c** | Tasks on the matter and task detail pages: create, list, edit, reassign, complete, cancel, reopen and history |
 | **13d** | Notifications: staff header unread count, inbox, mark read, task links and older pages |
+| **14f** | Matter time/finance; Accounts billing, receipts, payment and reconciliation workspaces; Compliance read-only ledgers and sign-off; audited CSV exports |
 | | Security review of the web app |
 
 ## Testing

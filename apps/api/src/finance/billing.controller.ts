@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Put, Req, Res } from '@nestjs/common';
+import { Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
@@ -6,7 +6,7 @@ import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/ses
 import { requestContext } from '../common/http/request-context.js';
 import { ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
-import type { BillDraft, BillLine, CreditNote, IssuedBill, IssuedBillSummary } from './finance.js';
+import type { BillDraft, BillDraftSummary, BillLine, CreditNote, IssuedBill, IssuedBillSummary } from './finance.js';
 import { FinanceService, type BillingChangeResult, type FinanceActor } from './finance.service.js';
 import { billAmountToPence, penceToPounds } from './money.js';
 
@@ -61,6 +61,12 @@ const creditSchema = z.object({
 });
 const billsSchema = z.object({ bills: z.array(billSummarySchema) });
 const deliverySchema = z.object({ id: z.uuid() });
+const draftSummarySchema = z.object({
+  id: z.uuid(), matterId: z.uuid(), matterReference: z.string(), matterTitle: z.string(), clientName: z.string(),
+  taxPoint: calendarDate, dueOn: calendarDate, gross: z.string(), updatedAt: z.iso.datetime(),
+});
+const draftListSchema = z.object({ drafts: z.array(draftSummarySchema), next: z.uuid().nullable() });
+const pageSchema = z.strictObject({ before: z.uuid().optional() });
 
 function actorFor(session: ResolvedSession, request: Request): FinanceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -80,6 +86,10 @@ function responseDraft(draft: BillDraft) {
     netPence: undefined, vatPence: undefined, grossPence: undefined, lines: draft.lines.map(responseLine),
     createdAt: draft.createdAt.toISOString(), updatedAt: draft.updatedAt.toISOString(),
   };
+}
+
+function responseDraftSummary(draft: BillDraftSummary) {
+  return { ...draft, gross: penceToPounds(draft.grossPence), grossPence: undefined, updatedAt: draft.updatedAt.toISOString() };
 }
 
 function responseBill(bill: IssuedBill) {
@@ -132,6 +142,14 @@ export class BillingController {
   @ResponseSchema(draftSchema)
   async createDraft(@Param('matterId', { schema: z.uuid() }) matterId: string, @Body({ schema: draftBodySchema }) body: z.infer<typeof draftBodySchema>, @CurrentSession() session: ResolvedSession, @Req() request: Request) {
     return responseDraft(changed(await this.finance.createBillDraft(matterId, details(body), actorFor(session, request))));
+  }
+
+  @Get('finance/bill-drafts')
+  @RequirePermission('bills.manage')
+  @ResponseSchema(draftListSchema)
+  async listDrafts(@Query({ schema: pageSchema }) query: z.infer<typeof pageSchema>) {
+    const drafts = await this.finance.listBillDrafts(query.before);
+    return { drafts: drafts.map(responseDraftSummary), next: drafts.length === 100 ? drafts.at(-1)!.id : null };
   }
 
   @Get('bill-drafts/:draftId')

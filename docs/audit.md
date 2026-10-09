@@ -107,3 +107,10 @@ It never copies filenames, statement references/descriptions, reconciliation
 explanations or bank details. Every successful change and its audit event share
 one transaction; invalid match, reversal and sign-off state is recorded as a
 denied event without the sensitive request body.
+
+Finance step 14f records the read/export events
+`finance.matter_ledger_exported`, `finance.cash_book_exported` and
+`finance.reconciliation_exported`. Metadata is limited to the exported record
+id, row/item count, reconciliation date and sign-off state. Ledger purposes,
+references and reconciliation explanations are in the authorised attachment,
+not copied into audit metadata.

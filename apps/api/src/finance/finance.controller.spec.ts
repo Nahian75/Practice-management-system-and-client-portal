@@ -111,6 +111,12 @@ describe('Finance time API', () => {
 
   describe('staff rates', () => {
     it('lets Accounts create and list an immutable rate', async () => {
+      const eligible = await as(accountsToken).get('/finance/rate-accounts');
+      expect(eligible.status).toBe(200);
+      expect(eligible.body.accounts).toEqual(expect.arrayContaining([
+        expect.objectContaining({ accountId: feeEarner.id, roles: expect.arrayContaining(['fee_earner']) }),
+        expect.objectContaining({ accountId: partner.id, roles: expect.arrayContaining(['partner']) }),
+      ]));
       const created = await createRate();
       expect(created.status).toBe(201);
       expect(created.body).toEqual({
@@ -132,6 +138,7 @@ describe('Finance time API', () => {
       const token = await signedIn(compliance);
       expect((await as(token).get(`/finance/rates?accountId=${feeEarner.id}`)).status).toBe(200);
       expect((await createRate(token, { accountId: partner.id })).status).toBe(403);
+      expect((await as(token).get('/finance/rate-accounts')).status).toBe(403);
     });
 
     it('refuses other roles, invalid money, duplicate dates and ineligible staff', async () => {

@@ -176,6 +176,16 @@ a:hover {
   max-width: 10ch;
 }
 
+.input-date {
+  max-width: 14rem;
+}
+
+.input-inline {
+  display: inline-block;
+  width: min(20rem, 100%);
+  margin-right: var(--space-2);
+}
+
 .button {
   font: inherit;
   font-weight: 600;
@@ -300,6 +310,11 @@ a:hover {
 }
 
 @media (max-width: 40rem) {
+  .table {
+    display: block;
+    overflow-x: auto;
+  }
+
   .summary {
     grid-template-columns: 1fr;
   }
@@ -328,6 +343,24 @@ a:hover {
 .button-secondary {
   background: var(--colour-background);
   color: var(--colour-brand);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 var(--space-4);
+  max-width: var(--measure);
+}
+
+.line-editor {
+  border-left: 4px solid var(--colour-rule);
+  padding-left: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.notice-warning,
+.notice-overdue {
+  border-left-color: var(--colour-error);
 }
 
 /* For an action that cannot be undone, such as closing a matter. */

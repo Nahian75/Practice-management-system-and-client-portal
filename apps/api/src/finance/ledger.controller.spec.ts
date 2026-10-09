@@ -178,7 +178,36 @@ describe('Finance ledger API', () => {
     const cash = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book`);
     expect(cash.body).toMatchObject({ balance: '100.03', bankAccount: { id: bank.body.id, lastFour: bank.body.lastFour } });
     expect(cash.body.entries).toHaveLength(1);
-    expect((await as(await signedIn(partner)).get(`/finance/matters/${matterId}/ledger`)).status).toBe(403);
+    const partnerSession = await signedIn(partner);
+    expect((await as(partnerSession).get(`/finance/matters/${matterId}/ledger`)).status).toBe(403);
+    expect((await as(partnerSession).get(`/finance/matters/${matterId}/ledger/export`)).status).toBe(403);
+
+    const ledgerExport = await as(await signedIn(compliance)).get(`/finance/matters/${matterId}/ledger/export`);
+    expect(ledgerExport.status).toBe(200);
+    expect(ledgerExport.headers).toMatchObject({
+      'content-type': 'text/csv; charset=utf-8', 'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox",
+    });
+    expect(ledgerExport.headers['content-disposition']).toMatch(/^attachment; filename="matter-ledger-[a-f0-9-]+\.csv"$/);
+    expect(ledgerExport.text).toContain('"Amount GBP"');
+    expect(ledgerExport.text).toContain('"100.03"');
+    const cashExport = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book/export`);
+    expect(cashExport.status).toBe(200);
+    expect(cashExport.text).toContain('"Matter id"');
+    expect(await db.selectFrom('audit_events').select('id').where('action', '=', 'finance.matter_ledger_exported').where('resource_id', '=', matterId).executeTakeFirst()).toBeDefined();
+    expect(await db.selectFrom('audit_events').select('id').where('action', '=', 'finance.cash_book_exported').where('resource_id', '=', bank.body.id).executeTakeFirst()).toBeDefined();
+  });
+
+  it('returns live UI capabilities without granting finance access to other staff', async () => {
+    expect((await as(accountsToken).get('/finance/access')).body).toEqual({
+      canManageBilling: true, canRecordClientMoney: true, canRequestPayment: true,
+      canApprovePayment: true, canReconcile: true, canSignOffReconciliation: false,
+    });
+    expect((await as(await signedIn(compliance)).get('/finance/access')).body).toEqual({
+      canManageBilling: false, canRecordClientMoney: false, canRequestPayment: false,
+      canApprovePayment: false, canReconcile: false, canSignOffReconciliation: true,
+    });
+    expect((await as(await signedIn(partner)).get('/finance/access')).status).toBe(403);
   });
 
   it('returns conflicts for invalid receipt/allocation state and keeps private text out of audit', async () => {
@@ -229,6 +258,9 @@ describe('Finance ledger API', () => {
     const firstCash = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book`);
     expect(firstCash.body.entries).toHaveLength(100);
     expect((await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book?before=${firstCash.body.next}`)).body.entries).toHaveLength(1);
+    const exported = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book/export`);
+    expect(exported.status).toBe(200);
+    expect(exported.text.match(/PAGE-/g)).toHaveLength(101);
   });
 
   it('rolls back a receipt when its audit record fails', async () => {

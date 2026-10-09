@@ -1,10 +1,10 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Query, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import { BadRequestException, Body, ConflictException, Controller, Get, NotFoundException, Param, Post, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type { FinanceActor } from './finance.service.js';
@@ -205,6 +205,23 @@ export class ReconciliationController {
     const item = await this.service.findReconciliation(id);
     if (!item) throw new NotFoundException('No reconciliation with this id');
     return responseReconciliation(item);
+  }
+
+  @Get('reconciliations/:reconciliationId/export')
+  @RequirePermission('finance.view_all')
+  @ResponseSchema(STREAMED)
+  async exportReconciliation(@Param('reconciliationId', { schema: z.uuid() }) id: string,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request, @Res() response: Response) {
+    const file = await this.service.exportReconciliation(id, actorFor(session, request));
+    if (!file) throw new NotFoundException('No reconciliation with this id');
+    response.status(200);
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader('Content-Length', String(file.content.length));
+    response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    response.end(file.content);
   }
 
   @Post('reconciliations/:reconciliationId/sign-off')

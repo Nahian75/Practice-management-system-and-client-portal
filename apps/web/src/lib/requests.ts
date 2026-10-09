@@ -11,6 +11,12 @@ export function postJson(path: `/api/${string}`, body: Record<string, unknown>):
   });
 }
 
+export function putJson(path: `/api/${string}`, body: Record<string, unknown>): Promise<Response> {
+  return fetch(path, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+
 /**
  * What the API said about a refused request, as a list: one message, or
  * several (a refused password gives every reason). A general message when

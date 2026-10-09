@@ -12,6 +12,7 @@ import type { Task } from '@/lib/tasks';
 import { ClearanceForm } from './clearance-form';
 import { DocumentsSection } from './documents-section';
 import { TasksSection } from './tasks-section';
+import { FinanceSection } from './finance-section';
 
 export const metadata: Metadata = { title: 'Matter' };
 
@@ -100,6 +101,8 @@ export default async function MatterPage({
         next={documents.body?.next ?? null}
         canAdd={matter.status === 'open'}
       />
+
+      <FinanceSection matter={matter} />
 
       <h2>Conflict check</h2>
       {check.body ? (

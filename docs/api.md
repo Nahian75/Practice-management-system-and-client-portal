@@ -2,11 +2,12 @@
 
 **Current state (2026-10-09):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
-are built. Tasks and Notifications are built. Finance steps 14a to 14e add
+are built. Tasks and Notifications are built. Finance steps 14a to 14f add
 rates, time and billing plus the encrypted bank register, receipts, allocation
 corrections, derived ledger/cash-book APIs and the client-payment request,
 approval and bank-outcome workflow, safe bank-statement imports, immutable
-matching, client reconciliation, Compliance sign-off and five-week status.
+matching, client reconciliation, Compliance sign-off, five-week status, safe
+exports and the capability response used by the staff Finance workspace.
 
 ## Endpoints
 
@@ -21,12 +22,14 @@ matching, client reconciliation, Compliance sign-off and five-week status.
 | POST | `/tasks/:taskId/cancel` | `tasks.manage` + assignee or supervising partner, open matter | Mark open task cancelled. 204; a completed task must be reopened first |
 | POST | `/tasks/:taskId/reopen` | `tasks.manage` + assignee or supervising partner, open matter | Reopen a completed or cancelled task. 204; repeating the current state is a no-op |
 | POST | `/finance/rates` | `rates.manage` | `{accountId, hourlyRate, effectiveFrom}` -> 201 with the permanent rate. Money is an exact string such as `"250.00"`; 409 for a duplicate date or ineligible account |
+| GET | `/finance/rate-accounts` | `rates.manage` | Active partners and fee earners eligible for a future rate, with display names and eligible roles |
 | GET | `/finance/rates` | `finance.view_all` | `{rates, next}`: 100 at a time, newest first. Optional `accountId`; `before` continues the list |
 | POST | `/matters/:matterId/time-entries` | `time.record` + current team, open matter | `{workedOn, minutes, description}` -> 201 with the entry and database-selected rate. Records only the caller's own time; 409 if no rate applies or state changed |
 | GET | `/matters/:matterId/time-entries` | `finance.matter.view` + team, or `finance.view_all` | `{timeEntries, next}`: 100 safe summaries at a time. Private descriptions and correction reasons are omitted |
 | GET | `/time-entries/:entryId` | Same record rule as the matter list | Full entry and oldest-first correction history; 404 when hidden |
 | POST | `/time-entries/:entryId/corrections` | `time.record` + original worker and current team | `{reason, replacement}` where replacement is a full date/minutes/description value or `null` to void. Returns the full current entry; a no-op adds no history |
 | POST | `/matters/:matterId/bill-drafts` | `bills.manage`, open matter | `{taxPoint, dueOn, supplier, lines[1..100]}` -> 201 with the draft and exact net, VAT and gross strings. A line may link available time from the same matter |
+| GET | `/finance/bill-drafts` | `bills.manage` | `{drafts,next}`: 100 newest unissued drafts with matter/client labels and totals for the Accounts queue |
 | GET | `/bill-drafts/:draftId` | `bills.manage` | The mutable draft with lines and totals; 404 once it has been issued |
 | PUT | `/bill-drafts/:draftId` | `bills.manage` | Replace the complete mutable draft. 409 if it was issued or state changed meanwhile |
 | POST | `/bill-drafts/:draftId/issue` | `bills.manage` | Create the permanent numbered bill snapshot. 201 with the bill; 409 if already issued, linked time was voided/reused, or required billing data is missing |
@@ -40,11 +43,14 @@ matching, client reconciliation, Compliance sign-off and five-week status.
 | GET | `/credit-notes/:creditNoteId/content` | Same record rule as the credit note | Audited UTF-8 text attachment generated from the fixed snapshots, with the same safe headers |
 | POST | `/finance/bank-accounts` | `client_money.record` | `{kind,name,sortCode,accountNumber,openedOn}` -> 201 with safe register fields only. Full details are encrypted and never returned; 409 for a duplicate or invalid live state |
 | GET | `/finance/bank-accounts` | `finance.view_all` | `{bankAccounts}` with safe name, kind, last four digits and opening/closure dates; no full bank details |
+| GET | `/finance/access` | `finance.view_all` | Live action capabilities for the Finance UI. These booleans only control presentation; every action route still checks its permission and database rules |
 | POST | `/finance/bank-accounts/:bankAccountId/close` | `client_money.record` | `{closedOn,reason}` -> 201 with the permanently closed safe register record; 409 if already closed or the date is invalid |
 | POST | `/finance/receipts` | `client_money.record` | `{bankAccountId,matterId,receivedOn,amount,reference,purpose}` -> 201 with the immutable client/business transaction and exact amount string |
 | POST | `/finance/allocations` | `client_money.record` | `{side,sourceMatterId,targetMatterId,amount,reason}` -> 201 with the immutable same-client correction; client money cannot be over-allocated |
 | GET | `/finance/matters/:matterId/ledger` | `finance.view_all` | Derived client/business balances and 100 newest postings. `before` continues the list |
+| GET | `/finance/matters/:matterId/ledger/export` | `finance.view_all` | Audited UTF-8 CSV of every posted ledger entry, with formula-like cells made literal and restrictive attachment headers |
 | GET | `/finance/bank-accounts/:bankAccountId/cash-book` | `finance.view_all` | Safe bank register record, derived balance and 100 newest bank postings. `before` continues the list |
+| GET | `/finance/bank-accounts/:bankAccountId/cash-book/export` | `finance.view_all` | Audited formula-safe UTF-8 CSV of every posted cash-book entry |
 | POST | `/finance/payment-requests` | `client_money.request` | Request a `refund` or `third_party` payment with encrypted `{name,sortCode,accountNumber}`, or a `costs_transfer` naming a business account and issued bill. All kinds name the matter, client bank account, evidence document, purpose and exact `amount` |
 | GET | `/finance/payment-requests` | `finance.view_all` | `{paymentRequests,next}`: 100 safe requests at a time, newest first. Includes permanent state events but never payee details or encryption fields |
 | GET | `/finance/payment-requests/:paymentRequestId` | `finance.view_all` | One safe request and its oldest-first events; no payee details |
@@ -63,6 +69,7 @@ matching, client reconciliation, Compliance sign-off and five-week status.
 | GET | `/finance/reconciliations` | `finance.view_all` | `{reconciliations,next}`: 100 newest fixed snapshots and sign-off state |
 | GET | `/finance/reconciliations/status` | `finance.view_all` | Statement deadlines for open client/business accounts and the firm-wide signed client-reconciliation deadline; warns during the last seven of 35 days |
 | GET | `/finance/reconciliations/:reconciliationId` | `finance.view_all` | One snapshot with three totals, two differences, selected statement ids, outstanding items/explanations and sign-off |
+| GET | `/finance/reconciliations/:reconciliationId/export` | `finance.view_all` | Audited formula-safe UTF-8 CSV generated from that fixed snapshot |
 | POST | `/finance/reconciliations/:reconciliationId/sign-off` | `finance.reconciliation_sign_off`, different Compliance holder | `{}` -> signed snapshot; prepared-but-unsigned work does not satisfy status |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |

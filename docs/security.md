@@ -16,7 +16,9 @@ client ledgers, fixed downloads, encrypted payment recipients, live four-eyes
 approval, reserved-balance locking, immutable bank outcomes, inert CSV
 statement parsing, duplicate detection, locked exact matching, permanent
 match reversals, server-calculated reconciliation snapshots, separate
-Compliance sign-off, signed-only deadlines and transactional audit. Finance
+Compliance sign-off, signed-only deadlines, transactional audit, and audited
+CSV exports that quote every field and make spreadsheet formula prefixes
+literal. Finance
 has not had its final security review yet.
 
 This file lists only the controls that are actually in place.

@@ -7,18 +7,19 @@ const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/clients', label: 'Clients' },
   { href: '/matters', label: 'Matters' },
+  { href: '/finance', label: 'Finance' },
   { href: '/notifications', label: 'Notifications' },
   { href: '/staff', label: 'Staff' },
 ] as const;
 
 /** The main sections. The current one is marked for screen readers as well as by sight. */
-export function NavLinks({ unreadCount }: { unreadCount: number }) {
+export function NavLinks({ unreadCount, canViewFinance }: { unreadCount: number; canViewFinance: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Main" className="nav">
       <ul>
-        {LINKS.map(({ href, label }) => {
+        {LINKS.filter(({ href }) => href !== '/finance' || canViewFinance).map(({ href, label }) => {
           const current = href === '/' ? pathname === '/' : pathname.startsWith(href);
           const notifications = href === '/notifications';
           return (

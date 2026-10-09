@@ -1,0 +1,11 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { NoAccess } from '@/components/no-access';
+import { apiGet } from '@/lib/api';
+import { formatCalendarDate } from '@/lib/format';
+import { pounds, type FinanceAccess, type IssuedBill } from '@/lib/finance';
+import { CreditBillForm, DeliveryForm } from '../../billing-actions';
+
+export const metadata: Metadata = { title: 'Bill' };
+export default async function BillPage({ params }: { params: Promise<{ billId: string }> }) { const { billId } = await params; const [result, access] = await Promise.all([apiGet<IssuedBill>(`/bills/${encodeURIComponent(billId)}`), apiGet<FinanceAccess>('/finance/access')]); if (result.status === 403) return <NoAccess what="this bill" />; if (!result.body) notFound(); const bill = result.body; return <><span className="caption">Issued bill</span><h1>{bill.reference}</h1><div className="actions"><Link href={`/finance/matters/${bill.matterId}`}>Matter finance</Link><a className="button button-secondary" href={`/api/bills/${bill.id}/content`}>Download fixed bill</a></div><dl className="summary"><div className="summary-row"><dt>Client</dt><dd>{bill.clientName} ({bill.clientReference})</dd></div><div className="summary-row"><dt>Matter</dt><dd>{bill.matterReference}</dd></div><div className="summary-row"><dt>Tax point</dt><dd>{formatCalendarDate(bill.taxPoint)}</dd></div><div className="summary-row"><dt>Due</dt><dd>{formatCalendarDate(bill.dueOn)}</dd></div><div className="summary-row"><dt>Total</dt><dd>{pounds(bill.gross)} including {pounds(bill.vat)} VAT</dd></div></dl><h2>Lines</h2><table className="table"><thead><tr><th scope="col">Description</th><th scope="col">Type</th><th scope="col">VAT treatment</th><th scope="col">Net</th><th scope="col">VAT</th><th scope="col">Gross</th></tr></thead><tbody>{bill.lines.map((line) => <tr key={line.id}><td>{line.description}</td><td>{line.kind}</td><td>{line.vatTreatment.replaceAll('_', ' ')}</td><td>{pounds(line.net)}</td><td>{pounds(line.vat)}</td><td>{pounds(line.gross)}</td></tr>)}</tbody></table>{access.body?.canManageBilling && <><DeliveryForm kind="bill" id={bill.id} /><CreditBillForm bill={bill} /></>}</>; }

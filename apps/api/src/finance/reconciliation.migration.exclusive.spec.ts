@@ -16,7 +16,9 @@ describe('bank statement and reconciliation database rules', () => {
   let bankId: string;
   let matterId: string;
   let today: string;
-  let testDay = 0;
+  // Keep these whole-ledger snapshot fixtures earlier than the controller suites,
+  // which also exercise reconciliation against the shared test database.
+  let testDay = 1_000;
   const unique = () => randomUUID().replaceAll('-', '').slice(0, 16);
 
   async function staffWith(...roles: StaffRole[]) {

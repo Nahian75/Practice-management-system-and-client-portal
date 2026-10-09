@@ -4,7 +4,7 @@ import { DATABASE } from '../database/database.module.js';
 import type { Database, FinancePostingAccount, FinanceTransactionKind, MatterStatus, TimeEntryCorrectionsTable } from '../database/schema.js';
 import { visibleTo } from '../matters/matters.repository.js';
 import type { SealedBankDetails } from './bank-account-cipher.js';
-import type { BankAccount, BillDraft, BillLine, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, LedgerEntry, MatterLedger, MoneySide, StaffRate, SupplierSnapshot, TimeCorrection, TimeEntry } from './finance.js';
+import type { BankAccount, BillDraft, BillDraftSummary, BillLine, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, LedgerEntry, MatterLedger, MoneySide, RateAccount, StaffRate, SupplierSnapshot, TimeCorrection, TimeEntry } from './finance.js';
 
 interface RateRow {
   id: string;
@@ -113,6 +113,28 @@ export class FinanceRepository {
       id: row.id, matterId: row.matter_id, status: 'draft', taxPoint: row.tax_point, dueOn: row.due_on,
       supplier: supplierFromRow(row), ...totals, lines: mapped, createdAt: row.created_at, updatedAt: row.updated_at,
     };
+  }
+
+  async listBillDrafts(before?: string): Promise<BillDraftSummary[]> {
+    const rows = await this.db.selectFrom('bill_drafts')
+      .innerJoin('matters', 'matters.id', 'bill_drafts.matter_id')
+      .innerJoin('clients', 'clients.id', 'matters.client_id')
+      .leftJoin('client_individuals', 'client_individuals.client_id', 'clients.id')
+      .leftJoin('client_organisations', 'client_organisations.client_id', 'clients.id')
+      .select([
+        'bill_drafts.id', 'bill_drafts.matter_id', 'matters.reference as matter_reference',
+        'matters.title as matter_title', sql<string>`coalesce(client_organisations.legal_name, client_individuals.given_names || ' ' || client_individuals.family_name)`.as('client_name'), 'bill_drafts.tax_point',
+        'bill_drafts.due_on', 'bill_drafts.updated_at',
+      ])
+      .where((eb) => eb.not(eb.exists(eb.selectFrom('issued_bills').select('id').whereRef('issued_bills.draft_id', '=', 'bill_drafts.id'))))
+      .$if(before !== undefined, (query) => query.where('bill_drafts.id', '<', before as string))
+      .orderBy('bill_drafts.id', 'desc').limit(100).execute();
+    const totals = await Promise.all(rows.map((row) => this.findBillDraft(row.id)));
+    return rows.map((row, index) => ({
+      id: row.id, matterId: row.matter_id, matterReference: row.matter_reference, matterTitle: row.matter_title,
+      clientName: row.client_name, taxPoint: row.tax_point, dueOn: row.due_on, grossPence: totals[index]!.grossPence,
+      updatedAt: row.updated_at,
+    }));
   }
 
   async findBill(id: string, viewerId: string, viewAll: boolean, executor: Kysely<Database> = this.db): Promise<IssuedBill | undefined> {
@@ -253,7 +275,7 @@ export class FinanceRepository {
     };
   }
 
-  async matterLedger(matterId: string, page: { before?: string; limit: number }): Promise<MatterLedger | undefined> {
+  async matterLedger(matterId: string, page: { before?: string; limit?: number }): Promise<MatterLedger | undefined> {
     if (!(await this.db.selectFrom('matters').select('id').where('id', '=', matterId).executeTakeFirst())) return undefined;
     const totals = (await sql<{ client_balance: string; business_balance: string }>`
       select
@@ -267,14 +289,15 @@ export class FinanceRepository {
       .where('finance_postings.matter_id', '=', matterId)
       .where('finance_postings.account', 'in', ['client_ledger', 'business_ledger'])
       .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
-      .orderBy('finance_postings.id', 'desc').limit(page.limit).execute();
+      .orderBy('finance_postings.id', 'desc')
+      .$if(page.limit !== undefined, (query) => query.limit(page.limit as number)).execute();
     return {
       matterId, clientBalancePence: totals.client_balance, businessBalancePence: totals.business_balance,
       entries: rows.map(toLedgerEntry),
     };
   }
 
-  async cashBook(bankAccountId: string, page: { before?: string; limit: number }): Promise<CashBook | undefined> {
+  async cashBook(bankAccountId: string, page: { before?: string; limit?: number }): Promise<CashBook | undefined> {
     const bankAccount = await this.findBankAccount(bankAccountId);
     if (!bankAccount) return undefined;
     const total = (await sql<{ balance: string }>`
@@ -284,7 +307,8 @@ export class FinanceRepository {
     const rows = await this.ledgerRows()
       .where('finance_postings.bank_account_id', '=', bankAccountId)
       .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
-      .orderBy('finance_postings.id', 'desc').limit(page.limit).execute();
+      .orderBy('finance_postings.id', 'desc')
+      .$if(page.limit !== undefined, (query) => query.limit(page.limit as number)).execute();
     return { bankAccount, balancePence: total, entries: rows.map(toLedgerEntry) };
   }
 
@@ -303,6 +327,21 @@ export class FinanceRepository {
       ))
       .executeTakeFirst();
     return row !== undefined;
+  }
+
+  async rateAccounts(): Promise<RateAccount[]> {
+    const rows = await this.db.selectFrom('accounts')
+      .innerJoin('account_roles', 'account_roles.account_id', 'accounts.id')
+      .select(['accounts.id', 'accounts.display_name', 'account_roles.role'])
+      .where('accounts.kind', '=', 'staff').where('accounts.status', '=', 'active')
+      .where('account_roles.revoked_at', 'is', null).where('account_roles.role', 'in', ['partner', 'fee_earner'])
+      .orderBy('accounts.display_name').orderBy('accounts.id').execute();
+    const grouped = new Map<string, RateAccount>();
+    for (const row of rows) {
+      const account = grouped.get(row.id) ?? { accountId: row.id, displayName: row.display_name, roles: [] };
+      account.roles.push(row.role as 'partner' | 'fee_earner'); grouped.set(row.id, account);
+    }
+    return [...grouped.values()];
   }
 
   async insertRate(rate: { accountId: string; hourlyRatePence: string; effectiveFrom: string; createdBy: string }, trx: Kysely<Database>): Promise<string> {
