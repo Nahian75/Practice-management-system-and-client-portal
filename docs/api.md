@@ -2,10 +2,11 @@
 
 **Current state (2026-10-09):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
-are built. Tasks and Notifications are built. Finance steps 14a to 14c add
+are built. Tasks and Notifications are built. Finance steps 14a to 14e add
 rates, time and billing plus the encrypted bank register, receipts, allocation
-corrections and derived ledger/cash-book APIs. Withdrawals and reconciliation
-are not built.
+corrections, derived ledger/cash-book APIs and the client-payment request,
+approval and bank-outcome workflow, safe bank-statement imports, immutable
+matching, client reconciliation, Compliance sign-off and five-week status.
 
 ## Endpoints
 
@@ -44,6 +45,25 @@ are not built.
 | POST | `/finance/allocations` | `client_money.record` | `{side,sourceMatterId,targetMatterId,amount,reason}` -> 201 with the immutable same-client correction; client money cannot be over-allocated |
 | GET | `/finance/matters/:matterId/ledger` | `finance.view_all` | Derived client/business balances and 100 newest postings. `before` continues the list |
 | GET | `/finance/bank-accounts/:bankAccountId/cash-book` | `finance.view_all` | Safe bank register record, derived balance and 100 newest bank postings. `before` continues the list |
+| POST | `/finance/payment-requests` | `client_money.request` | Request a `refund` or `third_party` payment with encrypted `{name,sortCode,accountNumber}`, or a `costs_transfer` naming a business account and issued bill. All kinds name the matter, client bank account, evidence document, purpose and exact `amount` |
+| GET | `/finance/payment-requests` | `finance.view_all` | `{paymentRequests,next}`: 100 safe requests at a time, newest first. Includes permanent state events but never payee details or encryption fields |
+| GET | `/finance/payment-requests/:paymentRequestId` | `finance.view_all` | One safe request and its oldest-first events; no payee details |
+| GET | `/finance/payment-requests/:paymentRequestId/payee` | `client_money.record` | Audited decrypted payee details for a pending or approved external payment only; 409 after a terminal event or for a costs transfer |
+| POST | `/finance/payment-requests/:paymentRequestId/approve` | `client_money.approve`, different Accounts holder | `{}` -> approved request. Rechecks evidence, bank history, unreserved client balance and any billed-cost balance |
+| POST | `/finance/payment-requests/:paymentRequestId/reject` | `client_money.approve`, different Accounts holder | `{reason}` -> rejected request |
+| POST | `/finance/payment-requests/:paymentRequestId/cancel` | `client_money.request`, original requester | `{reason}` -> cancelled pending or approved request and releases any reservation |
+| POST | `/finance/payment-requests/:paymentRequestId/paid` | `client_money.record` | `{bankReference,occurredOn}` -> paid request and immutable balanced postings; a billed-cost transfer also posts the business side |
+| POST | `/finance/payment-requests/:paymentRequestId/bank-rejected` | `client_money.record` | `{reason}` -> terminal bank-rejected request and releases its reservation without posting money |
+| POST | `/finance/statement-imports` | `finance.reconcile` | Multipart fields `bankAccountId`, `periodStart`, `periodEnd`, `openingBalance`, `closingBalance`, then one UTF-8 CSV `file`. Exact header `date,amount,reference,description`; 5 MB/10,000-row limits; 409 for a duplicate or unbalanced statement |
+| GET | `/finance/statement-imports` | `finance.view_all` | `{statements,next}`: 100 safe immutable imports with rows and match/reversal history; hashes and fingerprints are omitted |
+| GET | `/finance/statement-imports/:statementImportId` | `finance.view_all` | One safe import with signed decimal-string balances and rows |
+| POST | `/finance/statement-rows/:statementRowId/matches` | `finance.reconcile` | `{financeTransactionId}` -> permanent match id; account, signed amount, date and reference must equal the posted bank transaction |
+| POST | `/finance/statement-matches/:statementMatchId/reverse` | `finance.reconcile` | `{reason}` -> permanent reversal id. The original remains visible in row history |
+| POST | `/finance/reconciliations` | `finance.reconcile` | `{asOf,statementImportIds,explanations}` -> immutable server-calculated client reconciliation. Requires one statement per open client account and an explanation for every outstanding item/difference |
+| GET | `/finance/reconciliations` | `finance.view_all` | `{reconciliations,next}`: 100 newest fixed snapshots and sign-off state |
+| GET | `/finance/reconciliations/status` | `finance.view_all` | Statement deadlines for open client/business accounts and the firm-wide signed client-reconciliation deadline; warns during the last seven of 35 days |
+| GET | `/finance/reconciliations/:reconciliationId` | `finance.view_all` | One snapshot with three totals, two differences, selected statement ids, outstanding items/explanations and sign-off |
+| POST | `/finance/reconciliations/:reconciliationId/sign-off` | `finance.reconciliation_sign_off`, different Compliance holder | `{}` -> signed snapshot; prepared-but-unsigned work does not satisfy status |
 | GET | `/health` | Public | Liveness check for load balancers and monitoring |
 | POST | `/auth/sign-in` | Public | Email and password. 200 `{"next":"two_factor"}` with a session cookie waiting for 2FA, 401 `Email or password is incorrect` for every kind of failure, or 429 after too many failures from the caller's network address |
 | POST | `/auth/two-factor` | Public, but needs a session waiting for 2FA | `{"code"}`: a 6-digit authenticator code or a backup code. 200 `{"account"}` with a new session cookie. 401 `The code is incorrect` (try again) or `Please sign in again` (no waiting sign-in, 5 wrong codes, or account blocked) |

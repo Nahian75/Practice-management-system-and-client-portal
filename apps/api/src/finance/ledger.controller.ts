@@ -34,15 +34,17 @@ const bankSchema = z.object({
   openedOn: calendarDate, closedOn: calendarDate.nullable(), createdAt: z.iso.datetime(),
 });
 const transactionSchema = z.object({
-  id: z.uuid(), kind: z.enum(['bill', 'credit_note', 'client_receipt', 'business_receipt', 'client_allocation', 'business_allocation']),
+  id: z.uuid(), kind: z.enum(['bill', 'credit_note', 'client_receipt', 'business_receipt', 'client_allocation', 'business_allocation', 'client_payment', 'costs_transfer']),
   side: z.enum(['client', 'business']), clientId: z.uuid(), matterId: z.uuid(), relatedMatterId: z.uuid().nullable(),
   bankAccountId: z.uuid().nullable(), reference: z.string().nullable(), purpose: z.string(), amount: z.string(),
+  relatedBankAccountId: z.uuid().nullable(), sourcePaymentRequestId: z.uuid().nullable(),
   occurredOn: calendarDate, postedAt: z.iso.datetime(),
 });
 const entrySchema = z.object({
   id: z.uuid(), transactionId: z.uuid(), kind: transactionSchema.shape.kind, side: z.enum(['client', 'business']),
   direction: z.enum(['debit', 'credit']), amount: z.string(), matterId: z.uuid(), relatedMatterId: z.uuid().nullable(),
   bankAccountId: z.uuid().nullable(), reference: z.string().nullable(), purpose: z.string(),
+  relatedBankAccountId: z.uuid().nullable(),
   occurredOn: calendarDate, postedAt: z.iso.datetime(),
 });
 const banksSchema = z.object({ bankAccounts: z.array(bankSchema) });

@@ -629,7 +629,9 @@ export type FinanceTransactionKind =
   | 'client_receipt'
   | 'business_receipt'
   | 'client_allocation'
-  | 'business_allocation';
+  | 'business_allocation'
+  | 'client_payment'
+  | 'costs_transfer';
 export type FinancePostingAccount =
   | 'client_bank'
   | 'business_bank'
@@ -669,14 +671,125 @@ export interface FinanceTransactionsTable {
   matter_id: DatabaseSet<string>;
   related_matter_id: DatabaseSet<string | null>;
   bank_account_id: DatabaseSet<string | null>;
+  related_bank_account_id: DatabaseSet<string | null>;
   source_bill_id: DatabaseSet<string | null>;
   source_credit_note_id: DatabaseSet<string | null>;
+  source_payment_request_id: DatabaseSet<string | null>;
   reference: DatabaseSet<string | null>;
   purpose: DatabaseSet<string>;
   amount_pence: DatabaseSet<string>;
   occurred_on: DatabaseSet<string>;
   posted_by: DatabaseSet<string>;
   posted_at: DatabaseSet<Date>;
+}
+
+export type ClientPaymentKind = 'refund' | 'third_party' | 'costs_transfer';
+export type ClientPaymentEventKind = 'approved' | 'rejected' | 'cancelled' | 'paid' | 'bank_rejected';
+
+export interface ClientPaymentRequestsTable {
+  id: DatabaseSet<string>;
+  kind: DatabaseSet<ClientPaymentKind>;
+  client_id: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  client_bank_account_id: DatabaseSet<string>;
+  business_bank_account_id: DatabaseSet<string | null>;
+  bill_id: DatabaseSet<string | null>;
+  evidence_document_id: DatabaseSet<string>;
+  purpose: DatabaseSet<string>;
+  amount_pence: DatabaseSet<string>;
+  payee_context: DatabaseSet<string | null>;
+  payee_key_version: DatabaseSet<number | null>;
+  payee_nonce: DatabaseSet<Buffer | null>;
+  payee_ciphertext: DatabaseSet<Buffer | null>;
+  payee_auth_tag: DatabaseSet<Buffer | null>;
+  requested_by: DatabaseSet<string>;
+  requested_at: DatabaseSet<Date>;
+}
+
+export interface ClientPaymentEventsTable {
+  id: DatabaseSet<string>;
+  payment_request_id: DatabaseSet<string>;
+  kind: DatabaseSet<ClientPaymentEventKind>;
+  reason: DatabaseSet<string | null>;
+  bank_reference: DatabaseSet<string | null>;
+  occurred_on: DatabaseSet<string | null>;
+  finance_transaction_id: DatabaseSet<string | null>;
+  acted_by: DatabaseSet<string>;
+  acted_at: DatabaseSet<Date>;
+}
+
+export interface BankStatementImportsTable {
+  id: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string>;
+  period_start: DatabaseSet<string>;
+  period_end: DatabaseSet<string>;
+  opening_balance_pence: DatabaseSet<string>;
+  closing_balance_pence: DatabaseSet<string>;
+  file_name: DatabaseSet<string>;
+  file_hash: DatabaseSet<Buffer>;
+  row_count: DatabaseSet<number>;
+  imported_by: DatabaseSet<string>;
+  imported_at: DatabaseSet<Date>;
+}
+
+export interface BankStatementRowsTable {
+  id: DatabaseSet<string>;
+  statement_import_id: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string>;
+  row_number: DatabaseSet<number>;
+  occurred_on: DatabaseSet<string>;
+  amount_pence: DatabaseSet<string>;
+  reference: DatabaseSet<string>;
+  description: DatabaseSet<string>;
+  row_fingerprint: DatabaseSet<Buffer>;
+}
+
+export interface BankStatementMatchEventsTable {
+  id: DatabaseSet<string>;
+  kind: DatabaseSet<'matched' | 'reversed'>;
+  statement_row_id: DatabaseSet<string>;
+  finance_transaction_id: DatabaseSet<string | null>;
+  reversed_match_id: DatabaseSet<string | null>;
+  reason: DatabaseSet<string | null>;
+  acted_by: DatabaseSet<string>;
+  acted_at: DatabaseSet<Date>;
+}
+
+export interface ClientAccountReconciliationsTable {
+  id: DatabaseSet<string>;
+  as_of: DatabaseSet<string>;
+  bank_balance_pence: DatabaseSet<string>;
+  cashbook_balance_pence: DatabaseSet<string>;
+  client_ledger_balance_pence: DatabaseSet<string>;
+  bank_cashbook_difference_pence: DatabaseSet<string>;
+  cashbook_client_difference_pence: DatabaseSet<string>;
+  prepared_by: DatabaseSet<string>;
+  prepared_at: DatabaseSet<Date>;
+}
+
+export interface ClientAccountReconciliationStatementsTable {
+  reconciliation_id: DatabaseSet<string>;
+  statement_import_id: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string>;
+}
+
+export interface ClientAccountReconciliationItemsTable {
+  id: DatabaseSet<string>;
+  reconciliation_id: DatabaseSet<string>;
+  kind: DatabaseSet<'unmatched_statement' | 'unmatched_cashbook' | 'difference'>;
+  source_key: DatabaseSet<string>;
+  bank_account_id: DatabaseSet<string | null>;
+  occurred_on: DatabaseSet<string | null>;
+  amount_pence: DatabaseSet<string>;
+  reference: DatabaseSet<string | null>;
+  explanation: DatabaseSet<string>;
+}
+
+export interface ClientAccountReconciliationSignOffsTable {
+  id: DatabaseSet<string>;
+  reconciliation_id: DatabaseSet<string>;
+  signed_off_by: DatabaseSet<string>;
+  signed_off_at: DatabaseSet<Date>;
 }
 
 export interface FinancePostingsTable {
@@ -709,6 +822,9 @@ export interface Database {
   backup_codes: BackupCodesTable;
   bank_account_closures: BankAccountClosuresTable;
   bank_accounts: BankAccountsTable;
+  bank_statement_imports: BankStatementImportsTable;
+  bank_statement_match_events: BankStatementMatchEventsTable;
+  bank_statement_rows: BankStatementRowsTable;
   bill_deliveries: BillDeliveriesTable;
   bill_draft_lines: BillDraftLinesTable;
   bill_drafts: BillDraftsTable;
@@ -721,6 +837,12 @@ export interface Database {
   credit_note_lines: CreditNoteLinesTable;
   credit_notes: CreditNotesTable;
   clients: ClientsTable;
+  client_payment_events: ClientPaymentEventsTable;
+  client_payment_requests: ClientPaymentRequestsTable;
+  client_account_reconciliation_items: ClientAccountReconciliationItemsTable;
+  client_account_reconciliation_sign_offs: ClientAccountReconciliationSignOffsTable;
+  client_account_reconciliation_statements: ClientAccountReconciliationStatementsTable;
+  client_account_reconciliations: ClientAccountReconciliationsTable;
   document_versions: DocumentVersionsTable;
   document_sharing_changes: DocumentSharingChangesTable;
   document_withdrawals: DocumentWithdrawalsTable;

@@ -4,7 +4,10 @@
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
 issued billing records. Finance-wide bank, cash-book and ledger reads are
-restricted to Accounts and Compliance; step 14c writes are Accounts-only.
+restricted to Accounts and Compliance; step 14d client-payment actions are
+Accounts-only and enforce different request and approval actors in PostgreSQL.
+Step 14e gives statement import, matching and preparation only to Accounts and
+fixed reconciliation sign-off only to a different Compliance holder.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -85,6 +88,10 @@ Each module adds its own permissions when it is built. These exist now:
 | `rates.manage` - create permanent effective staff rates | | | | ✓ | |
 | `bills.manage` - prepare, issue, credit and record delivery of bills | | | | ✓ | |
 | `client_money.record` - record bank accounts, receipts and allocation corrections | | | | ✓ | |
+| `client_money.request` - request or cancel a client-account payment | | | | ✓ | |
+| `client_money.approve` - approve or reject another Accounts holder's request | | | | ✓ | |
+| `finance.reconcile` - import statements, match transactions and prepare reconciliation | | | | ✓ | |
+| `finance.reconciliation_sign_off` - sign a fixed reconciliation prepared by someone else | | | | | ✓ |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.

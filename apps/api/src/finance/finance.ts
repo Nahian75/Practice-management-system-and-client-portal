@@ -147,7 +147,9 @@ export type FinanceTransactionKind =
   | 'client_receipt'
   | 'business_receipt'
   | 'client_allocation'
-  | 'business_allocation';
+  | 'business_allocation'
+  | 'client_payment'
+  | 'costs_transfer';
 
 export interface BankAccount {
   id: string;
@@ -167,6 +169,8 @@ export interface FinanceTransaction {
   matterId: string;
   relatedMatterId: string | null;
   bankAccountId: string | null;
+  relatedBankAccountId: string | null;
+  sourcePaymentRequestId: string | null;
   reference: string | null;
   purpose: string;
   amountPence: string;
@@ -184,6 +188,7 @@ export interface LedgerEntry {
   matterId: string;
   relatedMatterId: string | null;
   bankAccountId: string | null;
+  relatedBankAccountId: string | null;
   reference: string | null;
   purpose: string;
   occurredOn: string;

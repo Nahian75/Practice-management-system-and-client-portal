@@ -2,7 +2,7 @@
 
 **Current state (2026-10-09):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-Finance steps 14a to 14c, plus Playwright end-to-end tests for the staff app,
+Finance steps 14a to 14e, plus Playwright end-to-end tests for the staff app,
 Tasks, Notifications and the client portal.
 
 ## Tools
@@ -189,7 +189,9 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   application and migration safeguards are recorded in the
   [step 14a](finance.md#step-14a-verification) and
   [step 14b](finance.md#step-14b-verification) and
-  [step 14c](finance.md#step-14c-verification) verification notes.
+  [step 14c](finance.md#step-14c-verification) and
+  [step 14d](finance.md#step-14d-verification) and
+  [step 14e](finance.md#step-14e-verification) verification notes.
 - Billing tests cover exact positive amounts, VAT rounding, draft replacement,
   issue snapshots and numbering, linked-time use, credit-note remaining
   balances, delivery records, fixed downloads, permissions, record visibility,
@@ -203,6 +205,21 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   double-entry shapes, automatic bill/credit postings, client nonnegative
   balances, direct-write denial and owner immutability; a controlled race
   proves concurrent allocations cannot overspend one client balance.
+- Client-payment tests cover encrypted payees, strict safe responses, live
+  Accounts permissions, four-eyes approval, requester cancellation, terminal
+  bank outcomes and transactional success/denial audit. Database tests cover
+  current evidence, reservations, balanced withdrawals and billed-cost
+  transfers, bank closure and later credits; controlled races prove concurrent
+  approvals cannot reserve the same client balance.
+- Reconciliation tests parse CSV as inert UTF-8 data and cover exact headers,
+  quotes, formula/control rejection, impossible dates, size/row/money bounds,
+  hashes, duplicate files/rows and opening-to-closing arithmetic. HTTP and
+  database tests cover Accounts/Compliance separation, exact match facts,
+  reversal/rematch history, complete client-bank coverage, server-calculated
+  totals, required explanations, fixed snapshots, self-sign-off refusal,
+  signed-only 35-day status, safe responses, private audit and rollback.
+  Twenty-two deliberate application and migration breaks were caught and
+  restored before the full suite.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

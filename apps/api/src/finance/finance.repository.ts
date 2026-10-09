@@ -41,6 +41,7 @@ interface LedgerRow {
   transaction_matter_id: string;
   related_matter_id: string | null;
   bank_account_id: string | null;
+  related_bank_account_id: string | null;
   reference: string | null;
   purpose: string;
   occurred_on: string;
@@ -246,6 +247,7 @@ export class FinanceRepository {
     return row && {
       id: row.id, kind: row.kind, side: transactionSide(row.kind), clientId: row.client_id,
       matterId: row.matter_id, relatedMatterId: row.related_matter_id, bankAccountId: row.bank_account_id,
+      relatedBankAccountId: row.related_bank_account_id, sourcePaymentRequestId: row.source_payment_request_id,
       reference: row.reference, purpose: row.purpose, amountPence: row.amount_pence,
       occurredOn: row.occurred_on, postedAt: row.posted_at,
     };
@@ -432,6 +434,7 @@ export class FinanceRepository {
         'finance_postings.direction', 'finance_postings.amount_pence', 'finance_postings.matter_id',
         'finance_postings.bank_account_id', 'finance_transactions.kind',
         'finance_transactions.matter_id as transaction_matter_id', 'finance_transactions.related_matter_id',
+        'finance_transactions.related_bank_account_id',
         'finance_transactions.reference', 'finance_transactions.purpose', 'finance_transactions.occurred_on',
         'finance_transactions.posted_at',
       ]);
@@ -553,7 +556,7 @@ function toBankAccount(row: {
 }
 
 function transactionSide(kind: FinanceTransactionKind): MoneySide {
-  return kind.startsWith('client_') ? 'client' : 'business';
+  return kind.startsWith('client_') || kind === 'costs_transfer' ? 'client' : 'business';
 }
 
 function toLedgerEntry(row: LedgerRow): LedgerEntry {
@@ -564,7 +567,7 @@ function toLedgerEntry(row: LedgerRow): LedgerEntry {
     id: row.id, transactionId: row.transaction_id, kind: row.kind,
     side: row.account.startsWith('client_') ? 'client' : 'business',
     direction: row.direction, amountPence: row.amount_pence, matterId: row.matter_id,
-    relatedMatterId, bankAccountId: row.bank_account_id,
+    relatedMatterId, bankAccountId: row.bank_account_id, relatedBankAccountId: row.related_bank_account_id,
     reference: row.reference, purpose: row.purpose, occurredOn: row.occurred_on, postedAt: row.posted_at,
   };
 }

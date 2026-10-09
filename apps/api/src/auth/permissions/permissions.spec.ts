@@ -35,6 +35,10 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'rates.manage': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
   'bills.manage': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
   'client_money.record': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
+  'client_money.request': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
+  'client_money.approve': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
+  'finance.reconcile': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: false },
+  'finance.reconciliation_sign_off': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
 };
 
 describe('role permissions', () => {
@@ -54,7 +58,7 @@ describe('role permissions', () => {
   });
 
   it('combines the permissions of every role held', () => {
-    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.view_all', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
+    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.reconciliation_sign_off', 'finance.view_all', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
   });
 
   it('gives no permissions without roles', () => {

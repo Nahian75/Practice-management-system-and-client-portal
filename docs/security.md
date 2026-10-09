@@ -9,11 +9,15 @@ The worker rechecks the recipient address, current assignee, task state, due
 date, team membership and account before delivery. The database refuses a
 future London reminder window. Staff screens use only the filtered API answer;
 client accounts are sent back to the separate portal. The Notifications module
-review fixed N1 and N2. Finance steps 14a to 14c add database-enforced
+review fixed N1 and N2. Finance steps 14a to 14e add database-enforced
 immutable rates, time, billing and posting records, exact integer-pence limits,
 live role/team checks, encrypted bank details, balanced postings, nonnegative
-client ledgers, fixed downloads and transactional audit. Finance has not had
-its final security review yet.
+client ledgers, fixed downloads, encrypted payment recipients, live four-eyes
+approval, reserved-balance locking, immutable bank outcomes, inert CSV
+statement parsing, duplicate detection, locked exact matching, permanent
+match reversals, server-calculated reconciliation snapshots, separate
+Compliance sign-off, signed-only deadlines and transactional audit. Finance
+has not had its final security review yet.
 
 This file lists only the controls that are actually in place.
 
@@ -258,6 +262,18 @@ neither the limit nor the recorded address.
   application cannot write register or ledger tables directly, and owner-level
   triggers reject changes and truncation. Stable matter locks and a deferred
   balance check stop concurrent client allocations creating a debit balance.
+- Statement uploads are buffered only to a 5 MB bound, decoded as strict
+  UTF-8 and parsed as CSV data. The service never invokes spreadsheet code;
+  exact headers, safe non-formula text, calendar dates, row count, signed
+  amounts and opening/closing arithmetic are checked before and inside the
+  database. Raw SHA-256 file hashes and normalized row fingerprints block
+  duplicates without being returned by the API.
+- The application cannot directly write statement, match or reconciliation
+  tables. Narrow functions recheck live Accounts/Compliance roles, lock match
+  participants, recompute all reconciliation totals and require complete
+  client-bank coverage and explanations. Match reversals and sign-off are new
+  immutable events; owner-level triggers reject every later change or removal.
+  Deadline status counts only a signed snapshot.
 
 ## Application secrets
 

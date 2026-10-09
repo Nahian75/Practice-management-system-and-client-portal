@@ -1,11 +1,13 @@
 # Finance
 
 **Current state (2026-10-09):** First-version design approved by the project
-owner. Steps 14a to 14c are built: exact GBP money strings, immutable staff
+owner. Steps 14a to 14e are built: exact GBP money strings, immutable staff
 rates and time entries, permanent corrections, billing, an encrypted bank
 register, balanced client/business postings, receipts, allocation corrections,
-derived ledgers, permissions, audit and the staff API. Withdrawals, bank
-outcomes, reconciliation and Finance screens are later steps.
+derived ledgers, encrypted client-payment requests, reservations, four-eyes
+approval, recorded bank outcomes, safe statement imports, immutable matching,
+five-week client reconciliation, Compliance sign-off, permissions, audit and
+the staff API. Finance screens are a later step.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -113,9 +115,9 @@ again during the Finance security review and before production.
 
 ## Permissions
 
-The first four permissions are built in step 14a, `bills.manage` in step 14b
-and `client_money.record` in step 14c. The remaining permissions are added
-only with their implementation step.
+The first four permissions are built in step 14a, `bills.manage` in step 14b,
+`client_money.record` in step 14c, the request/approve permissions in step
+14d and the reconciliation permissions in step 14e.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -194,8 +196,9 @@ by the design.
 
 - An import fixes the bank account, statement range, opening/closing balances,
   file hash, importer and rows. Duplicate files and duplicate rows are refused.
-- Statement rows may be matched once to posted bank transactions. A mistaken
-  match is reversed rather than overwritten.
+- A statement row and posted transaction/account pair may each have at most
+  one current match. A mistaken match is reversed rather than overwritten,
+  after which the row can be matched correctly without losing history.
 - A prepared reconciliation contains the three required totals and every
   outstanding item/difference. Sign-off by Compliance makes it final.
 - The dashboard warns before five weeks have passed and shows overdue
@@ -211,10 +214,14 @@ Event families:
 - `finance.bank_account_created`, `finance.bank_account_closed`,
   `finance.client_money_received`, `finance.business_money_received`,
   `finance.client_money_allocated` and `finance.business_money_allocated` are built;
-- later payment events include `finance.client_money_payment_requested`,
+- payment events include `finance.client_money_payment_requested`,
   `finance.client_money_payment_approved`,
-  `finance.client_money_payment_rejected` and `finance.client_money_paid`;
-- `finance.bank_statement_imported`, `finance.bank_transaction_matched`;
+  `finance.client_money_payment_rejected`,
+  `finance.client_money_payment_cancelled`,
+  `finance.client_money_payment_bank_rejected`,
+  `finance.client_money_payment_payee_viewed` and `finance.client_money_paid`;
+- `finance.bank_statement_imported`, `finance.bank_transaction_matched`,
+  `finance.bank_transaction_match_reversed`;
 - `finance.reconciliation_prepared`, `finance.reconciliation_signed_off`.
 
 Audit metadata uses ids, event kinds, pence amounts and safe states. It does
@@ -309,6 +316,69 @@ row resist update, deletion and truncation even by the table owner.
 | GET | `/finance/matters/:matterId/ledger` | `finance.view_all` | Return derived client/business balances and 100 newest matter postings; `before` continues the list |
 | GET | `/finance/bank-accounts/:bankAccountId/cash-book` | `finance.view_all` | Return the derived bank balance and 100 newest bank postings; `before` continues the list |
 
+### Step 14d API
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| POST | `/finance/payment-requests` | `client_money.request` | Create a refund/third-party request with encrypted payee details, or a billed-cost transfer with a business account and issued bill |
+| GET | `/finance/payment-requests` | `finance.view_all` | Return 100 newest safe requests and their events; `before` continues the list and no payee details are returned |
+| GET | `/finance/payment-requests/:paymentRequestId` | `finance.view_all` | Return one safe request and its permanent events |
+| GET | `/finance/payment-requests/:paymentRequestId/payee` | `client_money.record` | Audit and decrypt an external payee only while the request is pending or approved |
+| POST | `/finance/payment-requests/:paymentRequestId/approve` | `client_money.approve`; actor differs from requester | Recheck evidence, bank accounts, unreserved client money and any bill balance, then reserve the amount |
+| POST | `/finance/payment-requests/:paymentRequestId/reject` | `client_money.approve`; actor differs from requester | Add a terminal rejection with a reason |
+| POST | `/finance/payment-requests/:paymentRequestId/cancel` | `client_money.request`; original requester | Cancel a pending or approved request and release its reservation |
+| POST | `/finance/payment-requests/:paymentRequestId/paid` | `client_money.record` | Record the bank reference/date and create the balanced withdrawal postings; a costs transfer creates four postings |
+| POST | `/finance/payment-requests/:paymentRequestId/bank-rejected` | `client_money.record` | Record terminal bank refusal without posting money and release the reservation |
+
+All actions recheck a live Accounts actor in PostgreSQL. Requests and events
+are insert-only. Approval, allocation, bank closure and bill-credit paths take
+coordinated locks and include approved reservations in their live calculations.
+External payees are AES-GCM encrypted under `FINANCE_ENCRYPTION_KEY`. Safe
+queries do not load their ciphertext; a narrow payee-read function locks the
+request and releases ciphertext only for an eligible task. Lists, normal
+detail responses, audit and logs contain no payee details.
+
+### Step 14e API
+
+| Method | Path | Rule | Result |
+|---|---|---|---|
+| POST | `/finance/statement-imports` | `finance.reconcile` | Import one UTF-8 CSV statement with multipart fields `bankAccountId`, `periodStart`, `periodEnd`, `openingBalance`, `closingBalance` and one `file` |
+| GET | `/finance/statement-imports` | `finance.view_all` | Return 100 newest safe imports with rows and permanent match/reversal history; `before` continues the list |
+| GET | `/finance/statement-imports/:statementImportId` | `finance.view_all` | Return one safe import; file hashes and row fingerprints are not exposed |
+| POST | `/finance/statement-rows/:statementRowId/matches` | `finance.reconcile` | Match `{financeTransactionId}` only when bank account, signed amount, date and reference equal the posted bank transaction |
+| POST | `/finance/statement-matches/:statementMatchId/reverse` | `finance.reconcile` | Add a permanent reversal with `{reason}`; the original match remains in history and the row can then be matched correctly |
+| POST | `/finance/reconciliations` | `finance.reconcile` | Prepare a server-calculated firm-wide client reconciliation from `{asOf,statementImportIds,explanations}` |
+| GET | `/finance/reconciliations` | `finance.view_all` | Return 100 newest immutable snapshots and sign-off state; `before` continues the list |
+| GET | `/finance/reconciliations/status` | `finance.view_all` | Return per-account statement and firm-wide signed-reconciliation five-week deadlines with `current`, `warning` or `overdue` state |
+| GET | `/finance/reconciliations/:reconciliationId` | `finance.view_all` | Return one fixed snapshot, selected statements, totals, outstanding items, explanations and optional sign-off |
+| POST | `/finance/reconciliations/:reconciliationId/sign-off` | `finance.reconciliation_sign_off`; actor differs from preparer | Add the one permanent Compliance sign-off |
+
+The CSV header is exactly `date,amount,reference,description`. Dates are ISO
+calendar dates and amounts are signed pounds with two decimal places: money in
+is positive and money out is negative. Imports are limited to 5 MB and 10,000
+rows. Parsing is RFC 4180-style data parsing only: no spreadsheet is opened,
+text cells beginning with `=`, `+`, `-` or `@` are refused, and control or text
+direction characters are refused. PostgreSQL checks that every row is inside
+the statement period and that opening balance plus rows equals closing balance.
+The same file or normalized row cannot be imported twice for one bank account.
+
+A client reconciliation selects exactly one statement ending on `asOf` for
+every client bank account open on that date. PostgreSQL recomputes the selected
+closing-bank total, client cash-book total and aggregate matter client-ledger
+liability; caller-supplied totals are impossible. Every unmatched statement
+row uses the explanation key `statement:<rowId>`, every unmatched cash-book
+posting uses `cashbook:<transactionId>:<bankAccountId>`, and non-zero total
+differences use `difference:bank-cashbook` or `difference:cashbook-client`.
+Every present key needs a safe explanation before preparation succeeds.
+
+Statement freshness is tracked for every currently open client and business
+bank account. Signed client reconciliation freshness is firm-wide. The due
+date is 35 calendar days after the last statement end or signed reconciliation
+date (the account opening date is the initial baseline), with `warning` during
+the final seven days. A prepared but unsigned snapshot never completes the
+deadline. Business statements are monitored, while the SRA three-way
+reconciliation covers client accounts only.
+
 Accounts alone records bank accounts, receipts and allocations. Accounts and
 Compliance can read the firm-wide bank register, cash books and matter
 ledgers. Full sort codes and account numbers are AES-GCM encrypted under the
@@ -356,12 +426,15 @@ of each safeguard and updated documentation before the next step.
 - **14c. Done.** Encrypted bank-account register, balanced client/business
   postings, matter ledgers, cash books, receipts and same-client allocation
   corrections. Migration `0044`; API implementation in
-  `apps/api/src/finance/`. Withdrawals and bank outcomes remain step 14d.
-- **14d.** Client-money payment requests, encrypted payee details, reservations,
-  four-eyes approval and recorded bank outcomes, including billed-cost
-  transfers.
-- **14e.** Safe CSV statement import, transaction matching, five-week
-  reconciliation preparation, Compliance sign-off and overdue status.
+  `apps/api/src/finance/`. Withdrawals and bank outcomes were added in step 14d.
+- **14d. Done.** Client-money payment requests, encrypted payee details,
+  reservations, four-eyes approval and recorded bank outcomes, including
+  billed-cost transfers. Migration `0045`; API implementation in
+  `apps/api/src/finance/`.
+- **14e. Done.** Safe CSV statement import, immutable transaction
+  matching/reversal, five-week reconciliation preparation, separate Compliance
+  sign-off and overdue status. Migration `0046`; API implementation in
+  `apps/api/src/finance/`.
 - **14f.** Staff matter-finance, Accounts and Compliance screens, exports and
   accessibility tests.
 - Security review of Finance against the then-current SRA and HMRC rules.
@@ -453,3 +526,58 @@ the six-step build order above.
   allocation counterpart ids, invalid audit actions, missing Accounts/date/
   duplicate/closure/matter/client/balance/posting checks, lost allocation
   locking, automatic posting, direct-write denial and owner immutability.
+
+## Step 14d verification
+
+- Positive tests cover encrypted refund and third-party recipients, billed-cost
+  transfers, safe list/detail output, separately audited payee access,
+  four-eyes approval, requester cancellation, bank rejection, paid withdrawals
+  and their two- or four-posting ledger shapes.
+- Negative tests cover missing permissions, strict/unknown input, malformed or
+  zero amounts and payees, inactive or role-lost actors, self-approval,
+  foreign/current evidence, closed banks, invalid transitions and bank dates,
+  insufficient available client money, excessive bill transfers, direct app
+  writes and every owner mutation.
+- Success audit shares the payment transaction; failure tests prove a missing
+  audit rolls the request or event back. Refused approval is audited outside
+  the rolled-back attempt. Audit and safe responses exclude payees, bank
+  references, purposes, evidence contents, reasons and encryption material.
+- Controlled locking proves concurrent approvals cannot reserve the same
+  balance. Allocation respects reservations, approved requests prevent bank
+  closure, requester cancellation and bank rejection release reservations,
+  and a later credit cannot reduce a bill below costs already transferred.
+- Twenty-two deliberate break cases were run and restored. They proved the
+  tests catch missing permission mappings and route guards, loose request
+  schemas and amount bounds, deterministic encryption contexts, leaked audit
+  payees, missing denial audit, lost live-Accounts/evidence/four-eyes/state
+  checks, direct writes, mutable history, missing balance/bill reservations,
+  closure/cancellation/credit bypasses, and invalid payment posting shapes.
+
+## Step 14e verification
+
+- Positive tests cover strict UTF-8 CSV parsing, quoting, signed statement
+  money, balanced imports, exact bank matching, permanent reversal and rematch
+  history, server-calculated three-way totals, explained outstanding items,
+  separate Compliance sign-off and five-week status based only on signed work.
+- Negative tests cover permissions, strict multipart and JSON input, wrong
+  headers, formula-like or control text, invalid UTF-8, impossible dates,
+  oversized files and row counts, bad balances, duplicate files and rows,
+  inactive actors, incomplete client-account coverage, mismatched bank facts,
+  repeated matches/reversals/sign-off, missing explanations, self-sign-off,
+  direct writes and owner mutation or truncation.
+- Audit records ids, dates, counts and state only; it excludes statement text,
+  filenames, explanations and bank references. Import, match, reversal,
+  preparation and sign-off audit events share their database transactions.
+  A failed import audit rolls the new import and all rows back.
+- Matching locks the statement row, finance transaction and bank account so
+  concurrent attempts cannot actively reuse either side. Preparation locks
+  the client-bank set, recomputes every total and freezes selected statements,
+  outstanding items and explanations. Database tests use application and
+  owner roles.
+- Twenty-two deliberate break cases were run and restored. They proved the
+  tests catch missing permission mappings and route guards; loose header,
+  formula, calendar-date and size handling; direct app writes; missing file,
+  row and balance checks; lost live-Accounts and exact-reference checks;
+  mutable history; repeated reversal; incomplete account coverage; missing
+  outstanding explanations; wrong Compliance or self-sign-off; and counting
+  an unsigned preparation as complete.

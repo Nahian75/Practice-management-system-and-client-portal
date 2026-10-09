@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-09):** The database foundation through Finance step
-14c exists, with separate owner and application roles and forward-only
-migrations through `0044`.
+14e exists, with separate owner and application roles and forward-only
+migrations through `0046`.
 
 ## Database
 
@@ -76,7 +76,10 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `bill_drafts`, `bill_draft_lines` | `0043_finance_billing.sql` | Draft writes use narrow security-definer functions and require live Accounts staff. Drafts can change only before issue; issue freezes their source rows | [finance.md](finance.md#step-14b-api) |
 | `issued_bills`, `issued_bill_lines`, `credit_notes`, `credit_note_lines`, `bill_deliveries` | `0043_finance_billing.sql` | No direct application writes. Database functions serialise numbering and snapshot trusted client, supplier, time, VAT and totals. Posted rows reject update, deletion and truncation even by the owner | [finance.md](finance.md#step-14b-api) |
 | `bank_accounts`, `bank_account_closures` | `0044_finance_ledgers.sql` | Full details are encrypted by the API; PostgreSQL receives ciphertext, integrity fields, a keyed fingerprint and last four digits. Accounts-only functions add register/closure rows. No direct app writes or later owner changes | [finance.md](finance.md#step-14c-api) |
-| `finance_transactions`, `finance_postings` | `0044_finance_ledgers.sql` | Narrow functions and bill/credit triggers create immutable headers and exactly two balanced postings. Deferred checks enforce client/matter/account shape and nonnegative client balances; the app has no direct write rights | [finance.md](finance.md#step-14c-api) |
+| `finance_transactions`, `finance_postings` | `0044_finance_ledgers.sql`, `0045_finance_payments.sql` | Narrow functions and bill/credit/payment triggers create immutable headers and balanced postings: two normally, four for a client-to-business billed-cost transfer. Deferred checks enforce client/matter/account shape and nonnegative client balances; the app has no direct write rights | [finance.md](finance.md#step-14c-api) |
+| `client_payment_requests`, `client_payment_events` | `0045_finance_payments.sql` | Requests fix matter, accounts, evidence, purpose, exact amount and encrypted external-payee details. Insert-only events implement approval, rejection, requester cancellation, paid and bank-rejected states. Security-definer functions recheck live Accounts actors, four eyes, evidence, bank history, client-money and bill reservations; direct app writes and all later owner edits are refused | [finance.md](finance.md#step-14d-api) |
+| `bank_statement_imports`, `bank_statement_rows`, `bank_statement_match_events` | `0046_finance_reconciliation.sql` | Imports fix account, range, balances, content hash, importer and normalized rows. Account-scoped unique hashes/fingerprints refuse duplicate files/rows. Match and reversal events are insert-only; narrow functions require live Accounts and verify bank account, signed amount, date and reference against immutable postings | [finance.md](finance.md#step-14e-api) |
+| `client_account_reconciliations`, `client_account_reconciliation_statements`, `client_account_reconciliation_items`, `client_account_reconciliation_sign_offs` | `0046_finance_reconciliation.sql` | Preparation selects one same-date statement per open client bank, recomputes the three totals, and fixes every outstanding item/difference with its explanation. A different active Compliance holder adds the only sign-off. Direct app writes and every later owner edit/delete/truncate are refused | [finance.md](finance.md#step-14e-api) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

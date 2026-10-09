@@ -2,7 +2,7 @@
 
 **Current state (2026-10-09):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications and Finance steps 14a to 14c.
+Tasks, Notifications and Finance steps 14a to 14e.
 
 ## Purpose
 
@@ -85,3 +85,25 @@ dates, ledger side and exact pence amounts. It never contains a full or partial
 bank account number, sort code, bank-account name, receipt reference/purpose,
 allocation reason or encryption material. Each change and audit event shares
 one database transaction.
+
+Finance step 14d records `finance.client_money_payment_requested`,
+`finance.client_money_payment_approved`,
+`finance.client_money_payment_rejected`,
+`finance.client_money_payment_cancelled`,
+`finance.client_money_payment_bank_rejected`, `finance.client_money_paid` and
+the sensitive read `finance.client_money_payment_payee_viewed`. Refused
+self-approval, invalid-state and insufficient-funds attempts use the same
+action with outcome `denied`. Metadata is limited to request, matter, kind,
+state and exact pence facts; it never contains the payee, bank reference,
+purpose, evidence contents, reason or encryption material. Every successful
+state change and its audit event share one transaction.
+
+Finance step 14e records `finance.bank_statement_imported`,
+`finance.bank_transaction_matched`,
+`finance.bank_transaction_match_reversed`,
+`finance.reconciliation_prepared` and `finance.reconciliation_signed_off`.
+Metadata is limited to record/account ids, statement dates and row/item counts.
+It never copies filenames, statement references/descriptions, reconciliation
+explanations or bank details. Every successful change and its audit event share
+one transaction; invalid match, reversal and sign-off state is recorded as a
+denied event without the sensitive request body.
