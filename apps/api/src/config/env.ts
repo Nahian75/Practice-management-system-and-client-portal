@@ -80,6 +80,8 @@ const envSchema = z
     MAIL_ENCRYPTION_KEY: encryptionKeySchema,
     /** Seals firm and client bank details before they enter PostgreSQL. */
     FINANCE_ENCRYPTION_KEY: encryptionKeySchema,
+    /** Seals AML identity data and each protected evidence file key. */
+    AML_ENCRYPTION_KEY: encryptionKeySchema,
     TRUSTED_PROXIES: trustedProxiesSchema,
     /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
     DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),
@@ -95,6 +97,11 @@ const envSchema = z
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
   .superRefine((env, ctx) => {
+    for (const key of ['TOTP_ENCRYPTION_KEY','MAIL_ENCRYPTION_KEY','FINANCE_ENCRYPTION_KEY','DOCUMENT_ENCRYPTION_KEY'] as const) {
+      if (env.AML_ENCRYPTION_KEY === env[key]) {
+        ctx.addIssue({ code:'custom', path:['AML_ENCRYPTION_KEY'], message:`must be separate from ${key}` });
+      }
+    }
     for (const key of ['APP_BASE_URL', 'DOCUMENTS_S3_ENDPOINT'] as const) {
       if (env.NODE_ENV === 'production' && new URL(env[key]).protocol !== 'https:') {
         ctx.addIssue({ code: 'custom', path: [key], message: 'must use https in production' });

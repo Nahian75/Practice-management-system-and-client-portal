@@ -2,7 +2,7 @@
 
 **Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f and Compliance step 15a, plus
+the security-reviewed Finance steps 14a to 14f and Compliance steps 15a/15b, plus
 Playwright end-to-end tests for the staff app, Tasks, Notifications and the
 client portal.
 
@@ -243,6 +243,14 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   tests use the application and owner roles for direct-write denial, live-role
   rechecks and immutable history. Controlled concurrency proves version
   allocation and last-nominated-officer protection serialize correctly.
+- CDD HTTP tests cover visible-client and firm-wide Compliance access, safe
+  keyset summaries, strict individual/entity facts, ownership and authority
+  graphs, manual/electronic verification, protected uploads/downloads,
+  cross-case rejection, snapshots and submission. Database tests probe direct
+  application and owner writes, live-role loss, context binding, future dates,
+  immutable final history and competing drafts. Dedicated cipher/vault tests
+  prove distinct-key failure, purpose-bound integrity, non-plaintext metadata,
+  compliance object names and encrypted streaming round trips.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

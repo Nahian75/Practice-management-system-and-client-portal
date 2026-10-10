@@ -1,8 +1,8 @@
 # Data Model
 
-**Current state (2026-10-09):** The database foundation through Finance step
-14e exists, with separate owner and application roles and forward-only
-migrations through `0046`.
+**Current state (2026-10-10):** The database foundation through Compliance
+step 15b exists, with separate owner and application roles and forward-only
+migrations through `0049`.
 
 ## Database
 
@@ -80,6 +80,9 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `client_payment_requests`, `client_payment_events` | `0045_finance_payments.sql` | Requests fix matter, accounts, evidence, purpose, exact amount and encrypted external-payee details. Insert-only events implement approval, rejection, requester cancellation, paid and bank-rejected states. Security-definer functions recheck live Accounts actors, four eyes, evidence, bank history, client-money and bill reservations; direct app writes and all later owner edits are refused | [finance.md](finance.md#step-14d-api) |
 | `bank_statement_imports`, `bank_statement_rows`, `bank_statement_match_events` | `0046_finance_reconciliation.sql` | Imports fix account, range, balances, content hash, importer and normalized rows. Account-scoped unique hashes/fingerprints refuse duplicate files/rows. Match and reversal events are insert-only; narrow functions require live Accounts and verify bank account, signed amount, date and reference against immutable postings | [finance.md](finance.md#step-14e-api) |
 | `client_account_reconciliations`, `client_account_reconciliation_statements`, `client_account_reconciliation_items`, `client_account_reconciliation_sign_offs` | `0046_finance_reconciliation.sql` | Preparation selects one same-date statement per open client bank, recomputes the three totals, and fixes every outstanding item/difference with its explanation. A different active Compliance holder adds the only sign-off. Direct app writes and every later owner edit/delete/truncate are refused | [finance.md](finance.md#step-14e-api) |
+| `aml_officer_appointments`, `aml_control_versions`, `aml_control_approvals`, `aml_training_completions`, `aml_independent_reviews` | `0048_compliance_foundations.sql` | Narrow functions recheck live Administrator, Compliance or Partner roles, serialize officer continuity/control numbering and keep final controls, approvals, training and reviews immutable. App direct writes and owner update/delete/truncate are refused | [compliance.md](compliance.md#step-15a-api) |
+| `aml_cdd_cases`, `aml_cdd_case_controls` | `0049_compliance_cdd.sql` | One database-serialized draft version per client. Protected submission locks it, requires complete current verification/authority, snapshots the client and five current approved controls, then makes the case immutable. Direct inserts and owner changes/truncation are refused | [compliance.md](compliance.md#step-15b-api) |
+| `aml_cdd_subjects`, `aml_cdd_ownership_controls`, `aml_cdd_authorities`, `aml_cdd_verifications`, `aml_cdd_evidence` | `0049_compliance_cdd.sql` | Protected draft-only functions recheck live record access and same-case graph links. Identity/narrative/exact-source metadata and per-file keys are authenticated ciphertext bound to record/purpose contexts. Submitted facts are append-only; direct app writes and later owner insert/update/delete/truncate are refused | [compliance.md](compliance.md#step-15b-api) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

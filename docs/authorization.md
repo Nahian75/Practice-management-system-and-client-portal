@@ -10,8 +10,10 @@ Step 14e gives statement import, matching and preparation only to Accounts and
 fixed reconciliation sign-off only to a different Compliance holder.
 Step 14f exposes live Finance action capabilities to the staff UI, but those
 booleans are presentation only: route guards and PostgreSQL remain the controls.
-Compliance step 15a separates administrator-only officer appointments,
-Compliance-only firm-control work and Partner-only approval.
+Compliance steps 15a and 15b separate administrator-only officer appointments,
+Compliance-only firm-control work and Partner-only approval, while allowing
+Partners and fee earners to prepare CDD only for visible clients and Compliance
+to do so firm-wide.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -99,6 +101,8 @@ Each module adds its own permissions when it is built. These exist now:
 | `aml.officers.manage` - record and end nominated-officer and deputy appointments, without AML-content access | ✓ | | | | |
 | `aml.firm_controls` - prepare and read fixed firm controls, training records and independent reviews | | | | | ✓ |
 | `aml.firm_approve` - approve a firm-control version prepared by someone else | | ✓ | | | |
+| `aml.assess` - prepare CDD for a client allowed by the record rule | | ✓ | ✓ | | ✓ |
+| `aml.view_evidence` - read protected CDD detail and evidence under the same record rule | | ✓ | ✓ | | ✓ |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.

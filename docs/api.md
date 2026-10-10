@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-09):** Health, authentication, staff management,
+**Current state (2026-10-10):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
 are built. Tasks and Notifications are built. Finance steps 14a to 14f add
 rates, time and billing plus the encrypted bank register, receipts, allocation
@@ -8,11 +8,24 @@ corrections, derived ledger/cash-book APIs and the client-payment request,
 approval and bank-outcome workflow, safe bank-statement imports, immutable
 matching, client reconciliation, Compliance sign-off, five-week status, safe
 exports and the capability response used by the staff Finance workspace.
+Compliance steps 15a and 15b add firm controls and versioned client CDD,
+encrypted identity/ownership/authority facts and protected evidence.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| POST | `/clients/:clientId/cdd` | `aml.assess`; visible client, or Compliance | `{intendedRelationship,reason}` -> the sole live versioned draft; 409 while another draft exists |
+| GET | `/clients/:clientId/cdd` | `aml.view_evidence`; same record rule | `{cases,next}`: 100 safe summaries, newest first; `before` continues without identity or evidence detail |
+| GET | `/clients/:clientId/cdd/:caseId` | `aml.view_evidence`; same record rule | Protected full CDD detail. Cross-client or hidden ids answer 404 |
+| POST | `/clients/:clientId/cdd/:caseId/subjects` | `aml.assess`; draft | Add an encrypted individual or legal-entity identity and its relationship |
+| POST | `/clients/:clientId/cdd/:caseId/ownership` | `aml.assess`; draft | Add a case-local ownership/control edge with optional percentage and encrypted control basis |
+| POST | `/clients/:clientId/cdd/:caseId/authorities` | `aml.assess`; draft | Add verified authority for an authorised representative, linked to protected evidence |
+| POST | `/clients/:clientId/cdd/:caseId/verifications` | `aml.assess`; draft | Add source, dates, method, outcome and evidence link; exact identifiers/provider/reliance detail is encrypted |
+| POST | `/clients/:clientId/cdd/:caseId/evidence` | `aml.assess`; draft | Multipart metadata then one inspected, malware-scanned file, up to 50 MB; AML-encrypted and rate-limited |
+| GET | `/clients/:clientId/cdd/:caseId/evidence/:evidenceId/content` | `aml.view_evidence`; same record rule | Audited protected attachment with no-store and restrictive headers |
+| POST | `/clients/:clientId/cdd/:caseId/submit` | `aml.assess`; draft | Fix the complete case, client snapshot and five current approved firm-control versions; 409 if incomplete or final |
+| POST | `/clients/:clientId/cdd/:caseId/abandon` | `aml.assess`; draft | Permanently close a mistaken draft with `{reason}` so a replacement version can be created; collected facts remain fixed |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

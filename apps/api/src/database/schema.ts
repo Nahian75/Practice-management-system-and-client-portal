@@ -891,11 +891,70 @@ export interface AmlIndependentReviewsTable {
   recorded_at: DatabaseSet<Date>;
 }
 
+export type AmlCddStatus = 'draft' | 'submitted' | 'abandoned';
+export type AmlSubjectKind = 'individual' | 'legal_entity';
+export type AmlSubjectRelationship = 'client' | 'authorised_representative' | 'director_senior_manager'
+  | 'beneficial_owner' | 'trustee' | 'settlor' | 'beneficiary' | 'protector' | 'funder' | 'other_controller';
+
+export interface AmlCddCasesTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; version: DatabaseSet<number>;
+  status: DatabaseSet<AmlCddStatus>; intended_relationship: DatabaseSet<string>; reason: DatabaseSet<string>;
+  client_snapshot: DatabaseSet<Record<string, unknown> | null>; prepared_by: DatabaseSet<string>;
+  created_at: DatabaseSet<Date>; submitted_at: DatabaseSet<Date | null>;
+  abandoned_by: DatabaseSet<string | null>; abandoned_at: DatabaseSet<Date | null>; abandonment_reason: DatabaseSet<string | null>;
+}
+export interface AmlCddCaseControlsTable {
+  cdd_case_id: DatabaseSet<string>; control_version_id: DatabaseSet<string>; kind: DatabaseSet<AmlControlKind>;
+}
+export interface AmlCddSubjectsTable {
+  id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>; kind: DatabaseSet<AmlSubjectKind>;
+  relationship: DatabaseSet<AmlSubjectRelationship>; encryption_context: DatabaseSet<string>;
+  key_version: DatabaseSet<number>; nonce: DatabaseSet<Buffer>; ciphertext: DatabaseSet<Buffer>;
+  auth_tag: DatabaseSet<Buffer>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlCddEvidenceTable {
+  id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>; evidence_type: DatabaseSet<string>;
+  country: DatabaseSet<string | null>; issued_on: DatabaseSet<string | null>; expires_on: DatabaseSet<string | null>;
+  metadata_context: DatabaseSet<string>; metadata_key_version: DatabaseSet<number>; metadata_nonce: DatabaseSet<Buffer>;
+  metadata_ciphertext: DatabaseSet<Buffer>; metadata_auth_tag: DatabaseSet<Buffer>; media_type: DatabaseSet<DocumentMediaType>;
+  size_bytes: DatabaseSet<number>; sha256: DatabaseSet<Buffer>; storage_key: DatabaseSet<string>;
+  file_key_version: DatabaseSet<number>; file_key_nonce: DatabaseSet<Buffer>; wrapped_file_key: DatabaseSet<Buffer>;
+  file_key_tag: DatabaseSet<Buffer>; uploaded_by: DatabaseSet<string>; uploaded_at: DatabaseSet<Date>;
+}
+export interface AmlCddOwnershipControlsTable {
+  id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>; owned_subject_id: DatabaseSet<string>;
+  controller_subject_id: DatabaseSet<string>; ownership_percent: DatabaseSet<string | null>; control_kind: DatabaseSet<string>;
+  details_context: DatabaseSet<string>; details_key_version: DatabaseSet<number>; details_nonce: DatabaseSet<Buffer>;
+  details_ciphertext: DatabaseSet<Buffer>; details_auth_tag: DatabaseSet<Buffer>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlCddAuthoritiesTable {
+  id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>; representative_subject_id: DatabaseSet<string>;
+  represented_subject_id: DatabaseSet<string>; evidence_id: DatabaseSet<string>; authority_type: DatabaseSet<string>;
+  verified_on: DatabaseSet<string>; details_context: DatabaseSet<string>; details_key_version: DatabaseSet<number>;
+  details_nonce: DatabaseSet<Buffer>; details_ciphertext: DatabaseSet<Buffer>; details_auth_tag: DatabaseSet<Buffer>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlCddVerificationsTable {
+  id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>; subject_id: DatabaseSet<string>; evidence_id: DatabaseSet<string>;
+  source_type: DatabaseSet<string>; country: DatabaseSet<string | null>; checked_on: DatabaseSet<string>;
+  expires_on: DatabaseSet<string | null>; method: DatabaseSet<string>; outcome: DatabaseSet<string>;
+  provider: DatabaseSet<string | null>; service: DatabaseSet<string | null>; details_context: DatabaseSet<string>;
+  details_key_version: DatabaseSet<number>; details_nonce: DatabaseSet<Buffer>; details_ciphertext: DatabaseSet<Buffer>;
+  details_auth_tag: DatabaseSet<Buffer>; verified_by: DatabaseSet<string>; verified_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
   aml_control_approvals: AmlControlApprovalsTable;
   aml_control_versions: AmlControlVersionsTable;
+  aml_cdd_authorities: AmlCddAuthoritiesTable;
+  aml_cdd_case_controls: AmlCddCaseControlsTable;
+  aml_cdd_cases: AmlCddCasesTable;
+  aml_cdd_evidence: AmlCddEvidenceTable;
+  aml_cdd_ownership_controls: AmlCddOwnershipControlsTable;
+  aml_cdd_subjects: AmlCddSubjectsTable;
+  aml_cdd_verifications: AmlCddVerificationsTable;
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;

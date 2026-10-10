@@ -5,7 +5,8 @@ import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 
-const STORAGE_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const STORAGE_KEY = new RegExp(`^(?:${UUID}|compliance/${UUID})$`);
 
 export class ObjectNotFoundError extends Error {
   override readonly name = 'ObjectNotFoundError';
@@ -71,7 +72,7 @@ export class ObjectStorage implements OnApplicationShutdown {
 
 function checked(key: string): string {
   if (!STORAGE_KEY.test(key)) {
-    throw new Error('A storage key is a lower-case UUID');
+    throw new Error('A storage key is a lower-case UUID, optionally in the compliance namespace');
   }
   return key;
 }

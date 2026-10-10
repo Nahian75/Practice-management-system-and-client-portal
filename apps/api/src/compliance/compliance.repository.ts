@@ -1,12 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { AmlControlKind, AmlOfficerKind, Database } from '../database/schema.js';
-import type { ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
+import type { AmlControlKind, AmlOfficerKind, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType } from '../database/schema.js';
+import type { CddCase, CddSubjectDetails, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
+import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
+import type { SealedSecret } from '../common/crypto/secret-box.js';
 
 @Injectable()
 export class ComplianceRepository {
-  constructor(@Inject(DATABASE) private readonly db: Kysely<Database>) {}
+  constructor(@Inject(DATABASE) private readonly db: Kysely<Database>, private readonly cipher: ComplianceDataCipher) {}
 
   transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {
     return this.db.transaction().execute(work);
@@ -171,5 +173,102 @@ export class ComplianceRepository {
     const rows = await query.orderBy('id', 'desc').limit(100).execute();
     return (await Promise.all(rows.map((row) => this.findReview(row.id))))
       .filter((row): row is IndependentReview => row !== undefined);
+  }
+
+  async newId(executor: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select uuidv7() as id`.execute(executor);
+    return result.rows[0]!.id;
+  }
+
+  async assertClientAccess(clientId: string, actorId: string, executor: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.assert_aml_client_access(${actorId}::uuid, ${clientId}::uuid)`.execute(executor);
+  }
+
+  async createCdd(clientId: string, intendedRelationship: string, reason: string, actorId: string, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_aml_cdd_case(${clientId}::uuid,${intendedRelationship},${reason},${actorId}::uuid) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async cddStatus(clientId:string,caseId:string,actorId:string,executor:Kysely<Database>=this.db){
+    await this.assertClientAccess(clientId,actorId,executor);
+    return (await executor.selectFrom('aml_cdd_cases').select('status').where('id','=',caseId).where('client_id','=',clientId).executeTakeFirst())?.status;
+  }
+
+  async addSubject(input: { id: string; caseId: string; kind: AmlSubjectKind; relationship: AmlSubjectRelationship; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>) {
+    await sql`select app.add_aml_cdd_subject(${input.id}::uuid,${input.caseId}::uuid,${input.kind},${input.relationship},${input.sealed.context},${input.sealed.keyVersion}::smallint,${input.sealed.nonce},${input.sealed.ciphertext},${input.sealed.authTag},${input.actorId}::uuid)`.execute(trx);
+  }
+
+  async addEvidence(input: {
+    id: string; caseId: string; evidenceType: string; country: string | null; issuedOn: string | null; expiresOn: string | null;
+    metadata: SealedComplianceData; mediaType: DocumentMediaType; sizeBytes: number; sha256: Buffer; storageKey: string;
+    fileKey: SealedSecret; actorId: string;
+  }, trx: Kysely<Database>) {
+    await sql`select app.add_aml_cdd_evidence(${input.id}::uuid,${input.caseId}::uuid,${input.evidenceType},${input.country}::char(2),${input.issuedOn}::date,${input.expiresOn}::date,${input.metadata.context},${input.metadata.keyVersion}::smallint,${input.metadata.nonce},${input.metadata.ciphertext},${input.metadata.authTag},${input.mediaType},${input.sizeBytes},${input.sha256},${input.storageKey},${input.fileKey.keyVersion}::smallint,${input.fileKey.nonce},${input.fileKey.ciphertext},${input.fileKey.authTag},${input.actorId}::uuid)`.execute(trx);
+  }
+
+  async addOwnership(input: { id: string; caseId: string; ownedSubjectId: string; controllerSubjectId: string; ownershipPercent: string | null; controlKind: string; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>) {
+    await sql`select app.add_aml_cdd_ownership(${input.id}::uuid,${input.caseId}::uuid,${input.ownedSubjectId}::uuid,${input.controllerSubjectId}::uuid,${input.ownershipPercent}::numeric,${input.controlKind},${input.sealed.context},${input.sealed.keyVersion}::smallint,${input.sealed.nonce},${input.sealed.ciphertext},${input.sealed.authTag},${input.actorId}::uuid)`.execute(trx);
+  }
+
+  async addAuthority(input: { id: string; caseId: string; representativeSubjectId: string; representedSubjectId: string; evidenceId: string; authorityType: string; verifiedOn: string; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>) {
+    await sql`select app.add_aml_cdd_authority(${input.id}::uuid,${input.caseId}::uuid,${input.representativeSubjectId}::uuid,${input.representedSubjectId}::uuid,${input.evidenceId}::uuid,${input.authorityType},${input.verifiedOn}::date,${input.sealed.context},${input.sealed.keyVersion}::smallint,${input.sealed.nonce},${input.sealed.ciphertext},${input.sealed.authTag},${input.actorId}::uuid)`.execute(trx);
+  }
+
+  async addVerification(input: { id: string; caseId: string; subjectId: string; evidenceId: string; sourceType: string; country: string | null; checkedOn: string; expiresOn: string | null; method: string; outcome: string; provider: string | null; service: string | null; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>) {
+    await sql`select app.add_aml_cdd_verification(${input.id}::uuid,${input.caseId}::uuid,${input.subjectId}::uuid,${input.evidenceId}::uuid,${input.sourceType},${input.country}::char(2),${input.checkedOn}::date,${input.expiresOn}::date,${input.method},${input.outcome},${input.provider},${input.service},${input.sealed.context},${input.sealed.keyVersion}::smallint,${input.sealed.nonce},${input.sealed.ciphertext},${input.sealed.authTag},${input.actorId}::uuid)`.execute(trx);
+  }
+
+  async submitCdd(caseId: string, actorId: string, trx: Kysely<Database>) {
+    await sql`select app.submit_aml_cdd_case(${caseId}::uuid,${actorId}::uuid)`.execute(trx);
+  }
+
+  async abandonCdd(caseId:string,reason:string,actorId:string,trx:Kysely<Database>){await sql`select app.abandon_aml_cdd_case(${caseId}::uuid,${reason},${actorId}::uuid)`.execute(trx);}
+
+  async listCdd(clientId: string, actorId: string, before?: string): Promise<CddCase[]> {
+    await this.assertClientAccess(clientId, actorId);
+    let query = this.db.selectFrom('aml_cdd_cases').select('id').where('client_id', '=', clientId);
+    if (before) query = query.where('id', '<', before);
+    const rows = await query.orderBy('id', 'desc').limit(100).execute();
+    return (await Promise.all(rows.map((row) => this.findCdd(clientId, row.id, actorId, true)))).filter((item): item is CddCase => item !== undefined);
+  }
+
+  async findCdd(clientId: string, caseId: string, actorId: string, accessChecked = false, executor: Kysely<Database> = this.db): Promise<CddCase | undefined> {
+    if (!accessChecked) await this.assertClientAccess(clientId, actorId, executor);
+    const row = await executor.selectFrom('aml_cdd_cases as c').innerJoin('accounts as p', 'p.id', 'c.prepared_by').leftJoin('accounts as abandoner','abandoner.id','c.abandoned_by')
+      .select(['c.id','c.client_id','c.version','c.status','c.intended_relationship','c.reason','c.client_snapshot','c.created_at','c.submitted_at','c.abandonment_reason','c.abandoned_at','c.abandoned_by','p.id as prepared_by_id','p.display_name as prepared_by_name','abandoner.display_name as abandoned_by_name'])
+      .where('c.id','=',caseId).where('c.client_id','=',clientId).executeTakeFirst();
+    if (!row) return undefined;
+    const [controls, subjects, evidence, ownership, authorities, verifications] = await Promise.all([
+      executor.selectFrom('aml_cdd_case_controls as x').innerJoin('aml_control_versions as v','v.id','x.control_version_id').select(['v.id','v.kind','v.version']).where('x.cdd_case_id','=',caseId).orderBy('v.kind').execute(),
+      executor.selectFrom('aml_cdd_subjects').selectAll().where('cdd_case_id','=',caseId).orderBy('id').execute(),
+      executor.selectFrom('aml_cdd_evidence').selectAll().where('cdd_case_id','=',caseId).orderBy('id').execute(),
+      executor.selectFrom('aml_cdd_ownership_controls').selectAll().where('cdd_case_id','=',caseId).orderBy('id').execute(),
+      executor.selectFrom('aml_cdd_authorities').selectAll().where('cdd_case_id','=',caseId).orderBy('id').execute(),
+      executor.selectFrom('aml_cdd_verifications').selectAll().where('cdd_case_id','=',caseId).orderBy('id').execute(),
+    ]);
+    return {
+      id: row.id, clientId: row.client_id, version: row.version, status: row.status,
+      intendedRelationship: row.intended_relationship, reason: row.reason, clientSnapshot: row.client_snapshot,
+      preparedBy: { accountId: row.prepared_by_id, displayName: row.prepared_by_name }, createdAt: row.created_at, submittedAt: row.submitted_at,
+      abandonment:row.abandoned_by&&row.abandoned_by_name&&row.abandoned_at&&row.abandonment_reason?{by:{accountId:row.abandoned_by,displayName:row.abandoned_by_name},at:row.abandoned_at,reason:row.abandonment_reason}:null,
+      controls,
+      subjects: subjects.map((s) => ({ id:s.id,kind:s.kind,relationship:s.relationship,details:this.open<CddSubjectDetails>(s.encryption_context,s.key_version,s.nonce,s.ciphertext,s.auth_tag),recordedAt:s.recorded_at })),
+      evidence: evidence.map((e) => { const meta=this.open<{fileName:string;documentIdentifier:string|null;providerPayloadHash:string|null}>(e.metadata_context,e.metadata_key_version,e.metadata_nonce,e.metadata_ciphertext,e.metadata_auth_tag); return { id:e.id,evidenceType:e.evidence_type,country:e.country,issuedOn:e.issued_on,expiresOn:e.expires_on,...meta,mediaType:e.media_type,sizeBytes:e.size_bytes,uploadedAt:e.uploaded_at }; }),
+      ownership: ownership.map((o) => ({ id:o.id,ownedSubjectId:o.owned_subject_id,controllerSubjectId:o.controller_subject_id,ownershipPercent:o.ownership_percent,controlKind:o.control_kind,details:this.open<{details:string}>(o.details_context,o.details_key_version,o.details_nonce,o.details_ciphertext,o.details_auth_tag).details,recordedAt:o.recorded_at })),
+      authorities: authorities.map((a) => ({ id:a.id,representativeSubjectId:a.representative_subject_id,representedSubjectId:a.represented_subject_id,evidenceId:a.evidence_id,authorityType:a.authority_type,verifiedOn:a.verified_on,details:this.open<{details:string}>(a.details_context,a.details_key_version,a.details_nonce,a.details_ciphertext,a.details_auth_tag).details,recordedAt:a.recorded_at })),
+      verifications: verifications.map((v) => { const details=this.open<{documentIdentifier:string|null;providerResult:string|null;reliance:Record<string,unknown>|null}>(v.details_context,v.details_key_version,v.details_nonce,v.details_ciphertext,v.details_auth_tag); return { id:v.id,subjectId:v.subject_id,evidenceId:v.evidence_id,sourceType:v.source_type,country:v.country,checkedOn:v.checked_on,expiresOn:v.expires_on,method:v.method,outcome:v.outcome,provider:v.provider,service:v.service,...details,verifiedAt:v.verified_at }; }),
+    };
+  }
+
+  async evidenceForDownload(clientId: string, caseId: string, evidenceId: string, actorId: string) {
+    await this.assertClientAccess(clientId, actorId);
+    const e = await this.db.selectFrom('aml_cdd_evidence').selectAll().where('id','=',evidenceId).where('cdd_case_id','=',caseId).executeTakeFirst();
+    if (!e) return undefined;
+    const meta=this.open<{fileName:string}>(e.metadata_context,e.metadata_key_version,e.metadata_nonce,e.metadata_ciphertext,e.metadata_auth_tag);
+    return { ...meta, mediaType:e.media_type,sizeBytes:e.size_bytes,storageKey:e.storage_key,sealedKey:{keyVersion:e.file_key_version,nonce:e.file_key_nonce,ciphertext:e.wrapped_file_key,authTag:e.file_key_tag} };
+  }
+
+  private open<T>(context: string, keyVersion: number, nonce: Buffer, ciphertext: Buffer, authTag: Buffer): T {
+    return this.cipher.open<T>({ context, keyVersion, nonce, ciphertext, authTag });
   }
 }

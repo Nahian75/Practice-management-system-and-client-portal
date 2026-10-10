@@ -1,10 +1,11 @@
 # Compliance and AML
 
 **Current state (2026-10-10):** The project owner approved this first-version
-design. Step 15a is built: permissions, protected nominated-officer and deputy
+design. Steps 15a and 15b are built: permissions, protected nominated-officer and deputy
 appointments, fixed firm-control versions with separate Partner approval,
-training completions and independent-review records. Steps 15b to 15f remain
-planned.
+training completions and independent-review records, plus versioned client CDD,
+encrypted identity facts and separately protected evidence. Steps 15c to 15f
+remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -79,7 +80,7 @@ regulated sector.
 
 ## Roles and permissions
 
-Step 15a permissions exist now; later-step permission names remain planned.
+Step 15a and 15b permissions exist now; later-step permission names remain planned.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -137,7 +138,7 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
 
 - A firm-control document has a kind, version, effective period, source and
   private fixed document text with a SHA-256 digest. Step 15b adds the separate
-  protected-file path needed for evidence. Published versions are immutable
+  protected-file path used for CDD evidence. Published versions are immutable
   and a new version supersedes rather than edits one.
 - Risk assessments cover customers, geographies, services, transactions and
   delivery channels, and separately identify ML, TF, PF and sanctions risk.
@@ -159,6 +160,13 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
   self-review independent merely because a checkbox was selected.
 
 ## Client identity and ownership
+
+Step 15b implements this section. A visible client's Partner or fee earner, or
+Compliance firm-wide, creates one live draft at a time. Draft facts can only be
+appended through narrow database functions. A mistaken draft can be abandoned
+with a permanent reason and replaced; its facts are retained. Submission locks the draft, checks
+completeness, assigns its already-reserved client version and fixes the entire
+record; corrections use a later version rather than rewriting it.
 
 - A CDD case belongs to one client and snapshots the client name/details used,
   intended relationship, reason for the checks, preparer and governing firm
@@ -186,6 +194,23 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
 - Reliance on another regulated person records eligibility, written agreement,
   requested/received underlying evidence and review. It does not transfer the
   firm's responsibility and does not apply to sanctions liability.
+
+An individual subject requires a name and date of birth. A legal entity
+requires its name, legal form, governing law, registered office and principal
+office; registration number is recorded where one exists. The one subject
+marked `client` must match the client record's individual/organisation kind.
+Every submitted subject needs a current successful verification backed by
+case-local evidence. Every authorised representative also needs a case-local
+authority record and evidence. Ownership/control edges join two subjects from
+the same case, require the owned subject to be a legal entity, and keep both an
+optional percentage and a non-percentage control basis.
+
+Submission snapshots the current client record and the latest in-period,
+Partner-approved ML/TF, PF, sanctions, AML-policy and sanctions-policy versions.
+It fails closed if any required control is absent or expired. The snapshot and
+control links are historical evidence; later client or control edits do not
+rewrite them. Step 15c will turn relevant later changes into the live
+`review_due` gate state.
 
 ## Client and matter risk, CDD and EDD
 
@@ -475,6 +500,64 @@ production builds passed, together with all 77 Playwright browser tests, the
 offline production audit (zero cached vulnerabilities), and the
 hidden-character and diff checks.
 
+## Step 15b API
+
+- `POST /clients/:clientId/cdd` creates the client's sole live draft from
+  bounded `intendedRelationship` and `reason` narratives. `GET` on the same
+  path returns 100 newest safe summaries with a `before` UUID cursor.
+- `GET /clients/:clientId/cdd/:caseId` returns the authorised protected detail,
+  including its subjects, evidence metadata, ownership/control edges,
+  authorities, verifications, snapshot and governing controls.
+- `POST /clients/:clientId/cdd/:caseId/abandon` permanently closes a mistaken
+  draft with a reason, allowing the next client version to be prepared without
+  deleting its already collected evidence.
+- Draft-only `POST` routes under that case add `/subjects`, `/ownership`,
+  `/authorities` and `/verifications`. Bodies are strict. Electronic checks
+  require their provider and service. Reliance records require eligibility,
+  agreement, underlying-evidence and review facts.
+- `POST /clients/:clientId/cdd/:caseId/evidence` is a streaming multipart
+  upload. Metadata fields precede one `file`. It accepts the same inspected
+  types and 50 MB limit as ordinary documents, fails closed when ClamAV is
+  unavailable, and enforces 200 files / 2 GiB per uploader per hour under a
+  database advisory lock.
+- `GET /clients/:clientId/cdd/:caseId/evidence/:evidenceId/content` streams an
+  authorised attachment with restrictive headers and records
+  `aml.evidence_viewed`. `POST .../submit` performs the locked completeness and
+  current-control checks and records `aml.cdd_submitted` transactionally.
+- Other audit events: `aml.cdd_draft_created`, `aml.cdd_draft_abandoned`,
+  `aml.evidence_uploaded`, `aml.evidence_refused` and
+  `aml.evidence_upload_limited`.
+
+`aml.assess` permits Partners and fee earners only for clients they already see;
+Compliance can prepare firm-wide. `aml.view_evidence` follows the same client
+record rule. Accounts and administrators get neither permission. A hidden or
+cross-client case/evidence answers 404 without revealing whether it exists;
+an already submitted draft answers 409 to an otherwise authorised caller.
+
+Subject details, exact evidence metadata, authority/control narratives,
+document identifiers, provider results and reliance facts are AES-256-GCM
+encrypted with record-and-purpose context under `AML_ENCRYPTION_KEY`. Evidence
+files use per-file keys wrapped by that same AML master key and random
+`compliance/<uuid>` object keys, rather than the ordinary document key or
+namespace. Configuration refuses to reuse another application encryption key.
+Only safe type, country, dates, state and counts appear in list or audit data;
+file names and exact identifiers are decrypted only on protected detail or
+download paths.
+
+## Step 15b verification
+
+Focused HTTP tests cover client visibility, Compliance firm-wide access,
+permission denial, strict inputs, safe summaries, individual and organisation
+flows, ownership/control traversal, representative authority, manual and
+electronic verification, cross-case references, evidence upload/download,
+submission snapshots, current controls, immutability and safe audit metadata.
+Database tests use both application and owner roles to prove protected-only
+inserts, live-role rechecks, context binding, case-local graph nodes,
+future-date rejection, final-history immutability and serialized single-draft
+creation. Cipher and object-storage tests prove context/key separation,
+non-plaintext ciphertext, the private compliance namespace and streaming
+round trips.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -484,8 +567,9 @@ and updated documentation before the next step.
 - **15a. Built 2026-10-10.** Permissions, nominated-officer appointments,
   fixed firm-wide risk/policy versions, Partner approval, training records and
   independent-review records.
-- **15b.** Client CDD cases, people/entity subjects, ownership/control,
-  authority, identity verification and protected evidence storage.
+- **15b. Built 2026-10-10.** Versioned client CDD cases, people/entity subjects,
+  ownership/control, authority, manual/electronic identity verification,
+  reliance facts and separately encrypted protected evidence storage.
 - **15c.** Versioned client/matter risk assessments, scope, CDD/EDD and source
   evidence, multi-party approval, compliance gate, exceptional limited start
   and ongoing-review queue.

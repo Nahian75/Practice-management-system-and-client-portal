@@ -41,6 +41,8 @@ export const PERMISSIONS = [
   'aml.officers.manage',
   'aml.firm_controls',
   'aml.firm_approve',
+  'aml.assess',
+  'aml.view_evidence',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -87,6 +89,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'time.record',
     'finance.matter.view',
     'aml.firm_approve',
+    'aml.assess',
+    'aml.view_evidence',
   ],
   fee_earner: [
     'clients.create',
@@ -106,6 +110,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'tasks.manage',
     'time.record',
     'finance.matter.view',
+    'aml.assess',
+    'aml.view_evidence',
   ],
   accounts: [
     'finance.matter.view', 'finance.view_all', 'rates.manage', 'bills.manage',
@@ -116,6 +122,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view',
     'finance.view_all', 'finance.reconciliation_sign_off',
     'aml.firm_controls',
+    'aml.assess',
+    'aml.view_evidence',
   ],
 };
 

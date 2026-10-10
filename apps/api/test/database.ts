@@ -5,6 +5,7 @@ import type { Env } from '../src/config/env.js';
 const TEST_TOTP_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const TEST_DOCUMENT_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const TEST_FINANCE_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+const TEST_AML_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 // Every Vitest worker can claim the same durable queue, just as several API
 // instances can. They therefore need the same test-only key.
 const TEST_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString('base64');
@@ -34,6 +35,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     MAIL_FROM_NAME: 'Practice Portal',
     MAIL_ENCRYPTION_KEY: TEST_MAIL_ENCRYPTION_KEY,
     FINANCE_ENCRYPTION_KEY: TEST_FINANCE_ENCRYPTION_KEY,
+    AML_ENCRYPTION_KEY: TEST_AML_ENCRYPTION_KEY,
     // Requests from supertest arrive over loopback; believing their X-Forwarded-For
     // lets each test choose the address it is rate-limited under.
     TRUSTED_PROXIES: ['loopback'],

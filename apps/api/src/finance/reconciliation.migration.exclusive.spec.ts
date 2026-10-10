@@ -31,7 +31,7 @@ describe('bank statement and reconciliation database rules', () => {
     return db.transaction().execute(async (trx) => {
       const client = await trx.insertInto('clients').values({ kind: 'individual', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
       await trx.insertInto('client_individuals').values({
-        client_id: client.id, given_names: 'Reconcile', family_name: unique(), address_line1: '1 Bank Street',
+        client_id: client.id, given_names: unique(), family_name: unique(), address_line1: '1 Bank Street',
         town: 'London', postcode: 'SW1A 1AA', country: 'GB',
       }).execute();
       const check = await trx.insertInto('conflict_checks').values({ client_id: client.id, requested_by: feeEarner.id, names: [unique()] }).returning('id').executeTakeFirstOrThrow();

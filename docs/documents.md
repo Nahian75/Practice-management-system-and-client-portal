@@ -90,6 +90,10 @@ see there.
   re-encrypting files.
 - The storage holds only encrypted bytes; the database holds only wrapped keys.
   Neither alone opens a file.
+- Compliance CDD evidence reuses the streaming cipher, type inspection,
+  active-content checks, malware scan and S3-compatible store, but uses its
+  own `AML_ENCRYPTION_KEY`, `compliance/<uuid>` namespace, database tables and
+  authorization. It is never an ordinary document and cannot be client-shared.
 
 ## How a file's type is checked
 

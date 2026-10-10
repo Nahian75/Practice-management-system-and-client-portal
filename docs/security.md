@@ -21,7 +21,10 @@ CSV exports that quote every field and make spreadsheet formula prefixes
 literal. The Finance security review is complete. Compliance step 15a adds
 separate administrator, Compliance and Partner permissions, live-role checks,
 protected nominated-officer continuity, fixed firm-control digests and
-owner-immutable approval, training and independent-review evidence.
+owner-immutable approval, training and independent-review evidence. Step 15b
+adds record-rule CDD access, protected-only database writes, immutable
+submission snapshots, AML-specific metadata/file encryption, a separate
+compliance object namespace and fail-closed evidence inspection.
 
 This file lists only the controls that are actually in place.
 
@@ -287,6 +290,18 @@ neither the limit nor the recorded address.
   direct application writes. Owner-level triggers keep controls, approvals,
   training completions and independent reviews fixed and keep appointment
   history append-only apart from its protected ending operation.
+- Client CDD writes also use narrow security-definer functions. They recheck
+  the active Partner/fee-earner client-visibility rule or active Compliance
+  role, bind every subject/evidence/graph node to one draft and serialize the
+  one-live-draft and final-submission transitions. Fail-closed insert guards
+  deny application and owner writes outside those functions; final cases and
+  facts reject update, deletion and truncation.
+- AML identity facts and evidence metadata use authenticated AES-256-GCM under
+  a distinct `AML_ENCRYPTION_KEY`, bound to record-and-purpose contexts. Each
+  evidence file has its own key wrapped by that master key and is stored only
+  under a random `compliance/<uuid>` object key. Uploads reuse strict type,
+  active-content and malware inspection but never enter the ordinary document
+  tables, sharing routes or client portal.
 
 ## Application secrets
 
@@ -295,6 +310,8 @@ neither the limit nor the recorded address.
 | `TOTP_ENCRYPTION_KEY` | Encrypts 2FA secrets | Every account must re-enrol 2FA | With a copy of the database, an attacker could generate 2FA codes. Rotate the key and require re-enrolment |
 | `MAIL_ENCRYPTION_KEY` | Encrypts queued email addresses, subjects and bodies | Pending mail cannot be delivered; people may need a new invitation or reset link | With a copy of the database, an attacker could read pending email, including one-time links. Rotate the key; old pending rows fail their integrity check and must be requested again |
 | `FINANCE_ENCRYPTION_KEY` | Encrypts bank details and keys their duplicate fingerprint | Full bank details become unreadable; safe register and ledger history remain | With a copy of the database, an attacker could read bank details and test guessed details. Replace the key through a designed re-encryption migration; do not silently discard old key material |
+| `AML_ENCRYPTION_KEY` | Encrypts AML identity/source metadata and wraps protected evidence file keys | Protected CDD identity details and evidence become unreadable; safe ids/status history remains | With database plus object storage, an attacker could read highly sensitive identity evidence. Isolate and rotate through a designed re-encryption process; never reuse another application key |
+| `DOCUMENT_ENCRYPTION_KEY` | Wraps ordinary matter-document file keys | Ordinary stored documents become unreadable | With database plus object storage, an attacker could read ordinary matter documents. Rotate through a designed rewrapping process |
 
 Locally in `apps/api/.env` (git-ignored). In production from the secret manager,
 never from a file in the image.
