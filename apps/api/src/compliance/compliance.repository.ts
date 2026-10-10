@@ -3,10 +3,14 @@ import { sql, type Kysely } from 'kysely';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import { DATABASE } from '../database/database.module.js';
 import type {
-  AmlCddStatus, AmlControlKind, AmlOfficerKind, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType,
+  AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship,
+  Database, DocumentMediaType,
 } from '../database/schema.js';
 import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
-import type { CddCase, CddSubjectDetails, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
+import type {
+  CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
+} from './compliance.js';
 
 interface EvidenceMetadata { fileName: string; documentIdentifier: string | null; providerPayloadHash: string | null }
 interface VerificationDetails { documentIdentifier: string | null; providerResult: string | null; reliance: Record<string, unknown> | null }
@@ -370,6 +374,108 @@ export class ComplianceRepository {
     return {
       fileName, mediaType: e.media_type, sizeBytes: e.size_bytes, storageKey: e.storage_key,
       sealedKey: { keyVersion: e.file_key_version, nonce: e.file_key_nonce, ciphertext: e.wrapped_file_key, authTag: e.file_key_tag },
+    };
+  }
+
+  async createCountryList(input: { countries: string[]; source: string; effectiveFrom: string; actorId: string },
+    trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_aml_country_list(
+      ${input.countries}::text[], ${input.source}, ${input.effectiveFrom}::date, ${input.actorId}::uuid
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async approveCountryList(id: string, actorId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select app.approve_aml_country_list(${id}::uuid, ${actorId}::uuid)`.execute(trx);
+  }
+
+  async listCountryLists(pendingOnly: boolean, before?: string): Promise<CountryListVersion[]> {
+    let query = this.db.selectFrom('aml_country_list_versions as v')
+      .leftJoin('aml_country_list_approvals as a', 'a.country_list_version_id', 'v.id')
+      .select('v.id');
+    if (pendingOnly) query = query.where('a.id', 'is', null);
+    if (before) query = query.where('v.id', '<', before);
+    const rows = await query.orderBy('v.id', 'desc').limit(100).execute();
+    return (await Promise.all(rows.map((row) => this.findCountryList(row.id))))
+      .filter((item): item is CountryListVersion => item !== undefined);
+  }
+
+  async findCountryList(id: string, executor: Kysely<Database> = this.db): Promise<CountryListVersion | undefined> {
+    const row = await executor.selectFrom('aml_country_list_versions as v')
+      .innerJoin('accounts as p', 'p.id', 'v.prepared_by')
+      .leftJoin('aml_country_list_approvals as a', 'a.country_list_version_id', 'v.id')
+      .leftJoin('accounts as approver', 'approver.id', 'a.approved_by')
+      .select(['v.id', 'v.version', 'v.countries', 'v.source', 'v.effective_from', 'v.prepared_at',
+        'p.id as prepared_by_id', 'p.display_name as prepared_by_name',
+        'a.approved_at', 'approver.id as approved_by_id', 'approver.display_name as approved_by_name'])
+      .where('v.id', '=', id).executeTakeFirst();
+    if (!row) return undefined;
+    return {
+      id: row.id, version: row.version, countries: row.countries, source: row.source, effectiveFrom: row.effective_from,
+      preparedBy: { accountId: row.prepared_by_id, displayName: row.prepared_by_name }, preparedAt: row.prepared_at,
+      approval: row.approved_at && row.approved_by_id && row.approved_by_name
+        ? { approvedBy: { accountId: row.approved_by_id, displayName: row.approved_by_name }, approvedAt: row.approved_at }
+        : null,
+    };
+  }
+
+  /** Raises 42501 for a matter the actor may not see and P0002 for an unknown matter. */
+  async assertMatterAccess(matterId: string, actorId: string, executor: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.assert_aml_matter_access(${actorId}::uuid, ${matterId}::uuid)`.execute(executor);
+  }
+
+  async submitRiskAssessment(input: {
+    id: string; matterId: string; inScope: boolean; rating: AmlRiskRating; factors: RiskFactors;
+    jurisdictions: string[]; expectedValue: AmlExpectedValue; reviewDueOn: string; reviewGraceDays: number;
+    loweringGroundsGiven: boolean; sealed: SealedComplianceData; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    const { factors, sealed } = input;
+    await sql`select app.submit_aml_risk_assessment(
+      ${input.id}::uuid, ${input.matterId}::uuid, ${input.inScope}, ${input.rating},
+      ${factors.pep}, ${factors.unusualTransactions}, ${factors.complexStructure}, ${factors.cash},
+      ${factors.remoteInstruction}, ${factors.adverseInformation}, ${factors.sanctionsExposure}, ${factors.thirdPartyFunding},
+      ${input.jurisdictions}::text[], ${input.expectedValue}, ${input.reviewDueOn}::date, ${input.reviewGraceDays}::smallint,
+      ${input.loweringGroundsGiven},
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async listRiskAssessments(matterId: string, actorId: string, before?: string): Promise<RiskAssessment[]> {
+    await this.assertMatterAccess(matterId, actorId);
+    let query = this.db.selectFrom('aml_risk_assessments').select('id').where('matter_id', '=', matterId);
+    if (before) query = query.where('id', '<', before);
+    const rows = await query.orderBy('id', 'desc').limit(100).execute();
+    return (await Promise.all(rows.map((row) => this.findRiskAssessment(matterId, row.id, actorId, true))))
+      .filter((item): item is RiskAssessment => item !== undefined);
+  }
+
+  async findRiskAssessment(matterId: string, assessmentId: string, actorId: string, accessChecked = false,
+    executor: Kysely<Database> = this.db): Promise<RiskAssessment | undefined> {
+    if (!accessChecked) await this.assertMatterAccess(matterId, actorId, executor);
+    const row = await executor.selectFrom('aml_risk_assessments as r')
+      .innerJoin('accounts as p', 'p.id', 'r.prepared_by')
+      .selectAll('r').select(['p.display_name as prepared_by_name'])
+      .where('r.id', '=', assessmentId).where('r.matter_id', '=', matterId)
+      .executeTakeFirst();
+    if (!row) return undefined;
+    const controls = await executor.selectFrom('aml_risk_assessment_controls as x')
+      .innerJoin('aml_control_versions as v', 'v.id', 'x.control_version_id')
+      .select(['v.id', 'v.kind', 'v.version'])
+      .where('x.assessment_id', '=', assessmentId).orderBy('v.kind').execute();
+    return {
+      id: row.id, matterId: row.matter_id, clientId: row.client_id, version: row.version, inScope: row.in_scope,
+      cddCaseId: row.cdd_case_id, countryListVersionId: row.country_list_version_id, rating: row.rating,
+      factors: {
+        pep: row.pep, highRiskCountry: row.high_risk_country, unusualTransactions: row.unusual_transactions,
+        complexStructure: row.complex_structure, cash: row.cash, remoteInstruction: row.remote_instruction,
+        adverseInformation: row.adverse_information, sanctionsExposure: row.sanctions_exposure,
+        thirdPartyFunding: row.third_party_funding,
+      },
+      jurisdictions: row.jurisdictions, expectedValue: row.expected_value, lowersPrevious: row.lowers_previous,
+      reviewDueOn: row.review_due_on, reviewGraceDays: row.review_grace_days,
+      narrative: this.open<RiskNarrative>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag),
+      controls, preparedBy: { accountId: row.prepared_by, displayName: row.prepared_by_name }, submittedAt: row.submitted_at,
     };
   }
 

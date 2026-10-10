@@ -1,4 +1,4 @@
-import type { AmlCddStatus, AmlControlKind, AmlOfficerKind, AmlSubjectKind, AmlSubjectRelationship, DocumentMediaType } from '../database/schema.js';
+import type { AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, DocumentMediaType } from '../database/schema.js';
 
 export interface Person { accountId: string; displayName: string }
 
@@ -64,4 +64,28 @@ export interface CddCase {
   controls: { id: string; kind: AmlControlKind; version: number }[];
   subjects: CddSubject[]; evidence: CddEvidence[]; ownership: CddOwnership[];
   authorities: CddAuthority[]; verifications: CddVerification[];
+}
+
+export interface CountryListVersion {
+  id: string; version: number; countries: string[]; source: string; effectiveFrom: string;
+  preparedBy: Person; preparedAt: Date; approval: { approvedBy: Person; approvedAt: Date } | null;
+}
+
+/** The written reasoning of an assessment. It is encrypted before it reaches PostgreSQL. */
+export interface RiskNarrative {
+  scopeReason: string; clientRisk: string; serviceRisk: string; purposeAndNature: string;
+  fundingRisk: string; sanctionsExposure: string; rationale: string; mitigations: string;
+  requiredChecks: string; monitoringPlan: string; loweringGrounds: string | null;
+}
+export interface RiskFactors {
+  pep: boolean; unusualTransactions: boolean; complexStructure: boolean; cash: boolean;
+  remoteInstruction: boolean; adverseInformation: boolean; sanctionsExposure: boolean; thirdPartyFunding: boolean;
+}
+export interface RiskAssessment {
+  id: string; matterId: string; clientId: string; version: number; inScope: boolean;
+  cddCaseId: string | null; countryListVersionId: string; rating: AmlRiskRating;
+  factors: RiskFactors & { highRiskCountry: boolean }; jurisdictions: string[]; expectedValue: AmlExpectedValue;
+  lowersPrevious: boolean; reviewDueOn: string; reviewGraceDays: number;
+  narrative: RiskNarrative; controls: { id: string; kind: AmlControlKind; version: number }[];
+  preparedBy: Person; submittedAt: Date;
 }

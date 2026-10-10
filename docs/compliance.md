@@ -4,8 +4,9 @@
 design. Steps 15a and 15b are built: permissions, protected nominated-officer and deputy
 appointments, fixed firm-control versions with separate Partner approval,
 training completions and independent-review records, plus versioned client CDD,
-encrypted identity facts and separately protected evidence. Steps 15c to 15f
-remain planned.
+encrypted identity facts and separately protected evidence. Step 15c-1 adds
+partner-approved high-risk-country lists and permanent matter risk assessments.
+The rest of step 15c and steps 15d to 15f remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -382,6 +383,7 @@ new reference version and queue affected records for review.
 Planned ordinary event families:
 
 - `aml.control_published`, `aml.control_approved`, `aml.training_recorded`;
+- `aml.country_list_published`, `aml.country_list_approved`;
 - `aml.cdd_submitted`, `aml.risk_submitted`, `aml.clearance_approved`,
   `aml.clearance_refused`, `aml.review_completed`;
 - `aml.sanctions_list_activated`, `aml.screening_resolved`,
@@ -558,6 +560,53 @@ creation. Cipher and object-storage tests prove context/key separation,
 non-plaintext ciphertext, the private compliance namespace and streaming
 round trips.
 
+## Step 15c-1 API
+
+- Compliance uses `GET/POST /compliance/country-lists` to publish a numbered
+  high-risk-country list: ISO codes, the source it was copied from and an
+  effective date. Codes are sorted and must be distinct. A Partner other than
+  the preparer approves it with `POST /compliance/country-lists/:id/approval`;
+  `GET /compliance/country-lists/pending-approval` lists unapproved versions.
+  An assessment uses the latest approved version already in force.
+- `POST /matters/:matterId/aml-risk` fixes a permanent assessment version for a
+  matter the caller's team holds, or any matter for Compliance. It records AML
+  scope, the rating, eight risk-factor flags, the jurisdictions involved, an
+  expected-value band, a review date within five years and a grace period of 0
+  to 90 days. Ten written answers, plus grounds when lowering a rating, are
+  encrypted under `AML_ENCRYPTION_KEY` with context `aml-risk:<id>`.
+- `GET /matters/:matterId/aml-risk` lists 100 safe summaries without the
+  written answers; `GET /matters/:matterId/aml-risk/:id` returns the detail.
+  Unknown and hidden matters both answer 404.
+
+PostgreSQL decides the version, whether a jurisdiction is on the current list,
+which submitted CDD case is relied on, whether the rating was lowered, and which
+five firm controls and which country list governed the assessment. It refuses:
+
+- a rating other than `high` for a PEP, unusual transactions or a listed
+  jurisdiction, the cases where regulation 33 requires enhanced due diligence;
+- in-scope work for a client without a submitted CDD case;
+- a lower rating than the previous version without written grounds;
+- a closed matter, a missing current control or country list, or a review date
+  outside the next five years.
+
+The API also refuses written answers shorter than 20 characters and the same
+text given for two questions, since copied text shows a question was not
+considered. Audit metadata holds only the matter id and version: the rating is
+left out because it can reveal PEP or high-risk-country status.
+
+## Step 15c-1 verification
+
+Database tests prove sorted and distinct country codes, separate partner
+approval, refused direct writes for the application and owner (including later
+in a transaction that called a protected function), fixed versions and
+governing controls, forced high ratings, CDD reliance, lowering grounds,
+matter-team access, closed-matter refusal, context binding, serialized
+concurrent versions and owner immutability. HTTP tests cover permissions,
+hidden matters, sorted lists, narrative-free summaries, ciphertext and audit
+content, copied answers and the in-scope and lowering rules. Each database
+safeguard and the copied-answer check was deliberately broken once in the
+test database or a restored file copy, and a test failed each time.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -572,7 +621,24 @@ and updated documentation before the next step.
   reliance facts and separately encrypted protected evidence storage.
 - **15c.** Versioned client/matter risk assessments, scope, CDD/EDD and source
   evidence, multi-party approval, compliance gate, exceptional limited start
-  and ongoing-review queue.
+  and ongoing-review queue. Built in four parts:
+  - **15c-1. Built 2026-10-10.** Partner-approved high-risk-country list
+    versions and permanent matter risk-assessment versions.
+  - **15c-2.** Discrete CDD/EDD measures and source-of-funds/wealth conclusions.
+  - **15c-3.** Compliance and senior-management clearance, its fixed snapshot
+    and the live gate state.
+  - **15c-4.** Gate enforcement in time, billing, documents and Finance, the
+    early-verification exception and the ongoing-review queue.
+
+  Decisions confirmed by the project owner on 10 October 2026:
+  - When the gate is enforced, matters already open without clearance become
+    `pending` and are blocked until cleared. There is no grandfathering.
+  - The gate does not block tasks, so staff can chase onboarding work.
+  - Compliance enters each high-risk-country list version by hand with its
+    source, and a different active partner approves it. Nothing is downloaded.
+  - An overdue review blocks money movement at once. Time, documents and
+    billing continue for a grace period of 0 to 90 days fixed in the approved
+    assessment's monitoring plan.
 - **15d.** Official UK Sanctions List import, candidate screening/resolution,
   rescreening, holds, frozen funds, licence conditions and Finance enforcement.
 - **15e.** Encrypted internal disclosures, nominated-officer access, external

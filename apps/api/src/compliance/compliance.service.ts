@@ -6,14 +6,19 @@ import type { AuditActor } from '../audit/audit-event.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import { sql, type Kysely } from 'kysely';
 import { text } from '../common/validation/safe-text.js';
-import type { AmlControlKind, AmlOfficerKind, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType } from '../database/schema.js';
+import type {
+  AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType,
+} from '../database/schema.js';
 import { FileInspection, FileRefusedError, type RefusalReason } from '../documents/file-inspection.js';
 import { UploadFormError } from '../documents/upload-request.js';
 import { isLimitsAlert, VirusScanner } from '../documents/virus-scanner.js';
 import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.js';
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
-import type { CddCase, CddSubjectDetails, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
+import type {
+  CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
+} from './compliance.js';
 
 export interface ComplianceActor { actor: AuditActor; accountId: string; context?: RequestContext }
 export type Change<T> = { outcome: 'changed'; value: T } | { outcome: 'not_found' } | { outcome: 'conflict' };
@@ -177,14 +182,14 @@ export class ComplianceService {
         return this.records.findCdd(clientId, id, by.accountId, true, trx);
       });
       return value ? { outcome: 'changed', value } : { outcome: 'conflict' };
-    } catch (error) { return cddOutcome(error); }
+    } catch (error) { return protectedOutcome(error); }
   }
 
   async listCdd(clientId: string, actorId: string, before?: string) {
     try {
       return page(await this.records.listCdd(clientId, actorId, before));
     } catch (error) {
-      if (hiddenClient(error)) return undefined;
+      if (hiddenRecord(error)) return undefined;
       throw error;
     }
   }
@@ -193,7 +198,7 @@ export class ComplianceService {
     try {
       return await this.records.findCdd(clientId, caseId, actorId);
     } catch (error) {
-      if (hiddenClient(error)) return undefined;
+      if (hiddenRecord(error)) return undefined;
       throw error;
     }
   }
@@ -244,7 +249,7 @@ export class ComplianceService {
         return this.records.findCdd(clientId, caseId, by.accountId, true, trx);
       });
       return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
-    } catch (error) { return cddOutcome(error); }
+    } catch (error) { return protectedOutcome(error); }
   }
 
   /** False when the case does not exist; throws when it exists but is no longer a draft. */
@@ -265,7 +270,7 @@ export class ComplianceService {
       if (!status) return skip({ outcome: 'not_found' });
       if (status !== 'draft') return skip({ outcome: 'conflict' });
     } catch (error) {
-      if (hiddenClient(error)) return skip({ outcome: 'not_found' });
+      if (hiddenRecord(error)) return skip({ outcome: 'not_found' });
       throw error;
     }
     const checkedName = evidenceFileName.safeParse(input.fileName);
@@ -311,7 +316,7 @@ export class ComplianceService {
           metadata: { files: AML_EVIDENCE_UPLOADS_PER_HOUR, bytes: AML_EVIDENCE_BYTES_PER_HOUR }, ...by.context });
         return { outcome: 'refused', reason: 'over_allowance' };
       }
-      return { outcome: cddOutcome(error).outcome === 'not_found' ? 'not_found' : 'conflict' };
+      return { outcome: protectedOutcome(error).outcome === 'not_found' ? 'not_found' : 'conflict' };
     }
   }
 
@@ -334,7 +339,7 @@ export class ComplianceService {
         return item;
       });
       return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
-    } catch (error) { return cddOutcome(error); }
+    } catch (error) { return protectedOutcome(error); }
   }
 
   async abandonCdd(clientId: string, caseId: string, reason: string, by: ComplianceActor): Promise<Change<CddCase>> {
@@ -349,7 +354,7 @@ export class ComplianceService {
         return item;
       });
       return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
-    } catch (error) { return cddOutcome(error); }
+    } catch (error) { return protectedOutcome(error); }
   }
 
   async downloadEvidence(clientId: string, caseId: string, evidenceId: string, by: ComplianceActor) {
@@ -361,7 +366,84 @@ export class ComplianceService {
         resource: { type: 'aml_cdd_evidence', id: evidenceId }, metadata: { caseId }, ...by.context });
       return { outcome: 'ready', file, fileName: found.fileName, mediaType: found.mediaType, sizeBytes: found.sizeBytes } as const;
     } catch (error) {
-      if (hiddenClient(error)) return { outcome: 'not_found' } as const;
+      if (hiddenRecord(error)) return { outcome: 'not_found' } as const;
+      throw error;
+    }
+  }
+
+  async listCountryLists(pendingOnly: boolean, before?: string) {
+    return page(await this.records.listCountryLists(pendingOnly, before));
+  }
+
+  findCountryList(id: string) { return this.records.findCountryList(id); }
+
+  async createCountryList(input: { countries: string[]; source: string; effectiveFrom: string },
+    by: ComplianceActor): Promise<Change<CountryListVersion>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const id = await this.records.createCountryList({ ...input, actorId: by.accountId }, trx);
+        const list = await this.records.findCountryList(id, trx);
+        if (!list) return undefined;
+        await this.audit.record({ actor: by.actor, action: 'aml.country_list_published', outcome: 'success',
+          resource: { type: 'aml_country_list_version', id },
+          metadata: { version: list.version, countries: list.countries.length }, ...by.context }, trx);
+        return list;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'conflict' };
+    } catch (error) { return databaseOutcome(error); }
+  }
+
+  async approveCountryList(id: string, by: ComplianceActor): Promise<Change<CountryListVersion>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        await this.records.approveCountryList(id, by.accountId, trx);
+        const list = await this.records.findCountryList(id, trx);
+        if (!list) return undefined;
+        await this.audit.record({ actor: by.actor, action: 'aml.country_list_approved', outcome: 'success',
+          resource: { type: 'aml_country_list_version', id }, metadata: { version: list.version }, ...by.context }, trx);
+        return list;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return databaseOutcome(error); }
+  }
+
+  async submitRiskAssessment(matterId: string, input: {
+    inScope: boolean; rating: AmlRiskRating; factors: RiskFactors; jurisdictions: string[];
+    expectedValue: AmlExpectedValue; reviewDueOn: string; reviewGraceDays: number; narrative: RiskNarrative;
+  }, by: ComplianceActor): Promise<Change<RiskAssessment>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const id = await this.records.newId(trx);
+        const { narrative, ...facts } = input;
+        await this.records.submitRiskAssessment({ ...facts, id, matterId,
+          loweringGroundsGiven: narrative.loweringGrounds !== null,
+          sealed: this.cipher.seal(narrative, `aml-risk:${id}`), actorId: by.accountId }, trx);
+        const assessment = await this.records.findRiskAssessment(matterId, id, by.accountId, true, trx);
+        if (!assessment) return undefined;
+        // The rating is left out: it can reveal PEP or high-risk-country status.
+        await this.audit.record({ actor: by.actor, action: 'aml.risk_submitted', outcome: 'success',
+          resource: { type: 'aml_risk_assessment', id },
+          metadata: { matterId, version: assessment.version }, ...by.context }, trx);
+        return assessment;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
+  }
+
+  async listRiskAssessments(matterId: string, actorId: string, before?: string) {
+    try {
+      return page(await this.records.listRiskAssessments(matterId, actorId, before));
+    } catch (error) {
+      if (hiddenRecord(error)) return undefined;
+      throw error;
+    }
+  }
+
+  async findRiskAssessment(matterId: string, assessmentId: string, actorId: string) {
+    try {
+      return await this.records.findRiskAssessment(matterId, assessmentId, actorId);
+    } catch (error) {
+      if (hiddenRecord(error)) return undefined;
       throw error;
     }
   }
@@ -413,8 +495,8 @@ export class ComplianceService {
   }
 }
 
-/** An unknown client and one the actor may not see both read as "not found". */
-function hiddenClient(error: unknown): boolean {
+/** An unknown client or matter and one the actor may not see both read as "not found". */
+function hiddenRecord(error: unknown): boolean {
   return hasCode(error, '42501') || hasCode(error, 'P0002');
 }
 
@@ -422,9 +504,9 @@ function hasCode(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
 }
 
-/** CDD access is checked first, so a refusal hides the client like an unknown id. */
-function cddOutcome<T>(error: unknown): Change<T> {
-  return hiddenClient(error) ? { outcome: 'not_found' } : databaseOutcome(error);
+/** Access is checked first, so a refusal hides the record like an unknown id. */
+function protectedOutcome<T>(error: unknown): Change<T> {
+  return hiddenRecord(error) ? { outcome: 'not_found' } : databaseOutcome(error);
 }
 
 function databaseOutcome<T>(error: unknown): Change<T> {

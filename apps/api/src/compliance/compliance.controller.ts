@@ -13,7 +13,9 @@ import { ResponseSchema, STREAMED } from '../common/serialization/response-schem
 import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from '../documents/content-disposition.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
-import type { CddCase, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
+import type {
+  CddCase, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
+} from './compliance.js';
 import { ComplianceService, type Change, type ComplianceActor } from './compliance.service.js';
 
 const date = z.iso.date().refine((value) => value >= '1900-01-01' && value <= '9999-12-31', 'Date is outside the supported range');
@@ -151,6 +153,60 @@ const cddList = z.object({
   next: z.uuid().nullable(),
 });
 
+/** Sorted and duplicate-free, as PostgreSQL requires, so equal lists are identical. */
+const countryCodes = (max: number) => z.array(country).min(1).max(max)
+  .refine((codes) => new Set(codes).size === codes.length, 'Each country may appear once')
+  .transform((codes) => [...codes].sort());
+
+const countryListBody = z.strictObject({ countries: countryCodes(250), source: text(2_000), effectiveFrom: date });
+const countryListSchema = z.object({ id: z.uuid(), version: z.number().int().positive(), countries: z.array(country),
+  source: z.string(), effectiveFrom: date, preparedBy: person, preparedAt: z.iso.datetime(),
+  approval: z.object({ approvedBy: person, approvedAt: z.iso.datetime() }).nullable() });
+const countryListPage = z.object({ countryLists: z.array(countryListSchema), next: z.uuid().nullable() });
+
+const riskRating = z.enum(['low', 'standard', 'high']);
+const expectedValue = z.enum(['none', 'under_10k', '10k_to_100k', '100k_to_1m', 'over_1m']);
+const riskText = documentText(10_000).refine((value) => value.length >= 20, 'Give a tailored explanation of at least 20 characters');
+const NARRATIVE_FIELDS = ['scopeReason', 'clientRisk', 'serviceRisk', 'purposeAndNature', 'fundingRisk',
+  'sanctionsExposure', 'rationale', 'mitigations', 'requiredChecks', 'monitoringPlan'] as const;
+const riskFactors = z.strictObject({ pep: z.boolean(), unusualTransactions: z.boolean(), complexStructure: z.boolean(),
+  cash: z.boolean(), remoteInstruction: z.boolean(), adverseInformation: z.boolean(),
+  sanctionsExposure: z.boolean(), thirdPartyFunding: z.boolean() });
+const riskBody = z.strictObject({
+  inScope: z.boolean(), rating: riskRating, factors: riskFactors, jurisdictions: countryCodes(50),
+  expectedValue, reviewDueOn: date, reviewGraceDays: z.number().int().min(0).max(90),
+  narrative: z.strictObject({
+    ...Object.fromEntries(NARRATIVE_FIELDS.map((field) => [field, riskText])) as Record<typeof NARRATIVE_FIELDS[number], typeof riskText>,
+    loweringGrounds: riskText.nullable().optional(),
+  }),
+}).superRefine((value, ctx) => {
+  if ((value.factors.pep || value.factors.unusualTransactions) && value.rating !== 'high') {
+    ctx.addIssue({ code: 'custom', path: ['rating'], message: 'A PEP or unusual transactions require a high rating' });
+  }
+  // The same words in two answers means at least one question was not really considered.
+  const seen = new Map<string, string>();
+  for (const field of NARRATIVE_FIELDS) {
+    const normalized = value.narrative[field].toLowerCase().replace(/\s+/g, ' ');
+    const earlier = seen.get(normalized);
+    if (earlier) ctx.addIssue({ code: 'custom', path: ['narrative', field], message: `Repeats the answer given for ${earlier}` });
+    else seen.set(normalized, field);
+  }
+});
+const riskSchema = z.object({
+  id: z.uuid(), matterId: z.uuid(), clientId: z.uuid(), version: z.number().int().positive(), inScope: z.boolean(),
+  cddCaseId: z.uuid().nullable(), countryListVersionId: z.uuid(), rating: riskRating,
+  factors: riskFactors.extend({ highRiskCountry: z.boolean() }), jurisdictions: z.array(country), expectedValue,
+  lowersPrevious: z.boolean(), reviewDueOn: date, reviewGraceDays: z.number().int(),
+  narrative: z.object({ ...Object.fromEntries(NARRATIVE_FIELDS.map((field) => [field, z.string()])), loweringGrounds: z.string().nullable() }),
+  controls: z.array(z.object({ id: z.uuid(), kind: controlKind, version: z.number().int() })),
+  preparedBy: person, submittedAt: z.iso.datetime(),
+});
+const riskPage = z.object({
+  assessments: z.array(z.object({ id: z.uuid(), version: z.number().int().positive(), inScope: z.boolean(),
+    rating: riskRating, reviewDueOn: date, preparedBy: person, submittedAt: z.iso.datetime() })),
+  next: z.uuid().nullable(),
+});
+
 function actorFor(session: ResolvedSession, request: Request): ComplianceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
@@ -180,6 +236,16 @@ const summarizeCdd = (value: CddCase) => ({
   id: value.id, version: value.version, status: value.status, preparedBy: value.preparedBy,
   createdAt: value.createdAt.toISOString(), submittedAt: value.submittedAt?.toISOString() ?? null,
   subjectCount: value.subjects.length, evidenceCount: value.evidence.length,
+});
+
+const serializeCountryList = (value: CountryListVersion) => ({
+  ...value, preparedAt: value.preparedAt.toISOString(),
+  approval: value.approval ? { ...value.approval, approvedAt: value.approval.approvedAt.toISOString() } : null,
+});
+const serializeRisk = (value: RiskAssessment) => ({ ...value, submittedAt: value.submittedAt.toISOString() });
+const summarizeRisk = (value: RiskAssessment) => ({
+  id: value.id, version: value.version, inScope: value.inScope, rating: value.rating,
+  reviewDueOn: value.reviewDueOn, preparedBy: value.preparedBy, submittedAt: value.submittedAt.toISOString(),
 });
 
 function changedCdd(result: Change<CddCase>) {
@@ -437,5 +503,63 @@ export class ComplianceController {
     } catch (error) {
       this.logger.error(`CDD evidence ${evidenceId} download stopped: ${error instanceof Error ? error.name : 'unknown error'}`);
     }
+  }
+
+  @Get('compliance/country-lists') @RequirePermission('aml.firm_controls') @ResponseSchema(countryListPage)
+  async countryLists(@Query({ schema: pageQuery }) query: z.infer<typeof pageQuery>) {
+    const page = await this.compliance.listCountryLists(false, query.before);
+    return { countryLists: page.items.map(serializeCountryList), next: page.next };
+  }
+
+  @Get('compliance/country-lists/pending-approval') @RequirePermission('aml.firm_approve') @ResponseSchema(countryListPage)
+  async pendingCountryLists(@Query({ schema: pageQuery }) query: z.infer<typeof pageQuery>) {
+    const page = await this.compliance.listCountryLists(true, query.before);
+    return { countryLists: page.items.map(serializeCountryList), next: page.next };
+  }
+
+  @Post('compliance/country-lists') @RequirePermission('aml.firm_controls') @ResponseSchema(countryListSchema)
+  async createCountryList(@Body({ schema: countryListBody }) body: z.infer<typeof countryListBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.createCountryList(body, actorFor(session, request));
+    if (result.outcome !== 'changed') throw new ConflictException('The high-risk-country list is not valid');
+    return serializeCountryList(result.value);
+  }
+
+  @Post('compliance/country-lists/:listId/approval') @RequirePermission('aml.firm_approve') @ResponseSchema(countryListSchema)
+  async approveCountryList(@Param('listId', { schema: z.uuid() }) id: string,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.approveCountryList(id, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No high-risk-country list with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('This list cannot be approved');
+    return serializeCountryList(result.value);
+  }
+
+  @Post('matters/:matterId/aml-risk') @RequirePermission('aml.assess') @ResponseSchema(riskSchema)
+  async submitRisk(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: riskBody }) body: z.infer<typeof riskBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const input = { ...body, narrative: { ...body.narrative, loweringGrounds: body.narrative.loweringGrounds ?? null } };
+    const result = await this.compliance.submitRiskAssessment(matterId, input, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No matter with this id');
+    if (result.outcome === 'conflict') {
+      throw new ConflictException('The assessment is inconsistent, or the matter lacks the records it relies on');
+    }
+    return serializeRisk(result.value);
+  }
+
+  @Get('matters/:matterId/aml-risk') @RequirePermission('aml.view_evidence') @ResponseSchema(riskPage)
+  async riskAssessments(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Query({ schema: pageQuery }) query: z.infer<typeof pageQuery>, @CurrentSession() session: ResolvedSession) {
+    const page = await this.compliance.listRiskAssessments(matterId, session.account.id, query.before);
+    if (!page) throw new NotFoundException('No matter with this id');
+    return { assessments: page.items.map(summarizeRisk), next: page.next };
+  }
+
+  @Get('matters/:matterId/aml-risk/:assessmentId') @RequirePermission('aml.view_evidence') @ResponseSchema(riskSchema)
+  async findRisk(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string, @CurrentSession() session: ResolvedSession) {
+    const value = await this.compliance.findRiskAssessment(matterId, assessmentId, session.account.id);
+    if (!value) throw new NotFoundException('No risk assessment with this id');
+    return serializeRisk(value);
   }
 }

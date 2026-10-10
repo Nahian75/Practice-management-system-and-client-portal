@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-10):** The database foundation through Compliance
-step 15b exists, with separate owner and application roles and forward-only
-migrations through `0049`.
+step 15c-1 exists, with separate owner and application roles and forward-only
+migrations through `0050`.
 
 ## Database
 
@@ -83,6 +83,8 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `aml_officer_appointments`, `aml_control_versions`, `aml_control_approvals`, `aml_training_completions`, `aml_independent_reviews` | `0048_compliance_foundations.sql` | Narrow functions recheck live Administrator, Compliance or Partner roles, serialize officer continuity/control numbering and keep final controls, approvals, training and reviews immutable. App direct writes and owner update/delete/truncate are refused | [compliance.md](compliance.md#step-15a-api) |
 | `aml_cdd_cases`, `aml_cdd_case_controls` | `0049_compliance_cdd.sql` | One database-serialized draft version per client. Protected submission locks it, requires complete current verification/authority, snapshots the client and five current approved controls, then makes the case immutable. Direct inserts and owner changes/truncation are refused | [compliance.md](compliance.md#step-15b-api) |
 | `aml_cdd_subjects`, `aml_cdd_ownership_controls`, `aml_cdd_authorities`, `aml_cdd_verifications`, `aml_cdd_evidence` | `0049_compliance_cdd.sql` | Protected draft-only functions recheck live record access and same-case graph links. Identity/narrative/exact-source metadata and per-file keys are authenticated ciphertext bound to record/purpose contexts. Submitted facts are append-only; direct app writes and later owner insert/update/delete/truncate are refused | [compliance.md](compliance.md#step-15b-api) |
+| `aml_country_list_versions`, `aml_country_list_approvals` | `0050_compliance_risk.sql` | Compliance publishes sorted, distinct ISO code lists; a different active Partner approves each once. Inserts happen only inside the protected functions; owner update/delete/truncate are refused | [compliance.md](compliance.md#step-15c-1-api) |
+| `aml_risk_assessments`, `aml_risk_assessment_controls` | `0050_compliance_risk.sql` | One serialized, permanent version per submission. PostgreSQL derives the high-risk-country flag, relied-on CDD case, lowered-rating flag and governing controls, forces `high` for mandatory factors and rechecks matter-team access. Written answers are AES-GCM ciphertext bound to `aml-risk:<id>` | [compliance.md](compliance.md#step-15c-1-api) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

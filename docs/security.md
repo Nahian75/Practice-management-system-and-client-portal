@@ -24,7 +24,10 @@ protected nominated-officer continuity, fixed firm-control digests and
 owner-immutable approval, training and independent-review evidence. Step 15b
 adds record-rule CDD access, protected-only database writes, immutable
 submission snapshots, AML-specific metadata/file encryption, a separate
-compliance object namespace and fail-closed evidence inspection.
+compliance object namespace and fail-closed evidence inspection. Step 15c-1
+adds database-forced high ratings for mandatory enhanced-due-diligence factors,
+encrypted risk reasoning, matter-team rechecks and protected write flags that
+are cleared before each function returns.
 
 This file lists only the controls that are actually in place.
 

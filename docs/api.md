@@ -9,7 +9,8 @@ approval and bank-outcome workflow, safe bank-statement imports, immutable
 matching, client reconciliation, Compliance sign-off, five-week status, safe
 exports and the capability response used by the staff Finance workspace.
 Compliance steps 15a and 15b add firm controls and versioned client CDD,
-encrypted identity/ownership/authority facts and protected evidence.
+encrypted identity/ownership/authority facts and protected evidence. Step 15c-1
+adds high-risk-country lists and matter risk assessments.
 
 ## Endpoints
 
@@ -26,6 +27,13 @@ encrypted identity/ownership/authority facts and protected evidence.
 | GET | `/clients/:clientId/cdd/:caseId/evidence/:evidenceId/content` | `aml.view_evidence`; same record rule | Audited protected attachment with no-store and restrictive headers |
 | POST | `/clients/:clientId/cdd/:caseId/submit` | `aml.assess`; draft | Fix the complete case, client snapshot and five current approved firm-control versions; 409 if incomplete or final |
 | POST | `/clients/:clientId/cdd/:caseId/abandon` | `aml.assess`; draft | Permanently close a mistaken draft with `{reason}` so a replacement version can be created; collected facts remain fixed |
+| GET | `/compliance/country-lists` | `aml.firm_controls` | `{countryLists,next}`: 100 versions, newest first |
+| GET | `/compliance/country-lists/pending-approval` | `aml.firm_approve` | Versions still awaiting approval |
+| POST | `/compliance/country-lists` | `aml.firm_controls` | `{countries,source,effectiveFrom}` -> the next numbered version; codes are sorted and must be distinct |
+| POST | `/compliance/country-lists/:listId/approval` | `aml.firm_approve` | A Partner other than the preparer approves once; 409 otherwise |
+| POST | `/matters/:matterId/aml-risk` | `aml.assess`; matter team, or Compliance | Fix a permanent assessment version with scope, rating, factors, jurisdictions, value band, review plan and encrypted written answers; 409 when a database rule refuses it |
+| GET | `/matters/:matterId/aml-risk` | `aml.view_evidence`; same record rule | `{assessments,next}`: 100 summaries without written answers |
+| GET | `/matters/:matterId/aml-risk/:assessmentId` | `aml.view_evidence`; same record rule | Full assessment with decrypted answers and governing controls |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

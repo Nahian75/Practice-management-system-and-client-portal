@@ -13,7 +13,9 @@ booleans are presentation only: route guards and PostgreSQL remain the controls.
 Compliance steps 15a and 15b separate administrator-only officer appointments,
 Compliance-only firm-control work and Partner-only approval, while allowing
 Partners and fee earners to prepare CDD only for visible clients and Compliance
-to do so firm-wide.
+to do so firm-wide. Step 15c-1 applies the same split to matter risk
+assessments, using active matter-team membership, and lets only a Partner other
+than the preparer approve a high-risk-country list.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.

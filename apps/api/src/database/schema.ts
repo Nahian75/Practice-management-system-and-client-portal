@@ -943,6 +943,36 @@ export interface AmlCddVerificationsTable {
   details_auth_tag: DatabaseSet<Buffer>; verified_by: DatabaseSet<string>; verified_at: DatabaseSet<Date>;
 }
 
+export interface AmlCountryListVersionsTable {
+  id: DatabaseSet<string>; version: DatabaseSet<number>; countries: DatabaseSet<string[]>;
+  source: DatabaseSet<string>; effective_from: DatabaseSet<string>;
+  prepared_by: DatabaseSet<string>; prepared_at: DatabaseSet<Date>;
+}
+export interface AmlCountryListApprovalsTable {
+  id: DatabaseSet<string>; country_list_version_id: DatabaseSet<string>;
+  approved_by: DatabaseSet<string>; approved_at: DatabaseSet<Date>;
+}
+
+export type AmlRiskRating = 'low' | 'standard' | 'high';
+export type AmlExpectedValue = 'none' | 'under_10k' | '10k_to_100k' | '100k_to_1m' | 'over_1m';
+
+export interface AmlRiskAssessmentsTable {
+  id: DatabaseSet<string>; matter_id: DatabaseSet<string>; client_id: DatabaseSet<string>; version: DatabaseSet<number>;
+  in_scope: DatabaseSet<boolean>; cdd_case_id: DatabaseSet<string | null>; country_list_version_id: DatabaseSet<string>;
+  rating: DatabaseSet<AmlRiskRating>; pep: DatabaseSet<boolean>; high_risk_country: DatabaseSet<boolean>;
+  unusual_transactions: DatabaseSet<boolean>; complex_structure: DatabaseSet<boolean>; cash: DatabaseSet<boolean>;
+  remote_instruction: DatabaseSet<boolean>; adverse_information: DatabaseSet<boolean>;
+  sanctions_exposure: DatabaseSet<boolean>; third_party_funding: DatabaseSet<boolean>;
+  jurisdictions: DatabaseSet<string[]>; expected_value: DatabaseSet<AmlExpectedValue>;
+  lowers_previous: DatabaseSet<boolean>; review_due_on: DatabaseSet<string>; review_grace_days: DatabaseSet<number>;
+  encryption_context: DatabaseSet<string>; key_version: DatabaseSet<number>; nonce: DatabaseSet<Buffer>;
+  ciphertext: DatabaseSet<Buffer>; auth_tag: DatabaseSet<Buffer>;
+  prepared_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>;
+}
+export interface AmlRiskAssessmentControlsTable {
+  assessment_id: DatabaseSet<string>; control_version_id: DatabaseSet<string>; kind: DatabaseSet<AmlControlKind>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -955,6 +985,10 @@ export interface Database {
   aml_cdd_ownership_controls: AmlCddOwnershipControlsTable;
   aml_cdd_subjects: AmlCddSubjectsTable;
   aml_cdd_verifications: AmlCddVerificationsTable;
+  aml_country_list_approvals: AmlCountryListApprovalsTable;
+  aml_country_list_versions: AmlCountryListVersionsTable;
+  aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;
+  aml_risk_assessments: AmlRiskAssessmentsTable;
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;
