@@ -4,28 +4,54 @@ import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuditActor } from '../audit/audit-event.js';
 import type { RequestContext } from '../common/http/request-context.js';
-import type { AmlControlKind, AmlOfficerKind } from '../database/schema.js';
-import type { AmlSubjectKind, AmlSubjectRelationship, DocumentMediaType } from '../database/schema.js';
-import type { CddCase, CddSubjectDetails, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
-import { ComplianceRepository } from './compliance.repository.js';
-import { ComplianceDataCipher } from './compliance-data-cipher.js';
-import { AmlEvidenceVault } from './aml-evidence-vault.js';
-import { FileInspection, FileRefusedError, type RefusalReason } from '../documents/file-inspection.js';
-import { VirusScanner, isLimitsAlert } from '../documents/virus-scanner.js';
 import { sql, type Kysely } from 'kysely';
-import type { Database } from '../database/schema.js';
 import { text } from '../common/validation/safe-text.js';
+import type { AmlControlKind, AmlOfficerKind, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType } from '../database/schema.js';
+import { FileInspection, FileRefusedError, type RefusalReason } from '../documents/file-inspection.js';
 import { UploadFormError } from '../documents/upload-request.js';
+import { isLimitsAlert, VirusScanner } from '../documents/virus-scanner.js';
+import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.js';
+import { ComplianceDataCipher } from './compliance-data-cipher.js';
+import { ComplianceRepository } from './compliance.repository.js';
+import type { CddCase, CddSubjectDetails, ControlVersion, IndependentReview, OfficerAppointment, TrainingCompletion } from './compliance.js';
 
 export interface ComplianceActor { actor: AuditActor; accountId: string; context?: RequestContext }
 export type Change<T> = { outcome: 'changed'; value: T } | { outcome: 'not_found' } | { outcome: 'conflict' };
 const COMPLIANCE_PAGE_SIZE = 100;
-export const AML_EVIDENCE_UPLOADS_PER_HOUR=200;
-export const AML_EVIDENCE_BYTES_PER_HOUR=2*1024**3;
-const AML_EVIDENCE_WINDOW_SECONDS=60*60;
+export const AML_EVIDENCE_UPLOADS_PER_HOUR = 200;
+export const AML_EVIDENCE_BYTES_PER_HOUR = 2 * 1024 ** 3;
+const AML_EVIDENCE_WINDOW_SECONDS = 60 * 60;
+const evidenceFileName = text(255);
+
 class AmlEvidenceAllowanceError extends Error {}
 class CddSubmittedError extends Error {}
-const evidenceFileName=text(255);
+
+type ReceiveRefusal = RefusalReason | 'malware' | 'scanner_unavailable' | 'unscannable' | 'form' | 'interrupted';
+export type EvidenceOutcome =
+  | { outcome: 'added'; value: CddCase }
+  | { outcome: 'not_found' | 'conflict' }
+  | { outcome: 'refused'; reason: ReceiveRefusal | 'over_allowance' | 'file_name' };
+interface ReceivedEvidence {
+  inspected: { mediaType: DocumentMediaType; sizeBytes: number; sha256: Buffer };
+  stored: StoredAmlEvidence;
+}
+
+export interface EvidenceInput {
+  evidenceType: string; country: string | null; issuedOn: string | null; expiresOn: string | null;
+  documentIdentifier: string | null; providerPayloadHash: string | null; fileName: string; file: Readable;
+}
+export interface OwnershipInput {
+  ownedSubjectId: string; controllerSubjectId: string; ownershipPercent: string | null; controlKind: string; details: string;
+}
+export interface AuthorityInput {
+  representativeSubjectId: string; representedSubjectId: string; evidenceId: string;
+  authorityType: string; verifiedOn: string; details: string;
+}
+export interface VerificationInput {
+  subjectId: string; evidenceId: string; sourceType: string; country: string | null; checkedOn: string;
+  expiresOn: string | null; method: string; outcome: string; provider: string | null; service: string | null;
+  documentIdentifier: string | null; providerResult: string | null; reliance: Record<string, unknown> | null;
+}
 
 function page<T extends { id: string }>(items: T[]): { items: T[]; next: string | null } {
   return { items, next: items.length === COMPLIANCE_PAGE_SIZE ? items.at(-1)!.id : null };
@@ -146,131 +172,244 @@ export class ComplianceService {
     try {
       const value = await this.records.transaction(async (trx) => {
         const id = await this.records.createCdd(clientId, input.intendedRelationship, input.reason, by.accountId, trx);
-        await this.audit.record({ actor:by.actor,action:'aml.cdd_draft_created',outcome:'success',resource:{type:'aml_cdd_case',id},metadata:{clientId},...by.context },trx);
-        return this.records.findCdd(clientId,id,by.accountId,true,trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.cdd_draft_created', outcome: 'success',
+          resource: { type: 'aml_cdd_case', id }, metadata: { clientId }, ...by.context }, trx);
+        return this.records.findCdd(clientId, id, by.accountId, true, trx);
       });
-      return value ? { outcome:'changed',value } : { outcome:'conflict' };
+      return value ? { outcome: 'changed', value } : { outcome: 'conflict' };
     } catch (error) { return cddOutcome(error); }
   }
 
   async listCdd(clientId: string, actorId: string, before?: string) {
-    try { return page(await this.records.listCdd(clientId,actorId,before)); } catch (error) { if (hiddenClient(error)) return undefined; throw error; }
-  }
-  async findCdd(clientId: string, caseId: string, actorId: string) {
-    try { return await this.records.findCdd(clientId,caseId,actorId); } catch (error) { if (hiddenClient(error)) return undefined; throw error; }
-  }
-
-  async addSubject(clientId: string, caseId: string, input: { kind:AmlSubjectKind;relationship:AmlSubjectRelationship;details:CddSubjectDetails }, by: ComplianceActor): Promise<Change<CddCase>> {
     try {
-      const value=await this.records.transaction(async(trx)=>{
-        const status=await this.records.cddStatus(clientId,caseId,by.accountId,trx);if(!status)return undefined;if(status!=='draft')throw new CddSubmittedError();
-        const id=await this.records.newId(trx); const context=`aml-subject:${id}`;
-        await this.records.addSubject({id,caseId,kind:input.kind,relationship:input.relationship,sealed:this.cipher.seal(input.details,context),actorId:by.accountId},trx);
-        return this.records.findCdd(clientId,caseId,by.accountId,true,trx);
-      });
-      return value ? {outcome:'changed',value}:{outcome:'not_found'};
-    } catch(error){ return cddOutcome(error); }
-  }
-
-  async addOwnership(clientId:string,caseId:string,input:{ownedSubjectId:string;controllerSubjectId:string;ownershipPercent:string|null;controlKind:string;details:string},by:ComplianceActor):Promise<Change<CddCase>> {
-    return this.addEncryptedFact(clientId,caseId,'ownership',input,by);
-  }
-  async addAuthority(clientId:string,caseId:string,input:{representativeSubjectId:string;representedSubjectId:string;evidenceId:string;authorityType:string;verifiedOn:string;details:string},by:ComplianceActor):Promise<Change<CddCase>> {
-    return this.addEncryptedFact(clientId,caseId,'authority',input,by);
-  }
-  async addVerification(clientId:string,caseId:string,input:{subjectId:string;evidenceId:string;sourceType:string;country:string|null;checkedOn:string;expiresOn:string|null;method:string;outcome:string;provider:string|null;service:string|null;documentIdentifier:string|null;providerResult:string|null;reliance:Record<string,unknown>|null},by:ComplianceActor):Promise<Change<CddCase>> {
-    return this.addEncryptedFact(clientId,caseId,'verification',input,by);
-  }
-
-  private async addEncryptedFact(clientId:string,caseId:string,kind:'ownership'|'authority'|'verification',input:any,by:ComplianceActor):Promise<Change<CddCase>> {
-    try {
-      const value=await this.records.transaction(async(trx)=>{
-        const status=await this.records.cddStatus(clientId,caseId,by.accountId,trx);if(!status)return undefined;if(status!=='draft')throw new CddSubmittedError();
-        const id=await this.records.newId(trx); const context=`aml-${kind}:${id}`;
-        if(kind==='ownership') await this.records.addOwnership({...input,id,caseId,sealed:this.cipher.seal({details:input.details},context),actorId:by.accountId},trx);
-        else if(kind==='authority') await this.records.addAuthority({...input,id,caseId,sealed:this.cipher.seal({details:input.details},context),actorId:by.accountId},trx);
-        else {
-          const {documentIdentifier,providerResult,reliance,...safe}=input;
-          await this.records.addVerification({...safe,id,caseId,sealed:this.cipher.seal({documentIdentifier,providerResult,reliance},context),actorId:by.accountId},trx);
-        }
-        return this.records.findCdd(clientId,caseId,by.accountId,true,trx);
-      });
-      return value?{outcome:'changed',value}:{outcome:'not_found'};
-    } catch(error){return cddOutcome(error);}
-  }
-
-  async addEvidence(clientId:string,caseId:string,input:{evidenceType:string;country:string|null;issuedOn:string|null;expiresOn:string|null;documentIdentifier:string|null;providerPayloadHash:string|null;fileName:string;file:Readable},by:ComplianceActor):Promise<{outcome:'added';value:CddCase}|{outcome:'not_found'|'conflict'}|{outcome:'refused';reason:RefusalReason|'malware'|'scanner_unavailable'|'unscannable'|'over_allowance'|'file_name'|'form'|'interrupted'}> {
-    try { const status=await this.records.cddStatus(clientId,caseId,by.accountId);if(!status){input.file.resume();return {outcome:'not_found'};}if(status!=='draft'){input.file.resume();return {outcome:'conflict'};} } catch(error) { if(hiddenClient(error)) {input.file.resume();return {outcome:'not_found'};} throw error; }
-    const checkedName=evidenceFileName.safeParse(input.fileName);if(!checkedName.success){input.file.resume();return {outcome:'refused',reason:'file_name'};}input.fileName=checkedName.data;
-    if(!await this.withinEvidenceAllowance(by.accountId,0)){input.file.resume();return {outcome:'refused',reason:'over_allowance'};}
-    const received=await this.receiveEvidence(input.fileName,input.file);
-    if('reason' in received){await this.audit.record({actor:by.actor,action:'aml.evidence_refused',outcome:'failure',resource:{type:'aml_cdd_case',id:caseId},metadata:{reason:received.reason},...by.context});return {outcome:'refused',reason:received.reason};}
-    try {
-      const value=await this.records.transaction(async(trx)=>{
-        await sql`select pg_advisory_xact_lock(hashtextextended(${`app.aml_evidence_uploads:${by.accountId}`},0))`.execute(trx);
-        if(!await this.withinEvidenceAllowance(by.accountId,received.inspected.sizeBytes,trx))throw new AmlEvidenceAllowanceError();
-        const id=await this.records.newId(trx); const context=`aml-evidence-metadata:${id}`;
-        await this.records.addEvidence({id,caseId,evidenceType:input.evidenceType,country:input.country,issuedOn:input.issuedOn,expiresOn:input.expiresOn,
-          metadata:this.cipher.seal({fileName:input.fileName,documentIdentifier:input.documentIdentifier,providerPayloadHash:input.providerPayloadHash},context),
-          mediaType:received.inspected.mediaType,sizeBytes:received.inspected.sizeBytes,sha256:received.inspected.sha256,storageKey:received.stored.storageKey,fileKey:received.stored.sealedKey,actorId:by.accountId},trx);
-        await this.audit.record({actor:by.actor,action:'aml.evidence_uploaded',outcome:'success',resource:{type:'aml_cdd_evidence',id},metadata:{caseId,mediaType:received.inspected.mediaType,sizeBytes:received.inspected.sizeBytes},...by.context},trx);
-        return this.records.findCdd(clientId,caseId,by.accountId,true,trx);
-      });
-      if(!value){await this.evidenceVault.discard(received.stored.storageKey);return {outcome:'not_found'};}
-      return {outcome:'added',value};
-    } catch(error){
-      await this.evidenceVault.discard(received.stored.storageKey);
-      if(error instanceof AmlEvidenceAllowanceError){await this.audit.record({actor:by.actor,action:'aml.evidence_upload_limited',outcome:'denied',metadata:{files:AML_EVIDENCE_UPLOADS_PER_HOUR,bytes:AML_EVIDENCE_BYTES_PER_HOUR},...by.context});return {outcome:'refused',reason:'over_allowance'};}
-      const outcome=cddOutcome(error);
-      return {outcome:outcome.outcome==='not_found'?'not_found':'conflict'};
+      return page(await this.records.listCdd(clientId, actorId, before));
+    } catch (error) {
+      if (hiddenClient(error)) return undefined;
+      throw error;
     }
   }
 
-  private async withinEvidenceAllowance(accountId:string,sizeBytes:number,trx?:Kysely<Database>){const totals=await this.audit.recentTotals({actorId:accountId,actions:['aml.evidence_uploaded'],seconds:AML_EVIDENCE_WINDOW_SECONDS,field:'sizeBytes'},trx);return totals.count+1<=AML_EVIDENCE_UPLOADS_PER_HOUR&&totals.total+sizeBytes<=AML_EVIDENCE_BYTES_PER_HOUR;}
-
-  async submitCdd(clientId:string,caseId:string,by:ComplianceActor):Promise<Change<CddCase>> {
+  async findCdd(clientId: string, caseId: string, actorId: string) {
     try {
-      const value=await this.records.transaction(async(trx)=>{
-        const status=await this.records.cddStatus(clientId,caseId,by.accountId,trx);if(!status)return undefined;if(status!=='draft')throw new CddSubmittedError();
-        await this.records.submitCdd(caseId,by.accountId,trx);
-        const item=await this.records.findCdd(clientId,caseId,by.accountId,true,trx); if(!item)return undefined;
-        await this.audit.record({actor:by.actor,action:'aml.cdd_submitted',outcome:'success',resource:{type:'aml_cdd_case',id:caseId},metadata:{clientId,version:item.version,subjects:item.subjects.length,evidence:item.evidence.length},...by.context},trx);
+      return await this.records.findCdd(clientId, caseId, actorId);
+    } catch (error) {
+      if (hiddenClient(error)) return undefined;
+      throw error;
+    }
+  }
+
+  addSubject(clientId: string, caseId: string, input: {
+    kind: AmlSubjectKind; relationship: AmlSubjectRelationship; details: CddSubjectDetails;
+  }, by: ComplianceActor): Promise<Change<CddCase>> {
+    return this.addDraftFact(clientId, caseId, by, async (trx) => {
+      const id = await this.records.newId(trx);
+      await this.records.addSubject({ id, caseId, kind: input.kind, relationship: input.relationship,
+        sealed: this.cipher.seal(input.details, `aml-subject:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  addOwnership(clientId: string, caseId: string, input: OwnershipInput, by: ComplianceActor): Promise<Change<CddCase>> {
+    return this.addDraftFact(clientId, caseId, by, async (trx) => {
+      const id = await this.records.newId(trx);
+      await this.records.addOwnership({ ...input, id, caseId,
+        sealed: this.cipher.seal({ details: input.details }, `aml-ownership:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  addAuthority(clientId: string, caseId: string, input: AuthorityInput, by: ComplianceActor): Promise<Change<CddCase>> {
+    return this.addDraftFact(clientId, caseId, by, async (trx) => {
+      const id = await this.records.newId(trx);
+      await this.records.addAuthority({ ...input, id, caseId,
+        sealed: this.cipher.seal({ details: input.details }, `aml-authority:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  addVerification(clientId: string, caseId: string, input: VerificationInput, by: ComplianceActor): Promise<Change<CddCase>> {
+    return this.addDraftFact(clientId, caseId, by, async (trx) => {
+      const id = await this.records.newId(trx);
+      const { documentIdentifier, providerResult, reliance, ...safe } = input;
+      await this.records.addVerification({ ...safe, id, caseId,
+        sealed: this.cipher.seal({ documentIdentifier, providerResult, reliance }, `aml-verification:${id}`),
+        actorId: by.accountId }, trx);
+    });
+  }
+
+  /** Runs one write against a live draft and returns the case as it now stands. */
+  private async addDraftFact(clientId: string, caseId: string, by: ComplianceActor,
+    write: (trx: Kysely<Database>) => Promise<void>): Promise<Change<CddCase>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        if (!await this.isDraft(clientId, caseId, by, trx)) return undefined;
+        await write(trx);
+        return this.records.findCdd(clientId, caseId, by.accountId, true, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return cddOutcome(error); }
+  }
+
+  /** False when the case does not exist; throws when it exists but is no longer a draft. */
+  private async isDraft(clientId: string, caseId: string, by: ComplianceActor, trx: Kysely<Database>): Promise<boolean> {
+    const status = await this.records.cddStatus(clientId, caseId, by.accountId, trx);
+    if (!status) return false;
+    if (status !== 'draft') throw new CddSubmittedError();
+    return true;
+  }
+
+  async addEvidence(clientId: string, caseId: string, input: EvidenceInput, by: ComplianceActor): Promise<EvidenceOutcome> {
+    const skip = (result: EvidenceOutcome): EvidenceOutcome => {
+      input.file.resume();
+      return result;
+    };
+    try {
+      const status = await this.records.cddStatus(clientId, caseId, by.accountId);
+      if (!status) return skip({ outcome: 'not_found' });
+      if (status !== 'draft') return skip({ outcome: 'conflict' });
+    } catch (error) {
+      if (hiddenClient(error)) return skip({ outcome: 'not_found' });
+      throw error;
+    }
+    const checkedName = evidenceFileName.safeParse(input.fileName);
+    if (!checkedName.success) return skip({ outcome: 'refused', reason: 'file_name' });
+    const fileName = checkedName.data;
+    if (!await this.withinEvidenceAllowance(by.accountId, 0)) return skip({ outcome: 'refused', reason: 'over_allowance' });
+
+    const received = await this.receiveEvidence(fileName, input.file);
+    if ('reason' in received) {
+      await this.audit.record({ actor: by.actor, action: 'aml.evidence_refused', outcome: 'failure',
+        resource: { type: 'aml_cdd_case', id: caseId }, metadata: { reason: received.reason }, ...by.context });
+      return { outcome: 'refused', reason: received.reason };
+    }
+
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        await sql`select pg_advisory_xact_lock(hashtextextended(${`app.aml_evidence_uploads:${by.accountId}`}, 0))`.execute(trx);
+        if (!await this.withinEvidenceAllowance(by.accountId, received.inspected.sizeBytes, trx)) throw new AmlEvidenceAllowanceError();
+        const id = await this.records.newId(trx);
+        await this.records.addEvidence({
+          id, caseId, evidenceType: input.evidenceType, country: input.country,
+          issuedOn: input.issuedOn, expiresOn: input.expiresOn,
+          metadata: this.cipher.seal({ fileName, documentIdentifier: input.documentIdentifier,
+            providerPayloadHash: input.providerPayloadHash }, `aml-evidence-metadata:${id}`),
+          mediaType: received.inspected.mediaType, sizeBytes: received.inspected.sizeBytes, sha256: received.inspected.sha256,
+          storageKey: received.stored.storageKey, fileKey: received.stored.sealedKey,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.evidence_uploaded', outcome: 'success',
+          resource: { type: 'aml_cdd_evidence', id },
+          metadata: { caseId, mediaType: received.inspected.mediaType, sizeBytes: received.inspected.sizeBytes }, ...by.context }, trx);
+        return this.records.findCdd(clientId, caseId, by.accountId, true, trx);
+      });
+      if (!value) {
+        await this.evidenceVault.discard(received.stored.storageKey);
+        return { outcome: 'not_found' };
+      }
+      return { outcome: 'added', value };
+    } catch (error) {
+      await this.evidenceVault.discard(received.stored.storageKey);
+      if (error instanceof AmlEvidenceAllowanceError) {
+        await this.audit.record({ actor: by.actor, action: 'aml.evidence_upload_limited', outcome: 'denied',
+          metadata: { files: AML_EVIDENCE_UPLOADS_PER_HOUR, bytes: AML_EVIDENCE_BYTES_PER_HOUR }, ...by.context });
+        return { outcome: 'refused', reason: 'over_allowance' };
+      }
+      return { outcome: cddOutcome(error).outcome === 'not_found' ? 'not_found' : 'conflict' };
+    }
+  }
+
+  private async withinEvidenceAllowance(accountId: string, sizeBytes: number, trx?: Kysely<Database>): Promise<boolean> {
+    const totals = await this.audit.recentTotals({ actorId: accountId, actions: ['aml.evidence_uploaded'],
+      seconds: AML_EVIDENCE_WINDOW_SECONDS, field: 'sizeBytes' }, trx);
+    return totals.count + 1 <= AML_EVIDENCE_UPLOADS_PER_HOUR && totals.total + sizeBytes <= AML_EVIDENCE_BYTES_PER_HOUR;
+  }
+
+  async submitCdd(clientId: string, caseId: string, by: ComplianceActor): Promise<Change<CddCase>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        if (!await this.isDraft(clientId, caseId, by, trx)) return undefined;
+        await this.records.submitCdd(caseId, by.accountId, trx);
+        const item = await this.records.findCdd(clientId, caseId, by.accountId, true, trx);
+        if (!item) return undefined;
+        await this.audit.record({ actor: by.actor, action: 'aml.cdd_submitted', outcome: 'success',
+          resource: { type: 'aml_cdd_case', id: caseId },
+          metadata: { clientId, version: item.version, subjects: item.subjects.length, evidence: item.evidence.length }, ...by.context }, trx);
         return item;
       });
-      return value?{outcome:'changed',value}:{outcome:'not_found'};
-    }catch(error){return cddOutcome(error);}
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return cddOutcome(error); }
   }
 
-  async abandonCdd(clientId:string,caseId:string,reason:string,by:ComplianceActor):Promise<Change<CddCase>>{
-    try{const value=await this.records.transaction(async(trx)=>{const status=await this.records.cddStatus(clientId,caseId,by.accountId,trx);if(!status)return undefined;if(status!=='draft')throw new CddSubmittedError();await this.records.abandonCdd(caseId,reason,by.accountId,trx);const item=await this.records.findCdd(clientId,caseId,by.accountId,true,trx);if(!item)return undefined;await this.audit.record({actor:by.actor,action:'aml.cdd_draft_abandoned',outcome:'success',resource:{type:'aml_cdd_case',id:caseId},metadata:{clientId,version:item.version},...by.context},trx);return item;});return value?{outcome:'changed',value}:{outcome:'not_found'};}catch(error){return cddOutcome(error);}
-  }
-
-  async downloadEvidence(clientId:string,caseId:string,evidenceId:string,by:ComplianceActor) {
+  async abandonCdd(clientId: string, caseId: string, reason: string, by: ComplianceActor): Promise<Change<CddCase>> {
     try {
-      const found=await this.records.evidenceForDownload(clientId,caseId,evidenceId,by.accountId); if(!found)return {outcome:'not_found'} as const;
-      const file=await this.evidenceVault.open({storageKey:found.storageKey,sealedKey:found.sealedKey});
-      await this.audit.record({actor:by.actor,action:'aml.evidence_viewed',outcome:'success',resource:{type:'aml_cdd_evidence',id:evidenceId},metadata:{caseId},...by.context});
-      return {outcome:'ready',file,fileName:found.fileName,mediaType:found.mediaType,sizeBytes:found.sizeBytes} as const;
-    }catch(error){if(hiddenClient(error))return {outcome:'not_found'} as const;throw error;}
+      const value = await this.records.transaction(async (trx) => {
+        if (!await this.isDraft(clientId, caseId, by, trx)) return undefined;
+        await this.records.abandonCdd(caseId, reason, by.accountId, trx);
+        const item = await this.records.findCdd(clientId, caseId, by.accountId, true, trx);
+        if (!item) return undefined;
+        await this.audit.record({ actor: by.actor, action: 'aml.cdd_draft_abandoned', outcome: 'success',
+          resource: { type: 'aml_cdd_case', id: caseId }, metadata: { clientId, version: item.version }, ...by.context }, trx);
+        return item;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return cddOutcome(error); }
   }
 
-  private async receiveEvidence(fileName:string,file:Readable):Promise<{inspected:{mediaType:DocumentMediaType;sizeBytes:number;sha256:Buffer};stored:{storageKey:string;sealedKey:import('../common/crypto/secret-box.js').SealedSecret}}|{reason:RefusalReason|'malware'|'scanner_unavailable'|'unscannable'|'form'|'interrupted'}> {
-    const inspection=new FileInspection(fileName); const toScanner=new PassThrough(); const toVault=new PassThrough();
-    let first:{origin:'file'|'inspection'|'scanner'|'storage';error:unknown}|undefined;
-    const stop=(origin:NonNullable<typeof first>['origin'])=>(error:unknown)=>{first??={origin,error};const reason=error instanceof Error?error:new Error('Upload stopped');inspection.destroy(reason);toScanner.destroy(reason);toVault.destroy(reason);};
-    file.on('error',stop('file'));inspection.on('error',stop('inspection'));toScanner.on('error',()=>undefined);toVault.on('error',()=>undefined);
-    if(file.destroyed)stop('file')(file.errored??new Error('The upload was interrupted'));
-    file.pipe(inspection);inspection.pipe(toScanner);inspection.pipe(toVault);
-    const scanning=this.scanner.scan(toScanner);const storing=this.evidenceVault.store(toVault);scanning.catch(stop('scanner'));storing.catch(stop('storage'));
-    const [scan,store]=await Promise.allSettled([scanning,storing]);
-    let reason:RefusalReason|'malware'|'scanner_unavailable'|'unscannable'|'form'|'interrupted'|undefined;
-    if(first?.origin==='inspection'&&first.error instanceof FileRefusedError)reason=first.error.reason;
-    else if(first?.origin==='scanner')reason='scanner_unavailable';
-    else if(first?.origin==='file')reason=first.error instanceof UploadFormError?'form':'interrupted';
-    else if(!first&&scan.status==='fulfilled'&&!scan.value.clean)reason=isLimitsAlert(scan.value.signature)?'unscannable':'malware';
-    if(reason||first){if(store.status==='fulfilled')await this.evidenceVault.discard(store.value.storageKey);if(reason)return {reason};if(first)throw first.error;}
-    if(scan.status==='rejected'||store.status==='rejected')throw new Error('Evidence upload ended without an answer');
-    return {inspected:inspection.result(),stored:store.value};
+  async downloadEvidence(clientId: string, caseId: string, evidenceId: string, by: ComplianceActor) {
+    try {
+      const found = await this.records.evidenceForDownload(clientId, caseId, evidenceId, by.accountId);
+      if (!found) return { outcome: 'not_found' } as const;
+      const file = await this.evidenceVault.open({ storageKey: found.storageKey, sealedKey: found.sealedKey });
+      await this.audit.record({ actor: by.actor, action: 'aml.evidence_viewed', outcome: 'success',
+        resource: { type: 'aml_cdd_evidence', id: evidenceId }, metadata: { caseId }, ...by.context });
+      return { outcome: 'ready', file, fileName: found.fileName, mediaType: found.mediaType, sizeBytes: found.sizeBytes } as const;
+    } catch (error) {
+      if (hiddenClient(error)) return { outcome: 'not_found' } as const;
+      throw error;
+    }
+  }
+
+  /**
+   * Streams one upload through inspection into the scanner and the vault at once.
+   * The first failure stops every branch, and a refused or failed file is removed from storage.
+   */
+  private async receiveEvidence(fileName: string, file: Readable): Promise<ReceivedEvidence | { reason: ReceiveRefusal }> {
+    const inspection = new FileInspection(fileName);
+    const toScanner = new PassThrough();
+    const toVault = new PassThrough();
+    let first: { origin: 'file' | 'inspection' | 'scanner' | 'storage'; error: unknown } | undefined;
+    const stop = (origin: NonNullable<typeof first>['origin']) => (error: unknown) => {
+      first ??= { origin, error };
+      const reason = error instanceof Error ? error : new Error('Upload stopped');
+      inspection.destroy(reason);
+      toScanner.destroy(reason);
+      toVault.destroy(reason);
+    };
+    file.on('error', stop('file'));
+    inspection.on('error', stop('inspection'));
+    toScanner.on('error', () => undefined);
+    toVault.on('error', () => undefined);
+    if (file.destroyed) stop('file')(file.errored ?? new Error('The upload was interrupted'));
+    file.pipe(inspection);
+    inspection.pipe(toScanner);
+    inspection.pipe(toVault);
+
+    const scanning = this.scanner.scan(toScanner);
+    const storing = this.evidenceVault.store(toVault);
+    scanning.catch(stop('scanner'));
+    storing.catch(stop('storage'));
+    const [scan, store] = await Promise.allSettled([scanning, storing]);
+
+    let reason: ReceiveRefusal | undefined;
+    if (first?.origin === 'inspection' && first.error instanceof FileRefusedError) reason = first.error.reason;
+    else if (first?.origin === 'scanner') reason = 'scanner_unavailable';
+    else if (first?.origin === 'file') reason = first.error instanceof UploadFormError ? 'form' : 'interrupted';
+    else if (!first && scan.status === 'fulfilled' && !scan.value.clean) reason = isLimitsAlert(scan.value.signature) ? 'unscannable' : 'malware';
+
+    if (reason || first) {
+      if (store.status === 'fulfilled') await this.evidenceVault.discard(store.value.storageKey);
+      if (reason) return { reason };
+      throw first!.error;
+    }
+    if (scan.status === 'rejected' || store.status === 'rejected') throw new Error('Evidence upload ended without an answer');
+    return { inspected: inspection.result(), stored: store.value };
   }
 }
 

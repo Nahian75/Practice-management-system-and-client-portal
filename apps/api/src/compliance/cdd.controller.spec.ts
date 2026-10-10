@@ -93,6 +93,13 @@ describe('Client CDD API', () => {
     const result=await api(partnerToken).post(`/clients/${secondClient}/cdd/${second.id}/verifications`,{subjectId,evidenceId,sourceType:'Passport',country:'GB',checkedOn:today,method:'manual',outcome:'verified'});expect(result.status).toBe(409);
   });
 
+  it('refuses evidence from another client reached through a client the caller can see',async()=>{
+    const ownClient=await client(feeEarner);expect((await api(feeToken).get(`/clients/${ownClient}/cdd`)).status).toBe(200);
+    const otherClient=await client();const otherCase=(await draft(partnerToken,otherClient)).body.id;
+    const evidenceId=(await evidence(partnerToken,otherClient,otherCase)).body.evidence[0].id;
+    expect((await api(feeToken).get(`/clients/${ownClient}/cdd/${otherCase}/evidence/${evidenceId}/content`)).status).toBe(404);
+  });
+
   it('streams evidence only to authorised viewers and audits the view without identity data',async()=>{
     const clientId=await client();const caseId=(await draft(partnerToken,clientId)).body.id;const uploaded=await evidence(partnerToken,clientId,caseId);const evidenceId=uploaded.body.evidence[0].id;
     expect((await api(feeToken).get(`/clients/${clientId}/cdd/${caseId}/evidence/${evidenceId}/content`)).status).toBe(404);
