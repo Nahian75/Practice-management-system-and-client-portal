@@ -54,7 +54,11 @@ const billSummarySchema = z.object({
   id: z.uuid(), reference: z.string(), matterId: z.uuid(), taxPoint: calendarDate, dueOn: calendarDate,
   net: z.string(), vat: z.string(), gross: z.string(), issuedOn: calendarDate, issuedAt: z.iso.datetime(),
 });
-const creditLineSchema = z.object({ id: z.uuid(), position: z.number().int(), billLineId: z.uuid(), description: z.string(), net: z.string(), vat: z.string(), gross: z.string() });
+const creditLineSchema = z.object({
+  id: z.uuid(), position: z.number().int(), billLineId: z.uuid(), description: z.string(),
+  vatTreatment: z.enum(['standard', 'reduced', 'zero', 'exempt', 'outside_scope']),
+  net: z.string(), vat: z.string(), gross: z.string(),
+});
 const creditSchema = z.object({
   id: z.uuid(), reference: z.string(), billId: z.uuid(), billReference: z.string(), matterId: z.uuid(), reason: z.string(),
   net: z.string(), vat: z.string(), gross: z.string(), issuedOn: calendarDate, issuedAt: z.iso.datetime(), lines: z.array(creditLineSchema),

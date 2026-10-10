@@ -135,6 +135,7 @@ export interface CreditNoteLine {
   position: number;
   billLineId: string;
   description: string;
+  vatTreatment: VatTreatment;
   netPence: string;
   vatPence: string;
   grossPence: string;
@@ -201,6 +202,7 @@ export interface LedgerEntry {
   side: MoneySide;
   direction: 'debit' | 'credit';
   amountPence: string;
+  runningBalancePence: string;
   matterId: string;
   relatedMatterId: string | null;
   bankAccountId: string | null;

@@ -54,6 +54,7 @@ export interface ClientAccountReconciliation {
   preparedBy: string;
   preparedAt: Date;
   statementImportIds: string[];
+  clientBalances: { id: string; clientId: string; matterId: string; balancePence: string }[];
   items: ReconciliationItem[];
   signOff: { signedOffBy: string; signedOffAt: Date } | null;
 }

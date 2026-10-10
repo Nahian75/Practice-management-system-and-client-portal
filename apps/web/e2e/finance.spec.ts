@@ -9,6 +9,14 @@ const accountIdOf = async (page: Page) =>
 const today = () => new Date().toISOString().slice(0, 10);
 const yesterday = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 
+let settledPaymentAccount: {
+  bankAccountId: string;
+  receiptReference: string;
+  receiptTransactionId: string;
+  bankReference: string;
+  paymentTransactionId: string;
+} | undefined;
+
 test.describe.configure({ mode: 'serial', timeout: 60_000 });
 
 test('records time on a visible matter and keeps firm-wide Finance out of ordinary navigation', async ({ page, request }) => {
@@ -66,7 +74,7 @@ test('gives Accounts operational queues, cash books, exports and responsive acce
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.getByRole('link', { name: new RegExp(bankName) }).first().click();
   await expect(page.getByRole('heading', { name: bankName })).toBeVisible();
-  await expect(page.getByText('£250.00', { exact: true })).toBeVisible();
+  await expect(page.locator('dl.summary').getByText('£250.00', { exact: true })).toBeVisible();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('link', { name: 'Export cash book (CSV)' }).click(),
@@ -128,7 +136,8 @@ test('uses two Accounts holders for a payment request and records the bank outco
   expect(evidence.status()).toBe(201);
   const bank = await requester.api.post('/api/finance/bank-accounts', { data: { kind: 'client', name: `Payment account ${unique()}`, sortCode: '12-34-56', accountNumber: `2${Math.floor(Math.random() * 9_000_000 + 1_000_000)}`, openedOn: fixtureDate } });
   expect(bank.status()).toBe(201); const bankBody = await bank.json() as { id: string };
-  expect((await requester.api.post('/api/finance/receipts', { data: { bankAccountId: bankBody.id, matterId: matter.id, receivedOn: fixtureDate, amount: '200.00', reference: `PAY-${unique()}`, purpose: 'Funds on account' } })).status()).toBe(201);
+  const receiptReference = `PAY-${unique()}`;
+  expect((await requester.api.post('/api/finance/receipts', { data: { bankAccountId: bankBody.id, matterId: matter.id, receivedOn: fixtureDate, amount: '200.00', reference: receiptReference, purpose: 'Funds on account' } })).status()).toBe(201);
   const requested = await requester.api.post('/api/finance/payment-requests', { data: { kind: 'refund', matterId: matter.id, clientBankAccountId: bankBody.id, evidenceDocumentId: (await evidence.json() as { id: string }).id, purpose: 'Return surplus funds to the client', amount: '200.00', payee: { name: 'Alex Client', sortCode: '65-43-21', accountNumber: '87654321' } } });
   expect(requested.status()).toBe(201); const payment = await requested.json() as { id: string };
   await page.goto(`/finance/payment-requests/${payment.id}`);
@@ -137,12 +146,29 @@ test('uses two Accounts holders for a payment request and records the bank outco
   await expect(page.getByText('Approved, awaiting bank outcome')).toBeVisible();
   await page.getByRole('button', { name: 'Show payee bank details' }).click();
   await expect(page.getByText(/Payee: Alex Client/)).toBeVisible();
-  await page.getByLabel('Bank reference').fill(`BANK-${unique()}`);
-  await page.getByLabel('Date paid').fill(fixtureDate);
+  const bankReference = `BANK-${unique()}`;
+  await page.getByLabel('Bank reference').fill(bankReference);
+  await page.getByLabel('Date paid').fill(today());
   await page.getByRole('button', { name: 'Record paid' }).click();
   await expect(page.getByText('Paid', { exact: true })).toBeVisible();
   await noAxeViolations(page);
-  expect((await requester.api.post(`/api/finance/bank-accounts/${bankBody.id}/close`, { data: { closedOn: fixtureDate, reason: 'End of browser test' } })).status()).toBe(201);
+  const cashBook = await requester.api.get(`/api/finance/bank-accounts/${bankBody.id}/cash-book`);
+  expect(cashBook.status()).toBe(200);
+  const cashBookEntries = ((await cashBook.json()) as {
+    entries: { transactionId: string; kind: string; reference: string | null }[];
+  }).entries;
+  const receiptPosting = cashBookEntries.find((entry) => entry.kind === 'client_receipt' && entry.reference === receiptReference);
+  const paymentPosting = cashBookEntries.find((entry) => entry.kind === 'client_payment' && entry.reference === bankReference);
+  expect(receiptPosting).toBeDefined();
+  expect(paymentPosting).toBeDefined();
+  settledPaymentAccount = {
+    bankAccountId: bankBody.id,
+    receiptReference,
+    receiptTransactionId: receiptPosting!.transactionId,
+    bankReference,
+    paymentTransactionId: paymentPosting!.transactionId,
+  };
+  expect((await requester.api.post(`/api/finance/bank-accounts/${bankBody.id}/close`, { data: { closedOn: today(), reason: 'End of browser test' } })).status()).toBe(201);
 });
 
 test('shows immutable statement matching and gives reconciliation sign-off only to Compliance', async ({ page, request }) => {
@@ -155,10 +181,31 @@ test('shows immutable statement matching and gives reconciliation sign-off only 
   expect(bank.status()).toBe(201); const bankBody = await bank.json() as { id: string };
   const receipt = await accounts.api.post('/api/finance/receipts', { data: { bankAccountId: bankBody.id, matterId: matter.id, receivedOn: today(), amount: '100.00', reference, purpose: 'Funds on account' } });
   expect(receipt.status()).toBe(201);
+  if (!settledPaymentAccount) throw new Error('The preceding payment test did not retain its settled account');
+  const closingStatement = await accounts.api.post('/api/finance/statement-imports', { multipart: {
+    bankAccountId: settledPaymentAccount.bankAccountId,
+    periodStart: yesterday(), periodEnd: today(), openingBalance: '0.00', closingBalance: '0.00',
+    file: {
+      name: 'closing-statement.csv', mimeType: 'text/csv',
+      buffer: Buffer.from(`date,amount,reference,description\r\n${yesterday()},200.00,${settledPaymentAccount.receiptReference},Client funds\r\n${today()},-200.00,${settledPaymentAccount.bankReference},Client refund\r\n`),
+    },
+  } });
+  expect(closingStatement.status()).toBe(201);
+  const closingStatementBody = await closingStatement.json() as { id: string; rows: { id: string; reference: string }[] };
+  const receiptRow = closingStatementBody.rows.find((row) => row.reference === settledPaymentAccount!.receiptReference);
+  const paymentRow = closingStatementBody.rows.find((row) => row.reference === settledPaymentAccount!.bankReference);
+  expect(receiptRow).toBeDefined();
+  expect(paymentRow).toBeDefined();
+  expect((await accounts.api.post(`/api/finance/statement-rows/${receiptRow!.id}/matches`, {
+    data: { financeTransactionId: settledPaymentAccount.receiptTransactionId },
+  })).status()).toBe(201);
+  expect((await accounts.api.post(`/api/finance/statement-rows/${paymentRow!.id}/matches`, {
+    data: { financeTransactionId: settledPaymentAccount.paymentTransactionId },
+  })).status()).toBe(201);
   const statement = await accounts.api.post('/api/finance/statement-imports', { multipart: { bankAccountId: bankBody.id, periodStart: today(), periodEnd: today(), openingBalance: '0.00', closingBalance: '100.00', file: { name: 'statement.csv', mimeType: 'text/csv', buffer: Buffer.from(`date,amount,reference,description\r\n${today()},100.00,${reference},Client receipt\r\n`) } } });
   expect(statement.status()).toBe(201); const statementBody = await statement.json() as { id: string; rows: { id: string }[] };
   expect((await accounts.api.post(`/api/finance/statement-rows/${statementBody.rows[0]!.id}/matches`, { data: { financeTransactionId: (await receipt.json() as { id: string }).id } })).status()).toBe(201);
-  const reconciliation = await accounts.api.post('/api/finance/reconciliations', { data: { asOf: today(), statementImportIds: [statementBody.id], explanations: {} } });
+  const reconciliation = await accounts.api.post('/api/finance/reconciliations', { data: { asOf: today(), statementImportIds: [closingStatementBody.id, statementBody.id], explanations: {} } });
   expect(reconciliation.status()).toBe(201); const reconciliationBody = await reconciliation.json() as { id: string };
   await page.goto(`/finance/statements/${statementBody.id}`);
   await expect(page.getByText('Compliance view: matching is read-only.')).toBeVisible();

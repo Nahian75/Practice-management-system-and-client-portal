@@ -381,7 +381,7 @@ describe('bill database rules', () => {
       await expect(sql`select app.record_bill_delivery(${billId}, null, 'email', null, ${feeEarner.id})`.execute(db)).rejects.toThrow(/active accounts/i);
       await expect(sql`update credit_notes set reason = 'Changed' where id = ${creditId}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
       await expect(sql`delete from bill_deliveries where id = ${billDelivery}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
-      await expect(sql`truncate client_account_reconciliation_sign_offs, client_account_reconciliation_items, client_account_reconciliation_statements, client_account_reconciliations, bank_statement_match_events, bank_statement_rows, bank_statement_imports, client_payment_events, client_payment_requests, finance_postings, finance_transactions, bill_deliveries, credit_note_lines, credit_notes`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+      await expect(sql`truncate client_account_reconciliation_sign_offs, client_account_reconciliation_items, client_account_reconciliation_balances, client_account_reconciliation_statements, client_account_reconciliations, bank_statement_match_events, bank_statement_rows, bank_statement_imports, client_payment_events, client_payment_requests, finance_postings, finance_transactions, bill_deliveries, credit_note_lines, credit_notes`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
     });
   });
 });

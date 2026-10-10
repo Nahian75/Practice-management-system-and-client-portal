@@ -785,6 +785,14 @@ export interface ClientAccountReconciliationItemsTable {
   explanation: DatabaseSet<string>;
 }
 
+export interface ClientAccountReconciliationBalancesTable {
+  id: DatabaseSet<string>;
+  reconciliation_id: DatabaseSet<string>;
+  client_id: DatabaseSet<string>;
+  matter_id: DatabaseSet<string>;
+  balance_pence: DatabaseSet<string>;
+}
+
 export interface ClientAccountReconciliationSignOffsTable {
   id: DatabaseSet<string>;
   reconciliation_id: DatabaseSet<string>;
@@ -840,6 +848,7 @@ export interface Database {
   client_payment_events: ClientPaymentEventsTable;
   client_payment_requests: ClientPaymentRequestsTable;
   client_account_reconciliation_items: ClientAccountReconciliationItemsTable;
+  client_account_reconciliation_balances: ClientAccountReconciliationBalancesTable;
   client_account_reconciliation_sign_offs: ClientAccountReconciliationSignOffsTable;
   client_account_reconciliation_statements: ClientAccountReconciliationStatementsTable;
   client_account_reconciliations: ClientAccountReconciliationsTable;

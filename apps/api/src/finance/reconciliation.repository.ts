@@ -96,9 +96,12 @@ export class ReconciliationRepository {
     const row = await executor.selectFrom('client_account_reconciliations').selectAll()
       .where('id', '=', id).executeTakeFirst();
     if (!row) return undefined;
-    const [statements, items, signOff] = await Promise.all([
+    const [statements, balances, items, signOff] = await Promise.all([
       executor.selectFrom('client_account_reconciliation_statements').select('statement_import_id')
         .where('reconciliation_id', '=', id).orderBy('bank_account_id').execute(),
+      executor.selectFrom('client_account_reconciliation_balances')
+        .select(['id', 'client_id', 'matter_id', 'balance_pence'])
+        .where('reconciliation_id', '=', id).orderBy('id').execute(),
       executor.selectFrom('client_account_reconciliation_items').selectAll()
         .where('reconciliation_id', '=', id).orderBy('id').execute(),
       executor.selectFrom('client_account_reconciliation_sign_offs').selectAll()
@@ -112,6 +115,10 @@ export class ReconciliationRepository {
       cashbookClientDifferencePence: row.cashbook_client_difference_pence,
       preparedBy: row.prepared_by, preparedAt: row.prepared_at,
       statementImportIds: statements.map((item) => item.statement_import_id),
+      clientBalances: balances.map((balance) => ({
+        id: balance.id, clientId: balance.client_id, matterId: balance.matter_id,
+        balancePence: balance.balance_pence,
+      })),
       items: items.map((item) => ({
         id: item.id, kind: item.kind, sourceKey: item.source_key,
         bankAccountId: item.bank_account_id, occurredOn: item.occurred_on,

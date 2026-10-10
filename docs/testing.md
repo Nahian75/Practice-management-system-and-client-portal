@@ -1,9 +1,9 @@
 # Testing
 
-**Current state (2026-10-09):** Unit, HTTP and database integration tests for
+**Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-Finance steps 14a to 14f, plus Playwright end-to-end tests for the staff app,
-Tasks, Notifications and the client portal.
+the security-reviewed Finance steps 14a to 14f, plus Playwright end-to-end
+tests for the staff app, Tasks, Notifications and the client portal.
 
 ## Tools
 
@@ -202,7 +202,7 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
 - Finance-ledger tests cover authenticated encryption and context binding,
   safe bank-register responses, live Accounts permission checks, permanent
   closures, exact receipts, same-client allocation corrections, signed
-  balances and stable 100-row paging. Database tests prove balanced
+  balances, per-entry running balances and stable 100-row paging. Database tests prove balanced
   double-entry shapes, automatic bill/credit postings, client nonnegative
   balances, direct-write denial and owner immutability; a controlled race
   proves concurrent allocations cannot overspend one client balance.
@@ -210,14 +210,16 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   Accounts permissions, four-eyes approval, requester cancellation, terminal
   bank outcomes and transactional success/denial audit. Database tests cover
   current evidence, reservations, balanced withdrawals and billed-cost
-  transfers, bank closure and later credits; controlled races prove concurrent
-  approvals cannot reserve the same client balance.
+  transfers, bank closure, later credits and paid dates not preceding approval;
+  controlled races prove concurrent approvals cannot reserve the same client
+  balance and role revocation cannot pass an in-progress approval.
 - Reconciliation tests parse CSV as inert UTF-8 data and cover exact headers,
   quotes, formula/control rejection, impossible dates, size/row/money bounds,
   hashes, duplicate files/rows and opening-to-closing arithmetic. HTTP and
   database tests cover Accounts/Compliance separation, exact match facts,
   reversal/rematch history, complete client-bank coverage, server-calculated
-  totals, required explanations, fixed snapshots, self-sign-off refusal,
+  totals, required explanations, fixed snapshots with per-matter client
+  liabilities, self-sign-off refusal,
   signed-only 35-day status, safe responses, private audit and rollback.
   Twenty-two deliberate application and migration breaks were caught and
   restored before the full suite.

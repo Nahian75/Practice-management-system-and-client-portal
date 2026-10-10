@@ -9,7 +9,7 @@ import { BankAccountCipher } from './bank-account-cipher.js';
 import type { BankAccount, BillDraft, BillDraftSummary, BillLineInput, CashBook, CreditNote, FinanceTransaction, IssuedBill, IssuedBillSummary, MatterLedger, MoneySide, RateAccount, StaffRate, SupplierSnapshot, TimeEntry } from './finance.js';
 import { FinanceRepository } from './finance.repository.js';
 import { financeCsv } from './finance-export.js';
-import { penceToPounds } from './money.js';
+import { penceToPounds, signedPenceToPounds } from './money.js';
 
 export const FINANCE_PAGE_SIZE = 100;
 
@@ -302,9 +302,10 @@ export class FinanceService {
     return {
       fileName: `matter-ledger-${matterId}.csv`,
       content: financeCsv([
-        ['Date', 'Side', 'Type', 'Direction', 'Amount GBP', 'Reference', 'Purpose', 'Posted at'],
+        ['Date', 'Side', 'Type', 'Direction', 'Amount GBP', 'Running balance GBP', 'Reference', 'Purpose', 'Posted at'],
         ...ledger.entries.map((entry) => [
           entry.occurredOn, entry.side, entry.kind, entry.direction, penceToPounds(entry.amountPence),
+          signedPenceToPounds(entry.runningBalancePence),
           entry.reference, entry.purpose, entry.postedAt.toISOString(),
         ]),
       ]),
@@ -321,9 +322,10 @@ export class FinanceService {
     return {
       fileName: `cash-book-${bankAccountId}.csv`,
       content: financeCsv([
-        ['Date', 'Type', 'Direction', 'Amount GBP', 'Matter id', 'Reference', 'Purpose', 'Posted at'],
+        ['Date', 'Type', 'Direction', 'Amount GBP', 'Running balance GBP', 'Matter id', 'Reference', 'Purpose', 'Posted at'],
         ...book.entries.map((entry) => [
-          entry.occurredOn, entry.kind, entry.direction, penceToPounds(entry.amountPence), entry.matterId,
+          entry.occurredOn, entry.kind, entry.direction, penceToPounds(entry.amountPence),
+          signedPenceToPounds(entry.runningBalancePence), entry.matterId,
           entry.reference, entry.purpose, entry.postedAt.toISOString(),
         ]),
       ]),
@@ -507,6 +509,29 @@ function addressLines(address: { addressLine1: string; addressLine2: string | nu
   return [address.addressLine1, address.addressLine2, address.town, address.postcode, address.country].filter((line): line is string => line !== null);
 }
 
+function vatLabel(treatment: BillLineInput['vatTreatment']): string {
+  switch (treatment) {
+    case 'standard': return '20%';
+    case 'reduced': return '5%';
+    case 'zero': return '0%';
+    case 'exempt': return 'Exempt';
+    case 'outside_scope': return 'Outside scope';
+  }
+}
+
+function vatBreakdown(lines: readonly { vatTreatment: BillLineInput['vatTreatment']; netPence: string; vatPence: string }[]): string[] {
+  const totals = new Map<BillLineInput['vatTreatment'], { net: bigint; vat: bigint }>();
+  for (const line of lines) {
+    const current = totals.get(line.vatTreatment) ?? { net: 0n, vat: 0n };
+    current.net += BigInt(line.netPence);
+    current.vat += BigInt(line.vatPence);
+    totals.set(line.vatTreatment, current);
+  }
+  return [...totals].map(([treatment, total]) =>
+    `${vatLabel(treatment)} | Net £${money(total.net.toString())} | VAT £${money(total.vat.toString())}`,
+  );
+}
+
 function billText(bill: IssuedBill): string {
   return [
     bill.reference, 'BILL', '', `Issue date: ${bill.issuedOn}`, `Tax point: ${bill.taxPoint}`, `Due date: ${bill.dueOn}`, '',
@@ -514,7 +539,8 @@ function billText(bill: IssuedBill): string {
     ...(bill.supplier.vatRegistrationNumber ? [`VAT registration: ${bill.supplier.vatRegistrationNumber}`] : []), '',
     `Client: ${bill.clientName}`, ...addressLines(bill.clientAddress),
     `Client reference: ${bill.clientReference}`, `Matter reference: ${bill.matterReference}`, '',
-    'Lines', ...bill.lines.map((line) => `${line.position}. ${line.description} | Net £${money(line.netPence)} | VAT ${line.vatTreatment} £${money(line.vatPence)} | Gross £${money(line.grossPence)}`), '',
+    'Lines', ...bill.lines.map((line) => `${line.position}. ${line.description} | Quantity/extent 1 | Unit price £${money(line.netPence)} | Net £${money(line.netPence)} | VAT ${vatLabel(line.vatTreatment)} £${money(line.vatPence)} | Gross £${money(line.grossPence)}`), '',
+    'VAT breakdown', ...vatBreakdown(bill.lines), '',
     `Net: £${money(bill.netPence)}`, `VAT: £${money(bill.vatPence)}`, `Total: £${money(bill.grossPence)}`, '',
   ].join('\n');
 }
@@ -527,7 +553,8 @@ function creditText(credit: CreditNote, bill: IssuedBill): string {
     ...(bill.supplier.vatRegistrationNumber ? [`VAT registration: ${bill.supplier.vatRegistrationNumber}`] : []), '',
     `Client: ${bill.clientName}`, ...addressLines(bill.clientAddress),
     `Client reference: ${bill.clientReference}`, `Matter reference: ${bill.matterReference}`, '',
-    'Lines', ...credit.lines.map((line) => `${line.position}. ${line.description} | Net £${money(line.netPence)} | VAT £${money(line.vatPence)} | Gross £${money(line.grossPence)}`), '',
+    'Lines', ...credit.lines.map((line) => `${line.position}. ${line.description} | Quantity/extent 1 | Unit credit £${money(line.netPence)} | Net £${money(line.netPence)} | VAT ${vatLabel(line.vatTreatment)} £${money(line.vatPence)} | Gross £${money(line.grossPence)}`), '',
+    'VAT breakdown', ...vatBreakdown(credit.lines), '',
     `Net credit: £${money(credit.netPence)}`, `VAT credit: £${money(credit.vatPence)}`, `Total credit: £${money(credit.grossPence)}`, '',
   ].join('\n');
 }

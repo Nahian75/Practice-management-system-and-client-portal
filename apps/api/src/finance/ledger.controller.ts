@@ -46,7 +46,7 @@ const entrySchema = z.object({
   direction: z.enum(['debit', 'credit']), amount: z.string(), matterId: z.uuid(), relatedMatterId: z.uuid().nullable(),
   bankAccountId: z.uuid().nullable(), reference: z.string().nullable(), purpose: z.string(),
   relatedBankAccountId: z.uuid().nullable(),
-  occurredOn: calendarDate, postedAt: z.iso.datetime(),
+  runningBalance: z.string(), occurredOn: calendarDate, postedAt: z.iso.datetime(),
 });
 const banksSchema = z.object({ bankAccounts: z.array(bankSchema) });
 const ledgerSchema = z.object({
@@ -81,6 +81,7 @@ function responseTransaction(transaction: FinanceTransaction) {
 function responseEntry(entry: LedgerEntry) {
   return {
     ...entry, amount: penceToPounds(entry.amountPence), amountPence: undefined,
+    runningBalance: signedPenceToPounds(entry.runningBalancePence), runningBalancePence: undefined,
     postedAt: entry.postedAt.toISOString(),
   };
 }

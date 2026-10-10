@@ -46,6 +46,7 @@ interface LedgerRow {
   purpose: string;
   occurred_on: string;
   posted_at: Date;
+  running_balance: string;
 }
 
 type CorrectionRow = Selectable<TimeEntryCorrectionsTable> & { corrected_by_name: string };
@@ -166,7 +167,9 @@ export class FinanceRepository {
     if (!row) return undefined;
     const lines = await executor.selectFrom('credit_note_lines')
       .innerJoin('issued_bill_lines', 'issued_bill_lines.id', 'credit_note_lines.bill_line_id')
-      .selectAll('credit_note_lines').select('issued_bill_lines.description')
+      .selectAll('credit_note_lines').select([
+        'issued_bill_lines.description', 'issued_bill_lines.vat_treatment',
+      ])
       .where('credit_note_id', '=', id).orderBy('credit_note_lines.position').execute();
     return {
       id: row.id, reference: row.reference, billId: row.bill_id, billReference: row.bill_reference,
@@ -175,6 +178,7 @@ export class FinanceRepository {
       issuedOn: row.issued_on,
       lines: lines.map((line) => ({
         id: line.id, position: line.position, billLineId: line.bill_line_id, description: line.description,
+        vatTreatment: line.vat_treatment,
         netPence: line.net_pence, vatPence: line.vat_pence, grossPence: line.gross_pence,
       })),
     };
@@ -285,7 +289,7 @@ export class FinanceRepository {
           case direction when 'debit' then amount_pence else -amount_pence end else 0 end), 0) as business_balance
       from finance_postings where matter_id = ${matterId}
     `.execute(this.db)).rows[0]!;
-    const rows = await this.ledgerRows()
+    const rows = await this.ledgerRows('matter')
       .where('finance_postings.matter_id', '=', matterId)
       .where('finance_postings.account', 'in', ['client_ledger', 'business_ledger'])
       .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
@@ -304,7 +308,7 @@ export class FinanceRepository {
       select coalesce(sum(case direction when 'debit' then amount_pence else -amount_pence end), 0) as balance
       from finance_postings where bank_account_id = ${bankAccountId}
     `.execute(this.db)).rows[0]!.balance;
-    const rows = await this.ledgerRows()
+    const rows = await this.ledgerRows('bank')
       .where('finance_postings.bank_account_id', '=', bankAccountId)
       .$if(page.before !== undefined, (query) => query.where('finance_postings.id', '<', page.before as string))
       .orderBy('finance_postings.id', 'desc')
@@ -465,7 +469,25 @@ export class FinanceRepository {
       ]);
   }
 
-  private ledgerRows() {
+  private ledgerRows(scope: 'matter' | 'bank') {
+    const runningBalance = scope === 'bank'
+      ? sql<string>`(
+          select coalesce(sum(case p2.direction when 'debit' then p2.amount_pence else -p2.amount_pence end), 0)
+          from app.finance_postings p2
+          where p2.bank_account_id = finance_postings.bank_account_id
+            and p2.id <= finance_postings.id
+        )`
+      : sql<string>`(
+          select coalesce(sum(case
+            when p2.account = 'client_ledger' then
+              case p2.direction when 'credit' then p2.amount_pence else -p2.amount_pence end
+            else case p2.direction when 'debit' then p2.amount_pence else -p2.amount_pence end
+          end), 0)
+          from app.finance_postings p2
+          where p2.matter_id = finance_postings.matter_id
+            and p2.account = finance_postings.account
+            and p2.id <= finance_postings.id
+        )`;
     return this.db.selectFrom('finance_postings')
       .innerJoin('finance_transactions', 'finance_transactions.id', 'finance_postings.transaction_id')
       .select([
@@ -475,7 +497,7 @@ export class FinanceRepository {
         'finance_transactions.matter_id as transaction_matter_id', 'finance_transactions.related_matter_id',
         'finance_transactions.related_bank_account_id',
         'finance_transactions.reference', 'finance_transactions.purpose', 'finance_transactions.occurred_on',
-        'finance_transactions.posted_at',
+        'finance_transactions.posted_at', runningBalance.as('running_balance'),
       ]);
   }
 
@@ -606,6 +628,7 @@ function toLedgerEntry(row: LedgerRow): LedgerEntry {
     id: row.id, transactionId: row.transaction_id, kind: row.kind,
     side: row.account.startsWith('client_') ? 'client' : 'business',
     direction: row.direction, amountPence: row.amount_pence, matterId: row.matter_id,
+    runningBalancePence: row.running_balance,
     relatedMatterId, bankAccountId: row.bank_account_id, relatedBankAccountId: row.related_bank_account_id,
     reference: row.reference, purpose: row.purpose, occurredOn: row.occurred_on, postedAt: row.posted_at,
   };

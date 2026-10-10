@@ -137,6 +137,12 @@ export class ReconciliationService {
         ['Prepared at', reconciliation.preparedAt.toISOString()],
         ['Signed off at', reconciliation.signOff?.signedOffAt.toISOString() ?? 'Not signed off'],
         [],
+        ['Client liability balances'],
+        ['Client id', 'Matter id', 'Balance GBP'],
+        ...reconciliation.clientBalances.map((balance) => [
+          balance.clientId, balance.matterId, signedPenceToPounds(balance.balancePence),
+        ]),
+        [],
         ['Item type', 'Date', 'Amount GBP', 'Reference', 'Explanation'],
         ...reconciliation.items.map((item) => [
           item.kind, item.occurredOn, signedPenceToPounds(item.amountPence), item.reference, item.explanation,

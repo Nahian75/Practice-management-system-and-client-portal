@@ -167,17 +167,18 @@ describe('Finance ledger API', () => {
     expect(source.status).toBe(200);
     expect(source.body).toMatchObject({ clientBalance: '60.02', businessBalance: '0.00' });
     expect(source.body.entries).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'client_receipt', amount: '100.03' }),
-      expect.objectContaining({ kind: 'client_allocation', direction: 'debit', amount: '40.01' }),
+      expect.objectContaining({ kind: 'client_receipt', amount: '100.03', runningBalance: '100.03' }),
+      expect.objectContaining({ kind: 'client_allocation', direction: 'debit', amount: '40.01', runningBalance: '60.02' }),
     ]));
     const target = await as(accountsToken).get(`/finance/matters/${otherMatterId}/ledger`);
     expect(target.body.clientBalance).toBe('40.01');
     expect(target.body.entries).toContainEqual(expect.objectContaining({
-      kind: 'client_allocation', matterId: otherMatterId, relatedMatterId: matterId,
+      kind: 'client_allocation', matterId: otherMatterId, relatedMatterId: matterId, runningBalance: '40.01',
     }));
     const cash = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book`);
     expect(cash.body).toMatchObject({ balance: '100.03', bankAccount: { id: bank.body.id, lastFour: bank.body.lastFour } });
     expect(cash.body.entries).toHaveLength(1);
+    expect(cash.body.entries[0]).toMatchObject({ amount: '100.03', runningBalance: '100.03' });
     const partnerSession = await signedIn(partner);
     expect((await as(partnerSession).get(`/finance/matters/${matterId}/ledger`)).status).toBe(403);
     expect((await as(partnerSession).get(`/finance/matters/${matterId}/ledger/export`)).status).toBe(403);
@@ -190,10 +191,12 @@ describe('Finance ledger API', () => {
     });
     expect(ledgerExport.headers['content-disposition']).toMatch(/^attachment; filename="matter-ledger-[a-f0-9-]+\.csv"$/);
     expect(ledgerExport.text).toContain('"Amount GBP"');
+    expect(ledgerExport.text).toContain('"Running balance GBP"');
     expect(ledgerExport.text).toContain('"100.03"');
     const cashExport = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book/export`);
     expect(cashExport.status).toBe(200);
     expect(cashExport.text).toContain('"Matter id"');
+    expect(cashExport.text).toContain('"Running balance GBP"');
     expect(await db.selectFrom('audit_events').select('id').where('action', '=', 'finance.matter_ledger_exported').where('resource_id', '=', matterId).executeTakeFirst()).toBeDefined();
     expect(await db.selectFrom('audit_events').select('id').where('action', '=', 'finance.cash_book_exported').where('resource_id', '=', bank.body.id).executeTakeFirst()).toBeDefined();
   });
@@ -255,9 +258,14 @@ describe('Finance ledger API', () => {
     expect(firstLedger.body.next).toEqual(expect.any(String));
     const secondLedger = await as(accountsToken).get(`/finance/matters/${matterId}/ledger?before=${firstLedger.body.next}`);
     expect(secondLedger.body.entries).toHaveLength(1);
+    expect(firstLedger.body.entries[0].runningBalance).toBe('1.01');
+    expect(secondLedger.body.entries[0].runningBalance).toBe('0.01');
     const firstCash = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book`);
     expect(firstCash.body.entries).toHaveLength(100);
-    expect((await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book?before=${firstCash.body.next}`)).body.entries).toHaveLength(1);
+    expect(firstCash.body.entries[0].runningBalance).toBe('1.01');
+    const secondCash = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book?before=${firstCash.body.next}`);
+    expect(secondCash.body.entries).toHaveLength(1);
+    expect(secondCash.body.entries[0].runningBalance).toBe('0.01');
     const exported = await as(accountsToken).get(`/finance/bank-accounts/${bank.body.id}/cash-book/export`);
     expect(exported.status).toBe(200);
     expect(exported.text.match(/PAGE-/g)).toHaveLength(101);

@@ -127,6 +127,7 @@ describe('bank statement and reconciliation API', () => {
     expect(prepared.body).toMatchObject({
       bankBalance: '100.00', cashbookBalance: '100.00', clientLedgerBalance: '100.00',
       bankCashbookDifference: '0.00', cashbookClientDifference: '0.00', items: [], signOff: null,
+      clientBalances: [{ clientId: expect.any(String), matterId, balance: '100.00' }],
     });
     expect((await api(accountsToken).get(`/finance/reconciliations/${prepared.body.id}/export`)).status).toBe(200);
     expect((await api(accountsToken).post(`/finance/reconciliations/${prepared.body.id}/sign-off`, {})).status).toBe(403);
@@ -138,6 +139,8 @@ describe('bank statement and reconciliation API', () => {
     expect(exported.headers['content-type']).toBe('text/csv; charset=utf-8');
     expect(exported.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
     expect(exported.text).toContain('"Client account reconciliation"');
+    expect(exported.text).toContain('"Client liability balances"');
+    expect(exported.text).toContain(`"${matterId}"`);
     expect(exported.text).toContain('"100.00"');
     const actions = await db.selectFrom('audit_events').select('action').where('resource_id', 'in', [imported.body.id, matched.body.id, prepared.body.id]).execute();
     expect(actions.map((item) => item.action)).toEqual(expect.arrayContaining([

@@ -46,10 +46,10 @@ describe('client payment database rules', () => {
     });
   }
 
-  async function createBank(kind: 'client' | 'business' = 'client') {
+  async function createBank(kind: 'client' | 'business' = 'client', openedOn = today) {
     return (await sql<{ id: string }>`select app.create_bank_account(
       ${kind}, ${`${kind} ${unique()}`}, '5678', ${randomUUID()}::uuid, ${randomBytes(32)},
-      1::smallint, ${randomBytes(12)}, ${randomBytes(20)}, ${randomBytes(16)}, ${today}::date, ${requester.id}
+      1::smallint, ${randomBytes(12)}, ${randomBytes(20)}, ${randomBytes(16)}, ${openedOn}::date, ${requester.id}
     ) as id`.execute(db)).rows[0]!.id;
   }
 
@@ -186,6 +186,29 @@ describe('client payment database rules', () => {
     });
   });
 
+  it('orders an Accounts role revocation after an already-started approval', async () => {
+    await receipt();
+    const id = await requestPayment();
+    let approvalChecked!: () => void;
+    let finishApproval!: () => void;
+    const checked = new Promise<void>((resolve) => (approvalChecked = resolve));
+    const finish = new Promise<void>((resolve) => (finishApproval = resolve));
+    const approval = db.transaction().execute(async (trx) => {
+      await event(id, 'approved', approver.id, {}, trx);
+      approvalChecked();
+      await finish;
+    });
+    await checked;
+    const revocation = revokeTestRole(db, approver.id, 'accounts');
+    const early = await Promise.race([
+      revocation.then(() => 'finished'),
+      new Promise<'waiting'>((resolve) => setTimeout(() => resolve('waiting'), 50)),
+    ]);
+    finishApproval();
+    await Promise.all([approval, revocation]);
+    expect(early).toBe('waiting');
+  });
+
   it('keeps approved reservations unavailable to a later client allocation', async () => {
     await receipt('5000');
     const id = await requestPayment(requester.id, '4000');
@@ -211,6 +234,19 @@ describe('client payment database rules', () => {
     await event(rejected, 'approved', approver.id);
     await event(rejected, 'bank_rejected', requester.id, { reason: 'Bank refused it' });
     expect(await db.selectFrom('finance_transactions').select('id').where('source_payment_request_id', '=', rejected).executeTakeFirst()).toBeUndefined();
+  });
+
+  it('refuses a bank payment dated before its four-eyes approval', async () => {
+    const yesterday = (await sql<{ day: string }>`select (${today}::date - 1)::text as day`.execute(db)).rows[0]!.day;
+    clientBankId = await createBank('client', yesterday);
+    await receipt();
+    const id = await requestPayment();
+    await event(id, 'approved', approver.id);
+    await expect(event(id, 'paid', requester.id, {
+      reference: unique(), date: yesterday,
+    })).rejects.toThrow(/before approval/i);
+    expect(await db.selectFrom('finance_transactions').select('id')
+      .where('source_payment_request_id', '=', id).executeTakeFirst()).toBeUndefined();
   });
 
   it('requires an issued bill for a balanced costs transfer and protects paid costs from later credit', async () => {

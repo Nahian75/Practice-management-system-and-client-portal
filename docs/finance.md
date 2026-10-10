@@ -1,13 +1,16 @@
 # Finance
 
-**Current state (2026-10-09):** First-version design approved by the project
-owner. Steps 14a to 14f are built: exact GBP money strings, immutable staff
+**Current state (2026-10-10):** First-version design approved by the project
+owner. Steps 14a to 14f and the dedicated security review are complete: exact GBP money strings, immutable staff
 rates and time entries, permanent corrections, billing, an encrypted bank
 register, balanced client/business postings, receipts, allocation corrections,
 derived ledgers, encrypted client-payment requests, reservations, four-eyes
 approval, recorded bank outcomes, safe statement imports, immutable matching,
 five-week client reconciliation, Compliance sign-off, permissions, audit,
 staff APIs, role-sensitive staff screens and audited formula-safe exports.
+Review migration `0047` orders role loss against finance actions, refuses a
+payment date before approval and freezes each reconciliation's client balance
+list; ledgers expose running balances and VAT documents show numeric rates.
 
 How Stass records time, bills and money on matters while keeping client money
 separate, answerable and difficult to misuse. Stass is the legal practice
@@ -468,7 +471,9 @@ of each safeguard and updated documentation before the next step.
 - **14f. Done.** Staff matter-finance, Accounts and Compliance screens,
   audited formula-safe exports, narrow-screen behaviour and accessibility
   tests.
-- Security review of Finance against the then-current SRA and HMRC rules.
+- **Security review done.** The then-current SRA and HMRC rules were rechecked;
+  four findings were fixed in migration `0047` and the Finance application.
+  See [the review](reviews/2026-10-10-finance.md).
 
 ## Approval
 
@@ -633,4 +638,22 @@ the six-step build order above.
   tests. API and web type-checks, the API production build, hidden-character
   scan and `git diff --check` passed. The production web build and complete
   Playwright suite passed all 77 tests using the configured four workers.
-- Finance's dedicated security review remains the next project step.
+- The dedicated Finance security review is recorded in
+  [the 10 October review](reviews/2026-10-10-finance.md).
+
+## Finance security-review verification
+
+- Controlled database races prove Accounts and Compliance role loss waits for
+  an action that already locked that live authority; a later action is refused.
+- Payment migration tests refuse a paid date before approval and prove the
+  attempted transaction leaves neither postings nor a terminal event.
+- Ledger/API tests cover signed running balances across pagination and exports.
+  Reconciliation tests cover immutable per-matter liability snapshots whose
+  rows total the signed aggregate.
+- Billing HTTP tests check numeric VAT rates, unit/extent detail and treatment
+  breakdowns in both fixed bill and credit-note downloads.
+- The SRA and HMRC sources linked in the review were checked on 10 October
+  2026. The offline production advisory scan reported no cached vulnerability.
+- A clean test database passed the complete API suite: 76 files and 1,635
+  tests. API and web type-checks and production builds passed. The complete
+  Playwright suite passed all 77 tests using the configured four workers.

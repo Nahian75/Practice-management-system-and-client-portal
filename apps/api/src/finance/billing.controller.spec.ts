@@ -155,6 +155,9 @@ describe('Billing API', () => {
     expect(downloaded.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
     expect(downloaded.text).toContain(`${issued.body.reference}\n`);
     expect(downloaded.text).toContain('Professional fees');
+    expect(downloaded.text).toContain('Quantity/extent 1 | Unit price £100.03');
+    expect(downloaded.text).toContain('VAT 20% £20.01');
+    expect(downloaded.text).toContain('VAT breakdown\n20% | Net £100.03 | VAT £20.01');
     expect((await as(await signedIn(outsider)).get(`/bills/${issued.body.id}/content`)).status).toBe(404);
     expect(await db.selectFrom('audit_events').select('id').where('action', '=', 'bill.downloaded').where('resource_id', '=', issued.body.id).executeTakeFirst()).toBeDefined();
   });
@@ -166,13 +169,19 @@ describe('Billing API', () => {
       reason: 'The agreed fee was reduced', lines: [{ billLineId: bill.body.lines[0].id, net: '10.00' }],
     });
     expect(credit.status).toBe(201);
-    expect(credit.body).toMatchObject({ reference: expect.stringMatching(/^CRN-/), billId: bill.body.id, net: '10.00', vat: '2.00', gross: '12.00' });
+    expect(credit.body).toMatchObject({
+      reference: expect.stringMatching(/^CRN-/), billId: bill.body.id,
+      net: '10.00', vat: '2.00', gross: '12.00', lines: [{ vatTreatment: 'standard' }],
+    });
     expect((await as(partnerToken).get(`/credit-notes/${credit.body.id}`)).status).toBe(200);
     const content = await as(partnerToken).get(`/credit-notes/${credit.body.id}/content`);
     expect(content.status).toBe(200);
     expect(content.text).toContain(`Original bill: ${bill.body.reference}`);
     expect(content.text).toContain(`Issue date: ${today}`);
     expect(content.text).toContain('Supplier: Stass Legal LLP');
+    expect(content.text).toContain('Quantity/extent 1 | Unit credit £10.00');
+    expect(content.text).toContain('VAT 20% £2.00');
+    expect(content.text).toContain('VAT breakdown\n20% | Net £10.00 | VAT £2.00');
     expect((await as(accountsToken).post(`/bills/${bill.body.id}/deliveries`, { method: 'email', note: 'Sent from the firm mailbox' })).status).toBe(201);
     expect((await as(accountsToken).post(`/credit-notes/${credit.body.id}/deliveries`, { method: 'post', note: null })).status).toBe(201);
     expect((await as(partnerToken).post(`/bills/${bill.body.id}/deliveries`, { method: 'email', note: null })).status).toBe(403);

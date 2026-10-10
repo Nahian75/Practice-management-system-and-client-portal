@@ -52,7 +52,7 @@ export interface BankAccount {
 }
 export interface LedgerEntry {
   id: string; transactionId: string; kind: string; side: 'client' | 'business';
-  direction: 'debit' | 'credit'; amount: string; matterId: string; relatedMatterId: string | null;
+  direction: 'debit' | 'credit'; amount: string; runningBalance: string; matterId: string; relatedMatterId: string | null;
   bankAccountId: string | null; relatedBankAccountId: string | null; reference: string | null;
   purpose: string; occurredOn: string; postedAt: string;
 }
@@ -92,7 +92,9 @@ export interface ReconciliationItem {
 export interface Reconciliation {
   id: string; asOf: string; bankBalance: string; cashbookBalance: string; clientLedgerBalance: string;
   bankCashbookDifference: string; cashbookClientDifference: string; preparedBy: string; preparedAt: string;
-  statementImportIds: string[]; items: ReconciliationItem[];
+  statementImportIds: string[];
+  clientBalances: { id: string; clientId: string; matterId: string; balance: string }[];
+  items: ReconciliationItem[];
   signOff: { signedOffBy: string; signedOffAt: string } | null;
 }
 export interface ReconciliationStatus {

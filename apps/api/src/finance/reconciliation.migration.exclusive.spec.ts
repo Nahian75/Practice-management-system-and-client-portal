@@ -110,6 +110,37 @@ describe('bank statement and reconciliation database rules', () => {
     await expect(importStatement()).rejects.toThrow(/active accounts/i);
   });
 
+  it('holds the Compliance role used by an in-progress finance check', async () => {
+    const transactionId = await receipt();
+    const statementId = await importStatement();
+    const statementRow = await db.selectFrom('bank_statement_rows').select('id')
+      .where('statement_import_id', '=', statementId).executeTakeFirstOrThrow();
+    await sql`select app.match_bank_statement_row(${statementRow.id}, ${transactionId}, ${accounts.id})`.execute(db);
+    const reconciliationId = (await sql<{ id: string }>`select app.prepare_client_account_reconciliation(
+      ${today}::date, ${[statementId]}::uuid[], '{}'::jsonb, ${accounts.id}
+    ) as id`.execute(db)).rows[0]!.id;
+    let roleChecked!: () => void;
+    let finishCheck!: () => void;
+    const checked = new Promise<void>((resolve) => (roleChecked = resolve));
+    const finish = new Promise<void>((resolve) => (finishCheck = resolve));
+    const check = db.transaction().execute(async (trx) => {
+      await sql`select app.sign_off_client_account_reconciliation(
+        ${reconciliationId}, ${compliance.id}
+      )`.execute(trx);
+      roleChecked();
+      await finish;
+    });
+    await checked;
+    const revocation = revokeTestRole(db, compliance.id, 'compliance');
+    const early = await Promise.race([
+      revocation.then(() => 'finished'),
+      new Promise<'waiting'>((resolve) => setTimeout(() => resolve('waiting'), 50)),
+    ]);
+    finishCheck();
+    await Promise.all([check, revocation]);
+    expect(early).toBe('waiting');
+  });
+
   it('matches only exact posted bank facts, reverses by event, and permits a corrected rematch', async () => {
     const transactionId = await receipt();
     const statementId = await importStatement();
@@ -142,6 +173,10 @@ describe('bank statement and reconciliation database rules', () => {
     ) as id`.execute(db)).rows[0]!.id;
     const snapshot = await db.selectFrom('client_account_reconciliations').selectAll().where('id', '=', reconciliationId).executeTakeFirstOrThrow();
     expect(snapshot).toMatchObject({ bank_balance_pence: '10000', cashbook_balance_pence: '10000', client_ledger_balance_pence: '10000' });
+    const snapshotBalance = await db.selectFrom('client_account_reconciliation_balances')
+      .select(['client_id', 'matter_id', 'balance_pence'])
+      .where('reconciliation_id', '=', reconciliationId).executeTakeFirstOrThrow();
+    expect(snapshotBalance).toEqual({ client_id: expect.any(String), matter_id: matterId, balance_pence: '10000' });
     expect(await db.selectFrom('client_account_reconciliation_items').selectAll().where('reconciliation_id', '=', reconciliationId).execute()).toEqual([]);
     await expect(sql`select app.sign_off_client_account_reconciliation(${reconciliationId}, ${accounts.id})`.execute(db)).rejects.toThrow(/active compliance/i);
     await grantTestRole(db, accounts.id, 'compliance');
@@ -149,6 +184,10 @@ describe('bank statement and reconciliation database rules', () => {
     await sql`select app.sign_off_client_account_reconciliation(${reconciliationId}, ${compliance.id})`.execute(db);
     await expect(sql`select app.sign_off_client_account_reconciliation(${reconciliationId}, ${compliance.id})`.execute(db)).rejects.toThrow(/duplicate|unique/i);
     await expect(sql`update client_account_reconciliations set bank_balance_pence = 0 where id = ${reconciliationId}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+    await expect(sql`update client_account_reconciliation_balances set balance_pence = 1 where reconciliation_id = ${reconciliationId}`.execute(ownerDb)).rejects.toThrow(/cannot be altered/i);
+    await expect(sql`insert into client_account_reconciliation_balances (
+      reconciliation_id, client_id, matter_id, balance_pence
+    ) values (${reconciliationId}, ${snapshotBalance.client_id}, ${matterId}, 1)`.execute(db)).rejects.toThrow(/permission denied/i);
   });
 
   it('requires explanations for every unmatched item and each non-zero difference', async () => {

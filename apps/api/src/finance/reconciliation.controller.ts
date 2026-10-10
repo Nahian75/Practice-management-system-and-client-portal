@@ -45,7 +45,11 @@ const reconciliationSchema = z.object({
   id: z.uuid(), asOf: date, bankBalance: z.string(), cashbookBalance: z.string(),
   clientLedgerBalance: z.string(), bankCashbookDifference: z.string(),
   cashbookClientDifference: z.string(), preparedBy: z.uuid(), preparedAt: z.iso.datetime(),
-  statementImportIds: z.array(z.uuid()), items: z.array(reconciliationItemSchema),
+  statementImportIds: z.array(z.uuid()),
+  clientBalances: z.array(z.object({
+    id: z.uuid(), clientId: z.uuid(), matterId: z.uuid(), balance: z.string(),
+  })),
+  items: z.array(reconciliationItemSchema),
   signOff: z.object({ signedOffBy: z.uuid(), signedOffAt: z.iso.datetime() }).nullable(),
 });
 const reconciliationListSchema = z.object({ reconciliations: z.array(reconciliationSchema), next: z.uuid().nullable() });
@@ -102,6 +106,9 @@ function responseReconciliation(item: ClientAccountReconciliation) {
     cashbookClientDifferencePence: undefined, preparedAt: item.preparedAt.toISOString(),
     items: item.items.map((entry) => ({
       ...entry, amount: signedPenceToPounds(entry.amountPence), amountPence: undefined,
+    })),
+    clientBalances: item.clientBalances.map((balance) => ({
+      ...balance, balance: signedPenceToPounds(balance.balancePence), balancePence: undefined,
     })),
     signOff: item.signOff && { ...item.signOff, signedOffAt: item.signOff.signedOffAt.toISOString() },
   };
