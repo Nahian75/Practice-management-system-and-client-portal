@@ -8,7 +8,7 @@ import type {
 } from '../database/schema.js';
 import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
 import type {
-  AssessmentWork, CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, Clearance, Gate, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
 
@@ -559,6 +559,49 @@ export class ComplianceRepository {
         recordedBy: { accountId: c.recorded_by, displayName: c.display_name }, recordedAt: c.recorded_at,
       })),
     };
+  }
+
+  async decideClearance(input: {
+    id: string; assessmentId: string; decision: 'approved' | 'refused'; sealed: SealedComplianceData; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.decide_aml_clearance(
+      ${input.id}::uuid, ${input.assessmentId}::uuid, ${input.decision},
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async approveSenior(clearanceId: string, actorId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select app.approve_aml_senior(${clearanceId}::uuid, ${actorId}::uuid)`.execute(trx);
+  }
+
+  async findClearance(matterId: string, assessmentId: string, executor: Kysely<Database> = this.db): Promise<Clearance | undefined> {
+    const row = await executor.selectFrom('aml_clearances as c')
+      .innerJoin('accounts as d', 'd.id', 'c.decided_by')
+      .leftJoin('aml_senior_approvals as s', 's.clearance_id', 'c.id')
+      .leftJoin('accounts as p', 'p.id', 's.approved_by')
+      .selectAll('c')
+      .select(['d.display_name as decided_by_name', 's.approved_at', 'p.id as senior_id', 'p.display_name as senior_name'])
+      .where('c.assessment_id', '=', assessmentId).where('c.matter_id', '=', matterId)
+      .executeTakeFirst();
+    if (!row) return undefined;
+    return {
+      id: row.id, matterId: row.matter_id, assessmentId: row.assessment_id, decision: row.decision, needsSenior: row.needs_senior,
+      reliedMeasureResults: row.relied_measure_results, reliedConclusions: row.relied_conclusions,
+      reasoning: this.open<{ text: string }>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag).text,
+      decidedBy: { accountId: row.decided_by, displayName: row.decided_by_name }, decidedAt: row.decided_at,
+      seniorApproval: row.approved_at && row.senior_id && row.senior_name
+        ? { approvedBy: { accountId: row.senior_id, displayName: row.senior_name }, approvedAt: row.approved_at }
+        : null,
+    };
+  }
+
+  async gate(matterId: string, executor: Kysely<Database> = this.db): Promise<Gate> {
+    const row = (await sql<{ state: Gate['state']; due_since: string | null; work_allowed_until: string | null; clearance_id: string | null }>`
+      select state, due_since::text, work_allowed_until::text, clearance_id from app.aml_gate(${matterId}::uuid)
+    `.execute(executor)).rows[0]!;
+    return { state: row.state, dueSince: row.due_since, workAllowedUntil: row.work_allowed_until, clearanceId: row.clearance_id };
   }
 
   private open<T>(context: string, keyVersion: number, nonce: Buffer, ciphertext: Buffer, authTag: Buffer): T {

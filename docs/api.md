@@ -38,6 +38,10 @@ adds high-risk-country lists and matter risk assessments.
 | POST | `/matters/:matterId/aml-risk/:assessmentId/measures/:measureId/results` | `aml.assess`; same | Append `satisfied`/`not_satisfied` with encrypted reasoning and evidence from the relied-on CDD case |
 | POST | `/matters/:matterId/aml-risk/:assessmentId/sources` | `aml.assess`; same | Append a source-of-funds/wealth conclusion: person, pence range, outcome, evidence, encrypted reasoning |
 | GET | `/matters/:matterId/aml-risk/:assessmentId/work` | `aml.view_evidence`; same record rule | Measures with their results, and source conclusions |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/clearance` | `aml.approve` (Compliance) | `{decision,reasoning}`: one decision per assessment, never by its preparer; 409 when the work is incomplete or out of date |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/clearance/senior-approval` | `aml.firm_approve` (Partner) | Senior-management approval for a high-risk or PEP clearance, by a partner other than the preparer and approver |
+| GET | `/matters/:matterId/aml-risk/:assessmentId/clearance` | `aml.view_evidence`; matter record rule | `{clearance}` or `{clearance: null}` |
+| GET | `/matters/:matterId/aml-gate` | `aml.view_evidence`; matter record rule | `{state,dueSince,workAllowedUntil,clearanceId}` with state `pending`, `cleared` or `review_due` |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

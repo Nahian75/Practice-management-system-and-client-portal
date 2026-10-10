@@ -16,7 +16,7 @@ import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.j
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import type {
-  AssessmentWork, CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, Clearance, Gate, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
 
@@ -485,6 +485,62 @@ export class ComplianceService {
       await this.records.recordSourceConclusion({ ...facts, id, assessmentId,
         sealed: this.cipher.seal({ text: reasoning }, `aml-source:${id}`), actorId: by.accountId }, trx);
     });
+  }
+
+  async findClearance(matterId: string, assessmentId: string, actorId: string): Promise<Clearance | null | undefined> {
+    try {
+      await this.records.assertMatterAccess(matterId, actorId);
+      if (!await this.records.workBelongs(matterId, assessmentId, null)) return undefined;
+      return (await this.records.findClearance(matterId, assessmentId)) ?? null;
+    } catch (error) {
+      if (hiddenRecord(error)) return undefined;
+      throw error;
+    }
+  }
+
+  async decideClearance(matterId: string, assessmentId: string, input: { decision: 'approved' | 'refused'; reasoning: string },
+    by: ComplianceActor): Promise<Change<Clearance>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        await this.records.assertMatterAccess(matterId, by.accountId, trx);
+        if (!await this.records.workBelongs(matterId, assessmentId, null, trx)) return undefined;
+        const id = await this.records.newId(trx);
+        await this.records.decideClearance({ id, assessmentId, decision: input.decision,
+          sealed: this.cipher.seal({ text: input.reasoning }, `aml-clearance:${id}`), actorId: by.accountId }, trx);
+        const clearance = await this.records.findClearance(matterId, assessmentId, trx);
+        if (!clearance) return undefined;
+        await this.audit.record({ actor: by.actor,
+          action: input.decision === 'approved' ? 'aml.clearance_approved' : 'aml.clearance_refused', outcome: 'success',
+          resource: { type: 'aml_clearance', id }, metadata: { matterId, assessmentId }, ...by.context }, trx);
+        return clearance;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
+  }
+
+  /** Senior-management approval is firm-wide: a Partner approves without needing to be on the matter. */
+  async approveSenior(matterId: string, assessmentId: string, by: ComplianceActor): Promise<Change<Clearance>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const clearance = await this.records.findClearance(matterId, assessmentId, trx);
+        if (!clearance) return undefined;
+        await this.records.approveSenior(clearance.id, by.accountId, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.senior_approval_given', outcome: 'success',
+          resource: { type: 'aml_clearance', id: clearance.id }, metadata: { matterId, assessmentId }, ...by.context }, trx);
+        return this.records.findClearance(matterId, assessmentId, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
+  }
+
+  async gate(matterId: string, actorId: string): Promise<Gate | undefined> {
+    try {
+      await this.records.assertMatterAccess(matterId, actorId);
+      return await this.records.gate(matterId);
+    } catch (error) {
+      if (hiddenRecord(error)) return undefined;
+      throw error;
+    }
   }
 
   /**

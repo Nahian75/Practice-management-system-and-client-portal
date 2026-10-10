@@ -103,3 +103,11 @@ export interface SourceConclusion {
 }
 /** The measures and source conclusions recorded against one assessment version. */
 export interface AssessmentWork { assessmentId: string; measures: Measure[]; conclusions: SourceConclusion[] }
+
+export interface Clearance {
+  id: string; matterId: string; assessmentId: string; decision: 'approved' | 'refused'; needsSenior: boolean;
+  reliedMeasureResults: string[]; reliedConclusions: string[]; reasoning: string;
+  decidedBy: Person; decidedAt: Date; seniorApproval: { approvedBy: Person; approvedAt: Date } | null;
+}
+export type GateState = 'pending' | 'cleared' | 'review_due' | 'held';
+export interface Gate { state: GateState; dueSince: string | null; workAllowedUntil: string | null; clearanceId: string | null }

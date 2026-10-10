@@ -162,3 +162,60 @@ export async function recordTestSourceConclusion(db: Kysely<Database>, assessmen
 }
 
 export { staffWith as createAmlStaff };
+
+/**
+ * Makes sure current approved firm controls exist, and a current country list containing
+ * `countries`, publishing only what is missing. Parallel test files share one framework this
+ * way: publishing a newer control would make every cleared matter due for review.
+ */
+export async function ensureAmlFramework(db: Kysely<Database>, countries: string[] = [TEST_LISTED_COUNTRY]): Promise<void> {
+  await db.transaction().execute(async (trx) => {
+    await sql`select pg_advisory_xact_lock(hashtextextended('test.aml_framework', 0))`.execute(trx);
+    const { today } = await londonDates(trx);
+    const current = await trx.selectFrom('aml_control_versions as v')
+      .innerJoin('aml_control_approvals as p', 'p.control_version_id', 'v.id')
+      .select('v.kind').distinct()
+      .where('v.effective_from', '<=', today).where('v.review_due_on', '>=', today).execute();
+    const list = await trx.selectFrom('aml_country_list_versions as v')
+      .innerJoin('aml_country_list_approvals as p', 'p.country_list_version_id', 'v.id')
+      .select('v.countries').where('v.effective_from', '<=', today).orderBy('v.version', 'desc').limit(1).executeTakeFirst();
+    const missingControls = CONTROL_KINDS.some((kind) => !current.some((row) => row.kind === kind));
+    const listCovers = list !== undefined && countries.every((code) => list.countries.includes(code));
+    if (missingControls) await approveAmlFramework(trx, listCovers ? null : countries);
+    else if (!listCovers) await approveCountryList(trx, countries);
+  });
+}
+
+async function approveCountryList(db: Kysely<Database>, countries: string[]): Promise<void> {
+  const { today } = await londonDates(db);
+  const preparer = await staffWith(db, 'compliance');
+  const approver = await staffWith(db, 'partner');
+  const id = (await sql<{ id: string }>`select app.create_aml_country_list(
+    ${[...countries].sort()}::text[], 'Test list', ${today}::date, ${preparer.id}) as id`.execute(db)).rows[0]!.id;
+  await sql`select app.approve_aml_country_list(${id}, ${approver.id})`.execute(db);
+}
+
+export async function decideTestClearance(db: Kysely<Database>, assessmentId: string, actorId: string,
+  decision: 'approved' | 'refused' = 'approved') {
+  const id = randomUUID();
+  const seal = sealed({ text: 'Test clearance reasoning.' }, `aml-clearance:${id}`);
+  await sql`select app.decide_aml_clearance(${id}, ${assessmentId}, ${decision},
+    ${seal.context}, ${seal.keyVersion}::smallint, ${seal.nonce}, ${seal.ciphertext}, ${seal.authTag}, ${actorId})`.execute(db);
+  return id;
+}
+
+export async function approveTestSenior(db: Kysely<Database>, clearanceId: string, actorId: string): Promise<void> {
+  await sql`select app.approve_aml_senior(${clearanceId}, ${actorId})`.execute(db);
+}
+
+/**
+ * Clears a matter's compliance gate the way a firm would for low-risk, out-of-scope
+ * work: a team member assesses it and a separate Compliance holder clears it.
+ * `teamMemberId` must be on the matter team.
+ */
+export async function clearMatterForTests(db: Kysely<Database>, matterId: string, teamMemberId: string): Promise<void> {
+  await ensureAmlFramework(db);
+  const assessmentId = await submitTestAssessment(db, matterId, teamMemberId);
+  const compliance = await staffWith(db, 'compliance');
+  await decideTestClearance(db, assessmentId, compliance.id);
+}

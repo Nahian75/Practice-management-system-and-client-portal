@@ -2,7 +2,7 @@
 
 **Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f and Compliance steps 15a, 15b, 15c-1 and 15c-2, plus
+the security-reviewed Finance steps 14a to 14f and Compliance steps 15a, 15b and 15c-1 to 15c-3, plus
 Playwright end-to-end tests for the staff app, Tasks, Notifications and the
 client portal.
 
@@ -41,6 +41,15 @@ It recreates `pms_test` with the same setup as the init scripts
 (`infra/postgres/reset-test-database.sql`); the next test run applies every
 migration again. Tests must not rely on rows left by earlier runs or other
 files: a test that needs data creates it.
+
+## Compliance fixtures
+
+`test/aml.ts` builds AML records through the real protected database
+functions. Parallel test files call `ensureAmlFramework`, which publishes firm
+controls and a country list only when none are current: approving a newer
+version makes every cleared matter due for review, so parallel files must not
+supersede each other's framework. Tests that deliberately supersede one run as
+`*.exclusive.spec.ts`.
 
 ## Email tests
 

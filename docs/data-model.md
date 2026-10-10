@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-10):** The database foundation through Compliance
-step 15c-2 exists, with separate owner and application roles and forward-only
-migrations through `0051`.
+step 15c-3 exists, with separate owner and application roles and forward-only
+migrations through `0052`.
 
 ## Database
 
@@ -86,6 +86,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `aml_country_list_versions`, `aml_country_list_approvals` | `0050_compliance_risk.sql` | Compliance publishes sorted, distinct ISO code lists; a different active Partner approves each once. Inserts happen only inside the protected functions; owner update/delete/truncate are refused | [compliance.md](compliance.md#step-15c-1-api) |
 | `aml_risk_assessments`, `aml_risk_assessment_controls` | `0050_compliance_risk.sql` | One serialized, permanent version per submission. PostgreSQL derives the high-risk-country flag, relied-on CDD case, lowered-rating flag and governing controls, forces `high` for mandatory factors and rechecks matter-team access. Written answers are AES-GCM ciphertext bound to `aml-risk:<id>` | [compliance.md](compliance.md#step-15c-1-api) |
 | `aml_measures`, `aml_measure_results`, `aml_source_conclusions` | `0051_compliance_measures.sql` | Append-only work on the latest assessment of an open, visible matter. Evidence and people must belong to the relied-on CDD case. Reasoning is AES-GCM ciphertext bound to its record id. Inserts only through protected functions; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15c-2-api) |
+| `aml_clearances`, `aml_senior_approvals`, `aml_client_changes` | `0052_compliance_clearance.sql` | One decision per assessment by a non-preparing Compliance holder, fixing the relied-on result and conclusion ids; separate senior approval by another partner. Client identity edits are recorded by trigger. `app.aml_gate` derives the live state. Inserts only through protected functions or the trigger; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15c-3-api) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

@@ -5,7 +5,7 @@ import type { Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { TestAccount } from '../../test/accounts.js';
-import { approveAmlFramework, createAmlStaff, createTeamMatter, submitTestAssessment, submitTestCdd } from '../../test/aml.js';
+import { createAmlStaff, ensureAmlFramework, createTeamMatter, submitTestAssessment, submitTestCdd } from '../../test/aml.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -46,7 +46,7 @@ describe('CDD/EDD measures API', () => {
     app = await createTestApp(MeasuresTestModule);
     db = app.get(DATABASE);
     sessions = app.get(SessionsService);
-    await approveAmlFramework(db);
+    await ensureAmlFramework(db);
   });
   afterAll(async () => app.close());
   beforeEach(async () => {

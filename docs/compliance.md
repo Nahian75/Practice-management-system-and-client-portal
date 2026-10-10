@@ -6,7 +6,8 @@ appointments, fixed firm-control versions with separate Partner approval,
 training completions and independent-review records, plus versioned client CDD,
 encrypted identity facts and separately protected evidence. Step 15c-1 adds
 partner-approved high-risk-country lists and permanent matter risk assessments;
-step 15c-2 adds CDD/EDD measures and source-of-funds/wealth conclusions. The rest of step 15c and steps 15d to 15f remain planned.
+step 15c-2 adds CDD/EDD measures and source-of-funds/wealth conclusions; step
+15c-3 adds clearance, senior-management approval and the live gate state. The rest of step 15c and steps 15d to 15f remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -88,7 +89,7 @@ Step 15a and 15b permissions exist now; later-step permission names remain plann
 | `aml.officers.manage` - record and end nominated-officer/deputy appointments, without reading AML content | yes | | | | |
 | `aml.assess` - prepare CDD and risk work for a visible client/matter | | yes | yes | | yes |
 | `aml.view_evidence` - view necessary CDD evidence under the record rule | | yes | yes | | yes |
-| `aml.approve` - approve CDD, EDD, scope and ongoing reviews firm-wide | | | | | yes |
+| `aml.approve` - clear or refuse a matter assessment firm-wide (step 15c-3) | | | | | yes |
 | `aml.firm_controls` - prepare firm risk, policy, training and audit records | | | | | yes |
 | `aml.firm_approve` - approve a fixed firm-control version | | yes | | | |
 | `aml.sanctions` - resolve candidates, record licences and control freezes | | | | | yes |
@@ -631,6 +632,37 @@ Audit metadata holds only the matter id, because even a measure's kind can hint
 at PEP or high-risk status. All three tables are insert-only through protected
 functions and immutable for the owner.
 
+## Step 15c-3 API
+
+- `POST /matters/:matterId/aml-risk/:assessmentId/clearance` (`aml.approve`,
+  Compliance only) records `approved` or `refused` with encrypted reasoning.
+  The preparer can never clear their own assessment, and an assessment gets one
+  decision. Approval fixes the ids of the latest measure results and source
+  conclusions it relied on.
+- `POST .../clearance/senior-approval` (`aml.firm_approve`, Partner) adds the
+  senior-management approval a high-risk or PEP clearance needs. The partner
+  must be neither the preparer nor the Compliance approver, and need not be on
+  the matter team.
+- `GET .../clearance` returns the decision or `{clearance: null}`;
+  `GET /matters/:matterId/aml-gate` returns the live gate.
+
+PostgreSQL refuses approval unless the assessment is the matter's latest, its
+review date has not passed, and its governing controls, country list and CDD
+case are still current. In addition:
+
+- every measure's latest result and every latest source conclusion is satisfied;
+- in-scope work has identity, beneficial-ownership and purpose measures;
+- high risk has an enhanced-monitoring measure and another enhanced measure,
+  plus a source-of-funds conclusion unless no money is expected;
+- a PEP has a source-of-wealth conclusion.
+
+The gate is `pending` without an approved clearance (with senior approval where
+needed). It is `review_due` from the earliest day a relied-on input changed: the
+review date, a newer assessment version or CDD case, an edit to the client's
+identity details, or a superseded or expired control or country list. Other
+work continues until that day plus the assessment's grace period; step 15c-4
+blocks money at once. Otherwise the gate is `cleared`.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -649,7 +681,7 @@ and updated documentation before the next step.
   - **15c-1. Built 2026-10-10.** Partner-approved high-risk-country list
     versions and permanent matter risk-assessment versions.
   - **15c-2. Built 2026-10-10.** Discrete CDD/EDD measures and source-of-funds/wealth conclusions.
-  - **15c-3.** Compliance and senior-management clearance, its fixed snapshot
+  - **15c-3. Built 2026-10-11.** Compliance and senior-management clearance, its fixed snapshot
     and the live gate state.
   - **15c-4.** Gate enforcement in time, billing, documents and Finance, the
     early-verification exception and the ongoing-review queue.

@@ -15,7 +15,9 @@ Compliance-only firm-control work and Partner-only approval, while allowing
 Partners and fee earners to prepare CDD only for visible clients and Compliance
 to do so firm-wide. Step 15c-1 applies the same split to matter risk
 assessments, using active matter-team membership, and lets only a Partner other
-than the preparer approve a high-risk-country list.
+than the preparer approve a high-risk-country list. Step 15c-3 gives `aml.approve`
+only to Compliance, never to an assessment's preparer, and needs a third person,
+a Partner, for high-risk or PEP senior-management approval.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.

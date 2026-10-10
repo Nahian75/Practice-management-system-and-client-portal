@@ -996,6 +996,19 @@ export interface AmlSourceConclusionsTable extends AmlSealedColumns {
   recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
 }
 
+export interface AmlClientChangesTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; changed_at: DatabaseSet<Date>;
+}
+export interface AmlClearancesTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; matter_id: DatabaseSet<string>; assessment_id: DatabaseSet<string>;
+  decision: DatabaseSet<'approved' | 'refused'>; needs_senior: DatabaseSet<boolean>;
+  relied_measure_results: DatabaseSet<string[]>; relied_conclusions: DatabaseSet<string[]>;
+  decided_by: DatabaseSet<string>; decided_at: DatabaseSet<Date>;
+}
+export interface AmlSeniorApprovalsTable {
+  id: DatabaseSet<string>; clearance_id: DatabaseSet<string>; approved_by: DatabaseSet<string>; approved_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1008,12 +1021,15 @@ export interface Database {
   aml_cdd_ownership_controls: AmlCddOwnershipControlsTable;
   aml_cdd_subjects: AmlCddSubjectsTable;
   aml_cdd_verifications: AmlCddVerificationsTable;
+  aml_clearances: AmlClearancesTable;
+  aml_client_changes: AmlClientChangesTable;
   aml_country_list_approvals: AmlCountryListApprovalsTable;
   aml_country_list_versions: AmlCountryListVersionsTable;
   aml_measure_results: AmlMeasureResultsTable;
   aml_measures: AmlMeasuresTable;
   aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;
   aml_risk_assessments: AmlRiskAssessmentsTable;
+  aml_senior_approvals: AmlSeniorApprovalsTable;
   aml_source_conclusions: AmlSourceConclusionsTable;
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;

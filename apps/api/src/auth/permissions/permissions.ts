@@ -43,6 +43,7 @@ export const PERMISSIONS = [
   'aml.firm_approve',
   'aml.assess',
   'aml.view_evidence',
+  'aml.approve',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -124,6 +125,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.firm_controls',
     'aml.assess',
     'aml.view_evidence',
+    'aml.approve',
   ],
 };
 

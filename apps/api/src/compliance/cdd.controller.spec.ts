@@ -1,10 +1,11 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
+import { ensureAmlFramework } from '../../test/aml.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -14,8 +15,6 @@ import { ComplianceModule } from './compliance.module.js';
 @Module({ imports: [ComplianceModule] })
 class CddTestModule {}
 
-const CONTROL_KINDS = ['ml_tf_risk_assessment', 'proliferation_financing_risk_assessment',
-  'sanctions_risk_assessment', 'aml_policy', 'sanctions_policy'];
 const MINIMAL_PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF');
 const ADDRESS = { address_line1: '1 Test Street', address_line2: null, town: 'London', postcode: 'SW1A 1AA', country: 'GB' };
 
@@ -100,16 +99,7 @@ describe('Client CDD API', () => {
     sessions = app.get(SessionsService);
     today = (await sql<{ today: string }>`select (clock_timestamp() at time zone 'Europe/London')::date::text as today`
       .execute(db)).rows[0]!.today;
-    const preparer = await staffWith('compliance');
-    const approver = await staffWith('partner');
-    for (const kind of CONTROL_KINDS) {
-      const content = `Current ${kind} ${randomUUID()}`;
-      const id = (await sql<{ id: string }>`select app.create_aml_control_version(
-        ${kind}, ${`Current ${kind}`}, ${content}, ${createHash('sha256').update(content).digest()},
-        'CDD test control source', ${today}::date, '2099-12-31'::date, ${preparer.id}
-      ) as id`.execute(db)).rows[0]!.id;
-      await sql`select app.approve_aml_control_version(${id}, ${approver.id})`.execute(db);
-    }
+    await ensureAmlFramework(db);
   });
   afterAll(async () => app.close());
   beforeEach(async () => {

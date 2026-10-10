@@ -14,7 +14,7 @@ import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from '../documents/content-disposition.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type {
-  AssessmentWork, CddCase, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
+  AssessmentWork, CddCase, Clearance, Gate, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
 } from './compliance.js';
 import { ComplianceService, type Change, type ComplianceActor } from './compliance.service.js';
 
@@ -229,6 +229,17 @@ const workSchema = z.object({
     amountMinPence: z.string(), amountMaxPence: z.string(), outcome, evidenceIds: z.array(z.uuid()), reasoning: z.string(), ...recordedBy })),
 });
 
+const clearanceBody = z.strictObject({ decision: z.enum(['approved', 'refused']), reasoning: riskText });
+const clearanceSchema = z.object({
+  id: z.uuid(), matterId: z.uuid(), assessmentId: z.uuid(), decision: z.enum(['approved', 'refused']), needsSenior: z.boolean(),
+  reliedMeasureResults: z.array(z.uuid()), reliedConclusions: z.array(z.uuid()), reasoning: z.string(),
+  decidedBy: person, decidedAt: z.iso.datetime(),
+  seniorApproval: z.object({ approvedBy: person, approvedAt: z.iso.datetime() }).nullable(),
+});
+const optionalClearance = z.object({ clearance: clearanceSchema.nullable() });
+const gateSchema = z.object({ state: z.enum(['pending', 'cleared', 'review_due', 'held']), dueSince: date.nullable(),
+  workAllowedUntil: date.nullable(), clearanceId: z.uuid().nullable() });
+
 function actorFor(session: ResolvedSession, request: Request): ComplianceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
@@ -276,6 +287,17 @@ const serializeWork = (value: AssessmentWork) => ({
     results: m.results.map((r) => ({ ...r, recordedAt: r.recordedAt.toISOString() })) })),
   conclusions: value.conclusions.map((c) => ({ ...c, recordedAt: c.recordedAt.toISOString() })),
 });
+
+const serializeClearance = (value: Clearance) => ({
+  ...value, decidedAt: value.decidedAt.toISOString(),
+  seniorApproval: value.seniorApproval ? { ...value.seniorApproval, approvedAt: value.seniorApproval.approvedAt.toISOString() } : null,
+});
+
+function changedClearance(result: Change<Clearance>) {
+  if (result.outcome === 'not_found') throw new NotFoundException('No risk assessment or clearance with this id');
+  if (result.outcome === 'conflict') throw new ConflictException('The clearance or approval is refused; complete or reassess the work first');
+  return serializeClearance(result.value);
+}
 
 function changedWork(result: Change<AssessmentWork>) {
   if (result.outcome === 'not_found') throw new NotFoundException('No risk assessment with this id');
@@ -596,6 +618,36 @@ export class ComplianceController {
     const value = await this.compliance.findRiskAssessment(matterId, assessmentId, session.account.id);
     if (!value) throw new NotFoundException('No risk assessment with this id');
     return serializeRisk(value);
+  }
+
+  @Get('matters/:matterId/aml-risk/:assessmentId/clearance') @RequirePermission('aml.view_evidence') @ResponseSchema(optionalClearance)
+  async clearance(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string, @CurrentSession() session: ResolvedSession) {
+    const value = await this.compliance.findClearance(matterId, assessmentId, session.account.id);
+    if (value === undefined) throw new NotFoundException('No risk assessment with this id');
+    return { clearance: value ? serializeClearance(value) : null };
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/clearance') @RequirePermission('aml.approve') @ResponseSchema(clearanceSchema)
+  async decideClearance(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @Body({ schema: clearanceBody }) body: z.infer<typeof clearanceBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    return changedClearance(await this.compliance.decideClearance(matterId, assessmentId, body, actorFor(session, request)));
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/clearance/senior-approval') @RequirePermission('aml.firm_approve') @ResponseSchema(clearanceSchema)
+  async approveSenior(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    return changedClearance(await this.compliance.approveSenior(matterId, assessmentId, actorFor(session, request)));
+  }
+
+  @Get('matters/:matterId/aml-gate') @RequirePermission('aml.view_evidence') @ResponseSchema(gateSchema)
+  async gate(@Param('matterId', { schema: z.uuid() }) matterId: string, @CurrentSession() session: ResolvedSession): Promise<Gate> {
+    const value = await this.compliance.gate(matterId, session.account.id);
+    if (!value) throw new NotFoundException('No matter with this id');
+    return value;
   }
 
   @Get('matters/:matterId/aml-risk/:assessmentId/work') @RequirePermission('aml.view_evidence') @ResponseSchema(workSchema)
