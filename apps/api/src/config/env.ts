@@ -82,6 +82,8 @@ const envSchema = z
     FINANCE_ENCRYPTION_KEY: encryptionKeySchema,
     /** Seals AML identity data and each protected evidence file key. */
     AML_ENCRYPTION_KEY: encryptionKeySchema,
+    /** The official UK Sanctions List CSV, checked every six hours. Unset: lists are only uploaded by hand. */
+    SANCTIONS_LIST_URL: z.url({ protocol: /^https$/ }).optional(),
     TRUSTED_PROXIES: trustedProxiesSchema,
     /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
     DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),

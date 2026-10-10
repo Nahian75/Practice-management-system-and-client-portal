@@ -21,10 +21,10 @@ export interface Upload {
 /**
  * Reads a multipart upload: the named text fields first, then one file,
  * called `file`. The file is handed over as it starts to arrive, never held
- * whole in memory. Busboy stops a file at one byte past the 50 MB limit, so
- * the inspection always sees that it is too large.
+ * whole in memory. Busboy stops a file at one byte past the limit (50 MB for
+ * documents), so whatever reads it always sees that it is too large.
  */
-export function readUpload(request: Request, fieldNames: readonly string[]): Promise<Upload> {
+export function readUpload(request: Request, fieldNames: readonly string[], maxFileBytes = MAX_DOCUMENT_BYTES): Promise<Upload> {
   return new Promise((resolve, reject) => {
     let parser: busboy.Busboy;
     try {
@@ -37,7 +37,7 @@ export function readUpload(request: Request, fieldNames: readonly string[]): Pro
           fieldNameSize: 50,
           fieldSize: MAX_FIELD_BYTES,
           headerPairs: 20,
-          fileSize: MAX_DOCUMENT_BYTES + 1,
+          fileSize: maxFileBytes + 1,
         },
       });
     } catch {

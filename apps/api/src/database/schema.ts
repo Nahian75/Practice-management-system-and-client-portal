@@ -1025,6 +1025,25 @@ export interface AmlExceptionApprovalsTable {
   id: DatabaseSet<string>; exception_id: DatabaseSet<string>; approved_by: DatabaseSet<string>; approved_at: DatabaseSet<Date>;
 }
 
+export interface AmlSanctionsListsTable {
+  id: DatabaseSet<string>; version: DatabaseSet<number>; report_date: DatabaseSet<string>; sha256: DatabaseSet<Buffer>;
+  byte_size: DatabaseSet<number>; source: DatabaseSet<'download' | 'upload'>; designation_count: DatabaseSet<number>;
+  name_count: DatabaseSet<number>; imported_by: DatabaseSet<string | null>; imported_at: DatabaseSet<Date>;
+}
+export interface AmlSanctionsDesignationsTable {
+  list_id: DatabaseSet<string>; unique_id: DatabaseSet<string>; kind: DatabaseSet<'individual' | 'entity' | 'ship'>;
+  regime: DatabaseSet<string>; date_designated: DatabaseSet<string | null>; births: DatabaseSet<string[]>;
+  nationalities: DatabaseSet<string[]>;
+}
+export interface AmlSanctionsNamesTable {
+  list_id: DatabaseSet<string>; unique_id: DatabaseSet<string>; name: DatabaseSet<string>; normalized: DatabaseSet<string>;
+  tokens: DatabaseSet<string[]>; is_primary: DatabaseSet<boolean>;
+}
+export interface AmlSanctionsChecksTable {
+  id: DatabaseSet<string>; outcome: DatabaseSet<'imported' | 'unchanged' | 'failed'>; list_id: DatabaseSet<string | null>;
+  failure: DatabaseSet<string | null>; checked_by: DatabaseSet<string | null>; checked_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1048,6 +1067,10 @@ export interface Database {
   aml_measures: AmlMeasuresTable;
   aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;
   aml_risk_assessments: AmlRiskAssessmentsTable;
+  aml_sanctions_checks: AmlSanctionsChecksTable;
+  aml_sanctions_designations: AmlSanctionsDesignationsTable;
+  aml_sanctions_lists: AmlSanctionsListsTable;
+  aml_sanctions_names: AmlSanctionsNamesTable;
   aml_senior_approvals: AmlSeniorApprovalsTable;
   aml_source_conclusions: AmlSourceConclusionsTable;
   aml_start_exceptions: AmlStartExceptionsTable;

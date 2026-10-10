@@ -48,6 +48,9 @@ adds high-risk-country lists and matter risk assessments.
 | GET | `/compliance/reviews` | `aml.approve` | Open matters pending, held, due, or due within 30 days |
 | POST | `/matters/:matterId/aml-risk/:assessmentId/start-exceptions` | `aml.approve` | Early start for time/documents, at most 30 days, low-risk only |
 | POST | `/matters/:matterId/start-exceptions/:exceptionId/approval` | `aml.firm_approve` | A different partner approves the early start |
+| GET | `/compliance/sanctions/status` | `aml.sanctions` | Active list version, report date, last success/failure and `fresh` |
+| GET | `/compliance/sanctions/lists` | `aml.sanctions` | `{lists,next}`: imported versions, newest first |
+| POST | `/compliance/sanctions/lists` | `aml.sanctions` | Upload the official CSV as multipart `file`: `imported` or `unchanged`; 409 for an older report, 422 for another file |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

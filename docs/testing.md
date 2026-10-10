@@ -58,6 +58,9 @@ In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears
 each matter it opens unless told not to.
 
+Sanctions tests never use the network. `test/sanctions.ts` builds CSVs in the
+official layout with the real header row, and refresh tests pass a fake `fetch`.
+
 ## Email tests
 
 Tests that send email deliver to Mailpit and read it back through its API

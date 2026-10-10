@@ -8,10 +8,14 @@ import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceController } from './compliance.controller.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import { ComplianceService } from './compliance.service.js';
+import { SanctionsController } from './sanctions.controller.js';
+import { SanctionsRepository } from './sanctions.repository.js';
+import { SanctionsRefresher, SanctionsService } from './sanctions.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
-  controllers: [ComplianceController],
-  providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher],
+  controllers: [ComplianceController, SanctionsController],
+  providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher,
+    SanctionsRepository, SanctionsService, SanctionsRefresher],
 })
 export class ComplianceModule {}

@@ -8,7 +8,8 @@ encrypted identity facts and separately protected evidence; high-risk-country
 lists, matter risk assessments, CDD/EDD measures and source-of-funds/wealth
 conclusions; Compliance clearance with senior-management approval; and a
 compliance gate that PostgreSQL enforces on time, billing, documents and money,
-with holds, an early-start exception and a review queue. Steps 15d to 15f remain
+with holds, an early-start exception and a review queue. Step 15d-1 imports the
+official UK Sanctions List. The rest of step 15d and steps 15e and 15f remain
 planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
@@ -704,6 +705,35 @@ or matter is held.
 When the migration runs, every open matter without a clearance becomes
 `pending`, as decided: there is no grandfathering.
 
+## Step 15d-1 sanctions list
+
+Stass reads the official CSV published at
+`https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv`. Its first line is
+`Report Date: DD-Mon-YYYY`, then a header row, then one row per name and address
+of each designation; one `Unique ID` spans many rows. Columns are found by
+header name, so a reordered file still parses and a renamed required column is
+refused. The parser streams the file (the 8 October 2026 list is 50 MB, with
+6,406 designations and 15,551 distinct names, and parses in about 1.5 seconds),
+stops at 150 MB, and keeps only what screening needs: each designation's id,
+type, regime, designation date, birth dates (a year, year and month, or full
+date), nationalities, and its distinct names with their normalized form and
+word tokens. Control and text-direction characters are replaced rather than
+refusing the official file.
+
+- With `SANCTIONS_LIST_URL` set, the API downloads the list on start and every
+  six hours over HTTPS, with a two-minute timeout, no redirects and the size
+  limit. Unset, lists are only uploaded by hand.
+- `POST /compliance/sanctions/lists` (`aml.sanctions`, Compliance) uploads the CSV
+  as multipart `file`. `GET /compliance/sanctions/status` returns the active
+  version, last success and failure, and `fresh`; `GET
+  /compliance/sanctions/lists` lists versions.
+- One PostgreSQL function imports a list in one transaction, so a partial list
+  is never visible. An identical file is recorded as `unchanged`. A list whose
+  report date is older than the active one is refused and the refusal recorded.
+- Every import, unchanged check and failure is kept. The list is `fresh` while
+  a check succeeded in the last 48 hours. A failed refresh leaves the last good
+  version active and is visible in the status.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -738,6 +768,13 @@ and updated documentation before the next step.
     assessment's monitoring plan.
 - **15d.** Official UK Sanctions List import, candidate screening/resolution,
   rescreening, holds, frozen funds, licence conditions and Finance enforcement.
+  Built in three parts:
+  - **15d-1. Built 2026-10-11.** List import, versions, scheduled refresh and
+    staleness.
+  - **15d-2.** Screening of clients and CDD subjects, candidate resolution,
+    rescreening on each new list, and sanctions holds in the gate.
+  - **15d-3.** Confirmed designations: frozen funds, licences and Finance
+    enforcement.
 - **15e.** Encrypted internal disclosures, nominated-officer access, external
   SAR/DAML decision/status records and confidentiality-safe holds.
 - **15f.** Retention/legal holds/disposal, regulatory exports, staff and
