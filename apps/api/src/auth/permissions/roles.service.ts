@@ -21,11 +21,11 @@ export class OwnRoleChangeError extends Error {
   override readonly name = 'OwnRoleChangeError';
 }
 
-/** Why removing a role holder was refused: `'last_administrator'` or `'last_compliance'`. */
-export type LastHolderRefusal = `last_${ProtectedRole}`;
+/** Why removing a protected role or the appointed nominated officer was refused. */
+export type LastHolderRefusal = `last_${ProtectedRole}` | 'last_nominated_officer';
 
 export function isLastHolderRefusal(result: string): result is LastHolderRefusal {
-  return PROTECTED_ROLES.some((role) => result === `last_${role}`);
+  return result === 'last_nominated_officer' || PROTECTED_ROLES.some((role) => result === `last_${role}`);
 }
 
 export type RevokeResult = 'revoked' | 'not_held' | LastHolderRefusal;
@@ -116,6 +116,11 @@ export class RolesService {
     roles: readonly StaffRole[],
     trx: Kysely<Database>,
   ): Promise<LastHolderRefusal | null> {
+    if (roles.includes('compliance')
+      && await this.roles.hasActiveNominatedAppointment(accountId, trx)
+      && await this.roles.countOtherActiveNominatedOfficers(accountId, trx) === 0) {
+      return 'last_nominated_officer';
+    }
     for (const role of PROTECTED_ROLES) {
       if (roles.includes(role) && (await this.roles.countOtherActiveHolders(role, accountId, trx)) === 0) {
         return `last_${role}`;

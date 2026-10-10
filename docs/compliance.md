@@ -1,8 +1,10 @@
 # Compliance and AML
 
-**Current state (2026-10-10):** First-version design proposed for project-owner
-approval. Nothing in this document is implemented yet. Step 15a is the first
-planned implementation step.
+**Current state (2026-10-10):** The project owner approved this first-version
+design. Step 15a is built: permissions, protected nominated-officer and deputy
+appointments, fixed firm-control versions with separate Partner approval,
+training completions and independent-review records. Steps 15b to 15f remain
+planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -75,12 +77,13 @@ regulated sector.
 | Providers | Manual and certified digital verification evidence are both allowed. The provider, method, assurance result and raw response hash are recorded; the firm remains responsible | Avoids locking the design to one vendor or treating a provider result as the legal decision |
 | Client portal | No AML, sanctions, source-of-funds or suspicion pages, states, notifications or downloads | These are internal records and may expose sensitive checks or reporting |
 
-## Roles and proposed permissions
+## Roles and permissions
 
-Permission names are not added to code until their implementation step.
+Step 15a permissions exist now; later-step permission names remain planned.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
+| `aml.officers.manage` - record and end nominated-officer/deputy appointments, without reading AML content | yes | | | | |
 | `aml.assess` - prepare CDD and risk work for a visible client/matter | | yes | yes | | yes |
 | `aml.view_evidence` - view necessary CDD evidence under the record rule | | yes | yes | | yes |
 | `aml.approve` - approve CDD, EDD, scope and ongoing reviews firm-wide | | | | | yes |
@@ -133,8 +136,9 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
 ## Firm-wide controls
 
 - A firm-control document has a kind, version, effective period, source and
-  encrypted or private stored file. Published versions are immutable and a new
-  version supersedes rather than edits one.
+  private fixed document text with a SHA-256 digest. Step 15b adds the separate
+  protected-file path needed for evidence. Published versions are immutable
+  and a new version supersedes rather than edits one.
 - Risk assessments cover customers, geographies, services, transactions and
   delivery channels, and separately identify ML, TF, PF and sanctions risk.
   The author records which SRA sectoral assessment, National Risk Assessment,
@@ -420,15 +424,66 @@ schemas are fixed during their implementation step.
   licence applies, or when the firm may terminate a retainer.
 - HR vetting beyond a future integration point for staff sanctions screening.
 
+## Step 15a API
+
+- Administrators use `GET/POST /compliance/officers` and
+  `POST /compliance/officers/:id/end`. The target must be an active Compliance
+  holder. Administrators receive appointment metadata only, not firm-control
+  content.
+- Compliance uses `GET/POST /compliance/controls` and
+  `GET /compliance/controls/:id`. Each kind receives a database-serialized
+  version number; content, source, dates, preparer, trusted publication time
+  and SHA-256 digest are fixed.
+- Partners use `GET /compliance/controls/pending-approval` and
+  `POST /compliance/controls/:id/approval`. PostgreSQL rechecks the active
+  Partner role and refuses self-approval and repeat approval.
+- Any active member of staff can use `POST /compliance/training` for their own
+  completion and `GET /compliance/training/me`. Compliance can record and list
+  completions firm-wide. A completion requires an approved training-material
+  version and cannot be future-dated or duplicated.
+- Compliance uses `GET/POST /compliance/independent-reviews`. Reviewer,
+  organisation, independence basis, period, scope, findings, recommendations,
+  management response and completion are fixed together.
+
+List routes return stable 100-row keyset pages with an optional `before` UUID
+and a nullable `next` cursor, so older regulatory records are never silently
+hidden by a fixed result cap.
+
+All request bodies are strict and bounded. Multi-line document fields allow
+ordinary line breaks but reject unsafe control and text-direction characters.
+PostgreSQL recalculates the SHA-256 digest relationship and validates supported
+date ranges even when a database function is called directly. All responses
+are allow-listed and carry the API's global `no-store` header.
+
+## Step 15a verification
+
+HTTP tests cover role boundaries, appointment eligibility, version numbering,
+Partner separation, approved-material training, self-attestation,
+firm-wide-list restrictions, independent reviews and safe responses. Database
+tests run with both application and owner roles to prove direct-write denial,
+immutable history, live-role rechecks, separate approval and the protected
+last nominated officer. The appointment database spec runs serially because
+the last-holder rule is intentionally firm-wide.
+
+Thirteen deliberate application and migration breaks were caught and restored:
+permission mapping, route separation, hidden text, cursor filtering, audit
+action, digest matching, owner immutability, preparer/approver separation,
+training date and approval requirements, last-officer continuity, serialized
+version allocation and live-role enforcement. A clean database then passed the
+complete API suite (78 files, 1,662 tests). API and web type-checks and
+production builds passed, together with all 77 Playwright browser tests, the
+offline production audit (zero cached vulnerabilities), and the
+hidden-character and diff checks.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
 owner-role probes for database safeguards, deliberate breaks of its controls,
 and updated documentation before the next step.
 
-- **15a.** Permissions, nominated-officer appointments, fixed firm-wide risk/
-  policy versions, partner approval, training records and independent-review
-  records.
+- **15a. Built 2026-10-10.** Permissions, nominated-officer appointments,
+  fixed firm-wide risk/policy versions, Partner approval, training records and
+  independent-review records.
 - **15b.** Client CDD cases, people/entity subjects, ownership/control,
   authority, identity verification and protected evidence storage.
 - **15c.** Versioned client/matter risk assessments, scope, CDD/EDD and source
@@ -444,9 +499,8 @@ and updated documentation before the next step.
 - Security review against the then-current MLR, SRA/LSAG, sanctions, NCA and
   data-protection guidance.
 
-## Approval needed
+## Approval
 
-Implementation should not begin until the project owner approves the decisions
-above, especially the separate nominated-officer appointment, onboarding matter
-gate, dual approval for exceptional early work, official-list ingestion,
-external-only regulator submission and controlled five-year disposal model.
+The project owner approved the design on 10 October 2026. That approval covers
+the staged build above; it does not appoint a real nominated officer, approve a
+firm policy, make a regulatory decision or authorise an external submission.

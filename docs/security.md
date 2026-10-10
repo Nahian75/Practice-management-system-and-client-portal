@@ -1,6 +1,6 @@
 # Security
 
-**Current state (2026-10-09):** Core API, staff-web, client-portal, task and
+**Current state (2026-10-10):** Core API, staff-web, client-portal, task and
 notification controls are built and reviewed. Notifications steps 13a to 13d add the
 persistent encrypted email outbox, insert-only staff task notifications,
 database-controlled one-way reads, live matter-access checks, staff-only
@@ -18,8 +18,10 @@ statement parsing, duplicate detection, locked exact matching, permanent
 match reversals, server-calculated reconciliation snapshots, separate
 Compliance sign-off, signed-only deadlines, transactional audit, and audited
 CSV exports that quote every field and make spreadsheet formula prefixes
-literal. Finance
-has not had its final security review yet.
+literal. The Finance security review is complete. Compliance step 15a adds
+separate administrator, Compliance and Partner permissions, live-role checks,
+protected nominated-officer continuity, fixed firm-control digests and
+owner-immutable approval, training and independent-review evidence.
 
 This file lists only the controls that are actually in place.
 
@@ -199,6 +201,8 @@ process before it accepts any request.
 | 2026-10-06 | Documents module | [reviews/2026-10-06-documents.md](reviews/2026-10-06-documents.md) |
 | 2026-10-07 | Client portal | [reviews/2026-10-07-portal.md](reviews/2026-10-07-portal.md) |
 | 2026-10-07 | Tasks module | [reviews/2026-10-07-tasks.md](reviews/2026-10-07-tasks.md) |
+| 2026-10-08 | Notifications module | [reviews/2026-10-08-notifications.md](reviews/2026-10-08-notifications.md) |
+| 2026-10-10 | Finance module | [reviews/2026-10-10-finance.md](reviews/2026-10-10-finance.md) |
 
 Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), C6 (encrypted storage and backups).
@@ -276,6 +280,13 @@ neither the limit nor the recorded address.
   client-bank coverage and explanations. Match reversals and sign-off are new
   immutable events; owner-level triggers reject every later change or removal.
   Deadline status counts only a signed snapshot.
+- Compliance foundation writes use narrow security-definer functions that
+  recheck the actor's live role. PostgreSQL serializes officer continuity and
+  control version allocation, verifies each stored SHA-256 digest against the
+  fixed text, requires a different active Partner for approval, and refuses
+  direct application writes. Owner-level triggers keep controls, approvals,
+  training completions and independent reviews fixed and keep appointment
+  history append-only apart from its protected ending operation.
 
 ## Application secrets
 

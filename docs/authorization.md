@@ -1,6 +1,6 @@
 # Authorization
 
-**Current state (2026-10-09):** Layers 1 and 2 built, including the
+**Current state (2026-10-10):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
 issued billing records. Finance-wide bank, cash-book and ledger reads are
@@ -10,6 +10,8 @@ Step 14e gives statement import, matching and preparation only to Accounts and
 fixed reconciliation sign-off only to a different Compliance holder.
 Step 14f exposes live Finance action capabilities to the staff UI, but those
 booleans are presentation only: route guards and PostgreSQL remain the controls.
+Compliance step 15a separates administrator-only officer appointments,
+Compliance-only firm-control work and Partner-only approval.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -94,6 +96,9 @@ Each module adds its own permissions when it is built. These exist now:
 | `client_money.approve` - approve or reject another Accounts holder's request | | | | ✓ | |
 | `finance.reconcile` - import statements, match transactions and prepare reconciliation | | | | ✓ | |
 | `finance.reconciliation_sign_off` - sign a fixed reconciliation prepared by someone else | | | | | ✓ |
+| `aml.officers.manage` - record and end nominated-officer and deputy appointments, without AML-content access | ✓ | | | | |
+| `aml.firm_controls` - prepare and read fixed firm controls, training records and independent reviews | | | | | ✓ |
+| `aml.firm_approve` - approve a firm-control version prepared by someone else | | ✓ | | | |
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.
@@ -175,6 +180,12 @@ The same rule protects `compliance`: without it nobody can read the audit log
 in the app, and the only record of that gap would be a later grant. The roles
 covered are listed in `PROTECTED_ROLES` (`permissions.ts`); both share one lock.
 The 409 names the role that would be left without a holder.
+
+Once an administrator records a nominated officer, the same lock also prevents
+ending the last live appointment, disabling its holder or removing that
+holder's Compliance role unless another active appointed Compliance holder
+remains. The administrator can manage appointment metadata but receives no
+firm-control content through that permission.
 
 ### First administrator
 

@@ -69,6 +69,27 @@ export class RolesRepository {
     return Number(count);
   }
 
+  async hasActiveNominatedAppointment(accountId: string, executor: Kysely<Database> = this.db): Promise<boolean> {
+    const row = await executor.selectFrom('aml_officer_appointments').select('id')
+      .where('account_id', '=', accountId).where('kind', '=', 'nominated_officer')
+      .where('ended_at', 'is', null).executeTakeFirst();
+    return row !== undefined;
+  }
+
+  async countOtherActiveNominatedOfficers(accountId: string, executor: Kysely<Database> = this.db): Promise<number> {
+    const { count } = await executor.selectFrom('aml_officer_appointments')
+      .innerJoin('accounts', 'accounts.id', 'aml_officer_appointments.account_id')
+      .innerJoin('account_roles', 'account_roles.account_id', 'accounts.id')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('aml_officer_appointments.kind', '=', 'nominated_officer')
+      .where('aml_officer_appointments.ended_at', 'is', null)
+      .where('accounts.status', '=', 'active')
+      .where('account_roles.role', '=', 'compliance')
+      .where('account_roles.revoked_at', 'is', null)
+      .where('accounts.id', '<>', accountId).executeTakeFirstOrThrow();
+    return Number(count);
+  }
+
   /** Ids of the active accounts holding `role`. */
   async activeHolders(role: StaffRole): Promise<string[]> {
     const rows = await this.db

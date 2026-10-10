@@ -823,9 +823,82 @@ export interface PortalLinksTable {
   ended_at: UpdateOnly<Date | null>;
 }
 
+export type AmlOfficerKind = 'nominated_officer' | 'deputy';
+export type AmlControlKind =
+  | 'ml_tf_risk_assessment'
+  | 'proliferation_financing_risk_assessment'
+  | 'sanctions_risk_assessment'
+  | 'aml_policy'
+  | 'sanctions_policy'
+  | 'training_material';
+
+export interface AmlOfficerAppointmentsTable {
+  id: DatabaseSet<string>;
+  account_id: DatabaseSet<string>;
+  kind: DatabaseSet<AmlOfficerKind>;
+  appointed_by: DatabaseSet<string>;
+  appointed_at: DatabaseSet<Date>;
+  ended_by: DatabaseSet<string | null>;
+  ended_at: DatabaseSet<Date | null>;
+  end_reason: DatabaseSet<string | null>;
+}
+
+export interface AmlControlVersionsTable {
+  id: DatabaseSet<string>;
+  kind: DatabaseSet<AmlControlKind>;
+  version: DatabaseSet<number>;
+  title: DatabaseSet<string>;
+  content: DatabaseSet<string>;
+  content_sha256: DatabaseSet<Buffer>;
+  source: DatabaseSet<string>;
+  effective_from: DatabaseSet<string>;
+  review_due_on: DatabaseSet<string>;
+  prepared_by: DatabaseSet<string>;
+  prepared_at: DatabaseSet<Date>;
+}
+
+export interface AmlControlApprovalsTable {
+  id: DatabaseSet<string>;
+  control_version_id: DatabaseSet<string>;
+  approved_by: DatabaseSet<string>;
+  approved_at: DatabaseSet<Date>;
+}
+
+export interface AmlTrainingCompletionsTable {
+  id: DatabaseSet<string>;
+  account_id: DatabaseSet<string>;
+  training_material_id: DatabaseSet<string>;
+  provider: DatabaseSet<string>;
+  completed_on: DatabaseSet<string>;
+  evidence_reference: DatabaseSet<string>;
+  recorded_by: DatabaseSet<string>;
+  recorded_at: DatabaseSet<Date>;
+}
+
+export interface AmlIndependentReviewsTable {
+  id: DatabaseSet<string>;
+  period_start: DatabaseSet<string>;
+  period_end: DatabaseSet<string>;
+  completed_on: DatabaseSet<string>;
+  reviewer_name: DatabaseSet<string>;
+  reviewer_organisation: DatabaseSet<string | null>;
+  independence_basis: DatabaseSet<string>;
+  scope: DatabaseSet<string>;
+  findings: DatabaseSet<string>;
+  recommendations: DatabaseSet<string>;
+  management_response: DatabaseSet<string>;
+  recorded_by: DatabaseSet<string>;
+  recorded_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
+  aml_control_approvals: AmlControlApprovalsTable;
+  aml_control_versions: AmlControlVersionsTable;
+  aml_independent_reviews: AmlIndependentReviewsTable;
+  aml_officer_appointments: AmlOfficerAppointmentsTable;
+  aml_training_completions: AmlTrainingCompletionsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
   bank_account_closures: BankAccountClosuresTable;

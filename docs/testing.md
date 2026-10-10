@@ -2,8 +2,9 @@
 
 **Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f, plus Playwright end-to-end
-tests for the staff app, Tasks, Notifications and the client portal.
+the security-reviewed Finance steps 14a to 14f and Compliance step 15a, plus
+Playwright end-to-end tests for the staff app, Tasks, Notifications and the
+client portal.
 
 ## Tools
 
@@ -234,6 +235,14 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   multi-account setup, downloads and accessibility scans. API tests cover live
   action capabilities, the draft queue, audited export headers/content, and
   formula-safe CSV encoding.
+- Compliance-foundation HTTP tests cover the administrator, Compliance,
+  Partner and ordinary-staff boundaries; appointment eligibility and
+  continuity; fixed numbered controls and digest responses; separate approval;
+  approved in-period training and self-attestation; independent reviews;
+  strict inputs, pagination, safe responses and transactional audit. Database
+  tests use the application and owner roles for direct-write denial, live-role
+  rechecks and immutable history. Controlled concurrency proves version
+  allocation and last-nominated-officer protection serialize correctly.
 - Conflict checks match names loosely, so tests that expect no match use
   `randomName()` from `e2e/support/checks.ts`: names made of random letters,
   sharing no word with any other test's names.

@@ -38,6 +38,9 @@ export const PERMISSIONS = [
   'client_money.approve',
   'finance.reconcile',
   'finance.reconciliation_sign_off',
+  'aml.officers.manage',
+  'aml.firm_controls',
+  'aml.firm_approve',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -61,7 +64,7 @@ export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'complian
 
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
-  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable'],
+  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'aml.officers.manage'],
   partner: [
     'staff.view',
     'clients.create',
@@ -83,6 +86,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'tasks.manage',
     'time.record',
     'finance.matter.view',
+    'aml.firm_approve',
   ],
   fee_earner: [
     'clients.create',
@@ -111,6 +115,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
   compliance: [
     'staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view',
     'finance.view_all', 'finance.reconciliation_sign_off',
+    'aml.firm_controls',
   ],
 };
 

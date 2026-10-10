@@ -55,6 +55,7 @@ export const OWN_ACCOUNT_MESSAGE = 'You cannot change your own account';
 export const LAST_HOLDER_MESSAGES: Readonly<Record<LastHolderRefusal, string>> = {
   last_administrator: 'The firm must keep at least one active administrator',
   last_compliance: 'The firm must keep at least one active compliance holder',
+  last_nominated_officer: 'The firm must keep at least one active nominated officer',
 };
 
 function actorFor(session: ResolvedSession, request: Request): StaffActor {
@@ -127,6 +128,7 @@ export class StaffController {
         throw new ForbiddenException(OWN_ACCOUNT_MESSAGE);
       case 'last_administrator':
       case 'last_compliance':
+      case 'last_nominated_officer':
         throw new ConflictException(LAST_HOLDER_MESSAGES[result]);
       case 'revoked':
       case 'not_held':
@@ -151,6 +153,7 @@ export class StaffController {
         throw new ForbiddenException(OWN_ACCOUNT_MESSAGE);
       case 'last_administrator':
       case 'last_compliance':
+      case 'last_nominated_officer':
         throw new ConflictException(LAST_HOLDER_MESSAGES[result]);
       case 'disabled':
       case 'already_disabled':
