@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
@@ -109,6 +110,10 @@ describe('Client portal', () => {
         await trx.insertInto('matter_closures').values({ matter_id: created.id, closed_by: partner.id, reason: 'The work is complete' }).execute();
       }
       return { ...created, status: options.close ? 'closed' : created.status };
+    }).then(async (matter) => {
+      // A closed matter cannot be assessed, and needs no clearance for what the tests do with it.
+      if (!options.close) await clearMatterForTests(db, matter.id);
+      return matter;
     });
   }
 

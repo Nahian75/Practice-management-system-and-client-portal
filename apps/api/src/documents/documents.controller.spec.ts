@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { testAppDatabaseUrl } from '../../test/database.js';
@@ -68,6 +69,7 @@ describe('Documents', () => {
         conflictCheckId: check.body.id,
         parties: [{ role: 'opponent', kind: 'individual', name: otherParty }],
       });
+    if (opened.status === 201) await clearMatterForTests(db, opened.body.id);
     return opened.body;
   }
 

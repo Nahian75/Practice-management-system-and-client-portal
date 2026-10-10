@@ -5,10 +5,12 @@ import type { Env } from '../src/config/env.js';
 const TEST_TOTP_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const TEST_DOCUMENT_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const TEST_FINANCE_ENCRYPTION_KEY = randomBytes(32).toString('base64');
-const TEST_AML_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 // Every Vitest worker can claim the same durable queue, just as several API
 // instances can. They therefore need the same test-only key.
 const TEST_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString('base64');
+// Firm-wide Compliance lists (such as active holds) decrypt rows that other test
+// workers and earlier runs created, so the AML key is shared in the same way.
+const TEST_AML_ENCRYPTION_KEY = Buffer.alloc(32, 13).toString('base64');
 
 function required(name: string): string {
   const value = process.env[name];

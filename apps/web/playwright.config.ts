@@ -21,6 +21,7 @@ const E2E_API_PORT = '3101';
 // Playwright workers are separate processes but share one queue and therefore one test-only key.
 export const E2E_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 12).toString('base64');
 export const E2E_FINANCE_ENCRYPTION_KEY = Buffer.alloc(32, 13).toString('base64');
+export const E2E_AML_ENCRYPTION_KEY = Buffer.alloc(32, 14).toString('base64');
 
 export default defineConfig({
   testDir: './e2e',
@@ -33,7 +34,11 @@ export default defineConfig({
     // Traces and screenshots can show tokens; they stay in the git-ignored test-results/.
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Publishes the AML framework once, before any test can clear a matter.
+    { name: 'aml-setup', testMatch: /aml.setup.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['aml-setup'] },
+  ],
   webServer: [
     {
       // The built API, against the end-to-end database (e2e/prepare-database.mjs).
@@ -51,6 +56,7 @@ export default defineConfig({
         SMTP_URL: required('SMTP_URL'),
         MAIL_ENCRYPTION_KEY: E2E_MAIL_ENCRYPTION_KEY,
         FINANCE_ENCRYPTION_KEY: E2E_FINANCE_ENCRYPTION_KEY,
+        AML_ENCRYPTION_KEY: E2E_AML_ENCRYPTION_KEY,
         MAIL_FROM_ADDRESS: required('MAIL_FROM_ADDRESS'),
         MAIL_FROM_NAME: required('MAIL_FROM_NAME'),
         TRUSTED_PROXIES: 'loopback',

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { randomName } from './checks';
+import { clearMatter } from './compliance';
 import { apiSessionFor } from './session';
 import { emailedToken, totp } from './staff';
 
@@ -37,6 +38,7 @@ export async function clientWithMatter(request: APIRequestContext) {
   });
   expect(opened.status()).toBe(201);
   const matter = { ...((await opened.json()) as { id: string; reference: string }), title };
+  await clearMatter(feeEarner.api, matter.id);
 
   const granted = await feeEarner.api.post(`/api/clients/${clientId}/portal-access`, { data: {} });
   expect(granted.status()).toBe(201);

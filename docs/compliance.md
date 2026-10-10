@@ -1,13 +1,15 @@
 # Compliance and AML
 
-**Current state (2026-10-10):** The project owner approved this first-version
-design. Steps 15a and 15b are built: permissions, protected nominated-officer and deputy
-appointments, fixed firm-control versions with separate Partner approval,
-training completions and independent-review records, plus versioned client CDD,
-encrypted identity facts and separately protected evidence. Step 15c-1 adds
-partner-approved high-risk-country lists and permanent matter risk assessments;
-step 15c-2 adds CDD/EDD measures and source-of-funds/wealth conclusions; step
-15c-3 adds clearance, senior-management approval and the live gate state. The rest of step 15c and steps 15d to 15f remain planned.
+**Current state (2026-10-11):** The project owner approved this first-version
+design. Steps 15a to 15c are built: permissions, protected nominated-officer and
+deputy appointments, fixed firm-control versions with separate Partner approval,
+training completions and independent-review records; versioned client CDD,
+encrypted identity facts and separately protected evidence; high-risk-country
+lists, matter risk assessments, CDD/EDD measures and source-of-funds/wealth
+conclusions; Compliance clearance with senior-management approval; and a
+compliance gate that PostgreSQL enforces on time, billing, documents and money,
+with holds, an early-start exception and a review queue. Steps 15d to 15f remain
+planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -660,8 +662,47 @@ The gate is `pending` without an approved clearance (with senior approval where
 needed). It is `review_due` from the earliest day a relied-on input changed: the
 review date, a newer assessment version or CDD case, an edit to the client's
 identity details, or a superseded or expired control or country list. Other
-work continues until that day plus the assessment's grace period; step 15c-4
-blocks money at once. Otherwise the gate is `cleared`.
+work continues for the assessment's grace period: `workAllowedUntil` is the last
+allowed day, so a grace of 0 blocks at once. Money is blocked at once. Otherwise
+the gate is `cleared`.
+
+## Step 15c-4 enforcement and API
+
+A `BEFORE INSERT` trigger on each gated table asks PostgreSQL for the gate:
+
+| Work | Tables | Allowed when |
+|---|---|---|
+| Time | `time_entries` | cleared; review due within grace; pending with an approved early start for time |
+| Documents | `documents`, `document_versions` | cleared; review due within grace; pending with an approved early start for documents |
+| Billing | `bill_drafts`, `issued_bills` | cleared; review due within grace |
+| Money | `client_payment_requests`, approved `client_payment_events`, ledger allocations in `finance_transactions` | cleared only |
+
+Bank-confirmed receipts, bank outcomes and credit notes stay recordable: they
+record what already happened, and refusing them would hide it. Tasks are not
+gated. Every refusal is the same `check_violation`, which the ordinary APIs
+return as a generic 409, so a hold cannot be told apart from missing CDD or an
+overdue review. Gate checks take shared advisory locks on the matter and client
+that holds, assessments and clearances take exclusively, so a hold and a payment
+commit in a defined order.
+
+- `POST /compliance/holds` (`aml.approve`) holds one matter (`matterId`) or a
+  whole client (`clientId`) with an encrypted reason; `POST
+  /compliance/holds/:holdId/lift` lifts it once. `GET /compliance/holds` lists
+  active holds (`?all=true` for every hold). The gate is `held` first.
+- `POST /matters/:matterId/aml-risk/:assessmentId/start-exceptions`
+  (`aml.approve`) grants an early start for `time` and/or `documents`, never
+  money, for at most 30 days, on a current low or standard assessment without
+  mandatory high-risk factors, by someone other than the preparer, while no hold
+  is active. `POST /matters/:matterId/start-exceptions/:id/approval` needs a
+  Partner other than the granter and preparer. A newer assessment version ends it.
+- `GET /compliance/reviews` (`aml.approve`) lists up to 200 open matters that
+  are pending, held, due for review or due within 30 days, held first.
+
+Audit metadata for holds is empty, so the audit log does not show which client
+or matter is held.
+
+When the migration runs, every open matter without a clearance becomes
+`pending`, as decided: there is no grandfathering.
 
 ## Build order
 
@@ -675,7 +716,7 @@ and updated documentation before the next step.
 - **15b. Built 2026-10-10.** Versioned client CDD cases, people/entity subjects,
   ownership/control, authority, manual/electronic identity verification,
   reliance facts and separately encrypted protected evidence storage.
-- **15c.** Versioned client/matter risk assessments, scope, CDD/EDD and source
+- **15c. Built 2026-10-11.** Versioned client/matter risk assessments, scope, CDD/EDD and source
   evidence, multi-party approval, compliance gate, exceptional limited start
   and ongoing-review queue. Built in four parts:
   - **15c-1. Built 2026-10-10.** Partner-approved high-risk-country list
@@ -683,7 +724,7 @@ and updated documentation before the next step.
   - **15c-2. Built 2026-10-10.** Discrete CDD/EDD measures and source-of-funds/wealth conclusions.
   - **15c-3. Built 2026-10-11.** Compliance and senior-management clearance, its fixed snapshot
     and the live gate state.
-  - **15c-4.** Gate enforcement in time, billing, documents and Finance, the
+  - **15c-4. Built 2026-10-11.** Gate enforcement in time, billing, documents and Finance, the
     early-verification exception and the ongoing-review queue.
 
   Decisions confirmed by the project owner on 10 October 2026:

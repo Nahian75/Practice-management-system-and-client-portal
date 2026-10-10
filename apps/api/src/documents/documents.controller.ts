@@ -186,7 +186,7 @@ export class DocumentsController {
       case 'not_found':
         throw refused(new NotFoundException('No matter with this id'));
       case 'not_open':
-        throw refused(new ConflictException('Documents are added only to open matters'));
+        throw refused(new ConflictException('Documents are added only to open matters with current compliance clearance'));
       case 'refused':
         if (result.reason === 'over_allowance') {
           response.setHeader('Retry-After', String(UPLOAD_WINDOW_SECONDS));
@@ -220,7 +220,7 @@ export class DocumentsController {
       case 'not_found':
         throw refused(new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE));
       case 'not_open':
-        throw refused(new ConflictException('Documents are added only to open matters'));
+        throw refused(new ConflictException('Documents are added only to open matters with current compliance clearance'));
       case 'withdrawn':
         throw refused(new ConflictException(WITHDRAWN_MESSAGE));
       case 'refused':

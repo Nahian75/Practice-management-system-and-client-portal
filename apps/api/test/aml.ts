@@ -181,8 +181,9 @@ export async function ensureAmlFramework(db: Kysely<Database>, countries: string
       .select('v.countries').where('v.effective_from', '<=', today).orderBy('v.version', 'desc').limit(1).executeTakeFirst();
     const missingControls = CONTROL_KINDS.some((kind) => !current.some((row) => row.kind === kind));
     const listCovers = list !== undefined && countries.every((code) => list.countries.includes(code));
-    if (missingControls) await approveAmlFramework(trx, listCovers ? null : countries);
-    else if (!listCovers) await approveCountryList(trx, countries);
+    const publish = countries.length > 0 ? countries : [TEST_LISTED_COUNTRY];
+    if (missingControls) await approveAmlFramework(trx, listCovers ? null : publish);
+    else if (!listCovers) await approveCountryList(trx, publish);
   });
 }
 
@@ -210,12 +211,37 @@ export async function approveTestSenior(db: Kysely<Database>, clearanceId: strin
 
 /**
  * Clears a matter's compliance gate the way a firm would for low-risk, out-of-scope
- * work: a team member assesses it and a separate Compliance holder clears it.
- * `teamMemberId` must be on the matter team.
+ * work: one Compliance holder assesses it and another clears it. Tests of other
+ * modules use this so gated work (time, billing, documents, money) can proceed.
  */
-export async function clearMatterForTests(db: Kysely<Database>, matterId: string, teamMemberId: string): Promise<void> {
-  await ensureAmlFramework(db);
-  const assessmentId = await submitTestAssessment(db, matterId, teamMemberId);
-  const compliance = await staffWith(db, 'compliance');
-  await decideTestClearance(db, assessmentId, compliance.id);
+export async function clearMatterForTests(db: Kysely<Database>, matterId: string): Promise<void> {
+  await ensureAmlFramework(db, []);
+  const preparer = await staffWith(db, 'compliance');
+  const assessmentId = await submitTestAssessment(db, matterId, preparer.id);
+  const approver = await staffWith(db, 'compliance');
+  await decideTestClearance(db, assessmentId, approver.id);
+}
+
+export async function imposeTestHold(db: Kysely<Database>, target: { clientId?: string; matterId?: string }, actorId: string) {
+  const id = randomUUID();
+  const seal = sealed({ text: 'Test hold reason.' }, `aml-hold:${id}`);
+  await sql`select app.impose_aml_hold(${id}, ${target.clientId ?? null}::uuid, ${target.matterId ?? null}::uuid,
+    ${seal.context}, ${seal.keyVersion}::smallint, ${seal.nonce}, ${seal.ciphertext}, ${seal.authTag}, ${actorId})`.execute(db);
+  return id;
+}
+
+export async function liftTestHold(db: Kysely<Database>, holdId: string, actorId: string): Promise<void> {
+  const id = randomUUID();
+  const seal = sealed({ text: 'Test lift reason.' }, `aml-hold-lift:${id}`);
+  await sql`select app.lift_aml_hold(${id}, ${holdId},
+    ${seal.context}, ${seal.keyVersion}::smallint, ${seal.nonce}, ${seal.ciphertext}, ${seal.authTag}, ${actorId})`.execute(db);
+}
+
+export async function grantTestStartException(db: Kysely<Database>, assessmentId: string, actorId: string,
+  actions: ('documents' | 'time')[], expiresOn: string) {
+  const id = randomUUID();
+  const seal = sealed({ text: 'Test early-start grounds.' }, `aml-exception:${id}`);
+  await sql`select app.grant_aml_start_exception(${id}, ${assessmentId}, ${actions}::text[], ${expiresOn}::date,
+    ${seal.context}, ${seal.keyVersion}::smallint, ${seal.nonce}, ${seal.ciphertext}, ${seal.authTag}, ${actorId})`.execute(db);
+  return id;
 }

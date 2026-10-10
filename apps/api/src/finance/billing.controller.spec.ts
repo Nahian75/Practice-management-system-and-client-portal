@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -61,6 +62,7 @@ describe('Billing API', () => {
       await trx.insertInto('matter_team').values({ matter_id: row.id, account_id: partner.id, role: 'supervising_partner', added_by: partner.id }).execute();
       return row;
     });
+    await clearMatterForTests(db, matter.id);
     return matter.id;
   }
 

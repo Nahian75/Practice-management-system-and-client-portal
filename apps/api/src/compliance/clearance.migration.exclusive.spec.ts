@@ -117,7 +117,7 @@ describe('clearance and compliance gate database rules', () => {
     const edited = await readyInScope({ graceDays: 14 });
     await decideTestClearance(db, edited.assessmentId, compliance.id);
     await db.updateTable('client_individuals').set({ town: 'Leeds' }).where('client_id', '=', edited.clientId).execute();
-    const expectedUntil = (await sql<{ day: string }>`select (${today}::date + 14)::text as day`.execute(db)).rows[0]!.day;
+    const expectedUntil = (await sql<{ day: string }>`select (${today}::date + 13)::text as day`.execute(db)).rows[0]!.day;
     expect(await gate(edited.matterId)).toEqual({ state: 'review_due', due_since: today, work_allowed_until: expectedUntil });
 
     const reassessed = await readyInScope();

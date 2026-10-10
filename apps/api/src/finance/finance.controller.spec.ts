@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, revokeTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -61,6 +62,7 @@ describe('Finance time API', () => {
       conflictCheckId: check.body.id,
       parties: [],
     });
+    if (matter.status === 201) await clearMatterForTests(db, matter.body.id);
     return matter.body.id;
   }
 

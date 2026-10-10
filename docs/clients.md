@@ -156,7 +156,7 @@ team (compliance, with a reason) are audited when Matters is built.
 ## Not in this module
 
 - **AML and identity checks:** versioned client CDD and protected evidence are
-  built in Compliance step 15b. Step 15c will make current clearance a work
+  built in Compliance step 15b. Step 15c made current clearance a work
   gate for matters.
 - **Conflict checks:** built with Matters, which searches clients and other
   parties together. Name search may then move to trigram matching (`pg_trgm`)

@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, revokeTestRole, setAccountStatus, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl, testOwnerDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
@@ -46,6 +47,7 @@ describe('finance ledger database rules', () => {
       ]).execute();
       return row;
     });
+    await clearMatterForTests(db, matter.id);
     return { clientId: selectedClient, matterId: matter.id };
   }
 

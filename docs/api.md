@@ -42,6 +42,12 @@ adds high-risk-country lists and matter risk assessments.
 | POST | `/matters/:matterId/aml-risk/:assessmentId/clearance/senior-approval` | `aml.firm_approve` (Partner) | Senior-management approval for a high-risk or PEP clearance, by a partner other than the preparer and approver |
 | GET | `/matters/:matterId/aml-risk/:assessmentId/clearance` | `aml.view_evidence`; matter record rule | `{clearance}` or `{clearance: null}` |
 | GET | `/matters/:matterId/aml-gate` | `aml.view_evidence`; matter record rule | `{state,dueSince,workAllowedUntil,clearanceId}` with state `pending`, `cleared` or `review_due` |
+| GET | `/compliance/holds` | `aml.approve` | Active holds (`?all=true` for all), 100 at a time |
+| POST | `/compliance/holds` | `aml.approve` | Hold one `matterId` or a whole `clientId` with an encrypted reason |
+| POST | `/compliance/holds/:holdId/lift` | `aml.approve` | Lift a hold once, with an encrypted reason |
+| GET | `/compliance/reviews` | `aml.approve` | Open matters pending, held, due, or due within 30 days |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/start-exceptions` | `aml.approve` | Early start for time/documents, at most 30 days, low-risk only |
+| POST | `/matters/:matterId/start-exceptions/:exceptionId/approval` | `aml.firm_approve` | A different partner approves the early start |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

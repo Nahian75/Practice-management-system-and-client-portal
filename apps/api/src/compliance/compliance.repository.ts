@@ -8,7 +8,7 @@ import type {
 } from '../database/schema.js';
 import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
 import type {
-  AssessmentWork, CddCase, Clearance, Gate, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, Clearance, Gate, Hold, ReviewQueueItem, StartException, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
 
@@ -602,6 +602,102 @@ export class ComplianceRepository {
       select state, due_since::text, work_allowed_until::text, clearance_id from app.aml_gate(${matterId}::uuid)
     `.execute(executor)).rows[0]!;
     return { state: row.state, dueSince: row.due_since, workAllowedUntil: row.work_allowed_until, clearanceId: row.clearance_id };
+  }
+
+  async imposeHold(input: { id: string; clientId: string | null; matterId: string | null; sealed: SealedComplianceData; actorId: string },
+    trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.impose_aml_hold(
+      ${input.id}::uuid, ${input.clientId}::uuid, ${input.matterId}::uuid,
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async liftHold(input: { id: string; holdId: string; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.lift_aml_hold(
+      ${input.id}::uuid, ${input.holdId}::uuid,
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async listHolds(activeOnly: boolean, before?: string): Promise<Hold[]> {
+    let query = this.db.selectFrom('aml_holds as h').leftJoin('aml_hold_lifts as l', 'l.hold_id', 'h.id').select('h.id');
+    if (activeOnly) query = query.where('l.id', 'is', null);
+    if (before) query = query.where('h.id', '<', before);
+    const rows = await query.orderBy('h.id', 'desc').limit(100).execute();
+    return (await Promise.all(rows.map((row) => this.findHold(row.id)))).filter((item): item is Hold => item !== undefined);
+  }
+
+  async findHold(id: string, executor: Kysely<Database> = this.db): Promise<Hold | undefined> {
+    const row = await executor.selectFrom('aml_holds as h')
+      .innerJoin('accounts as i', 'i.id', 'h.imposed_by')
+      .leftJoin('aml_hold_lifts as l', 'l.hold_id', 'h.id')
+      .leftJoin('accounts as lifter', 'lifter.id', 'l.lifted_by')
+      .selectAll('h')
+      .select(['i.display_name as imposed_by_name', 'l.lifted_at', 'l.lifted_by', 'lifter.display_name as lifted_by_name',
+        'l.encryption_context as lift_context', 'l.key_version as lift_key', 'l.nonce as lift_nonce',
+        'l.ciphertext as lift_ciphertext', 'l.auth_tag as lift_tag'])
+      .where('h.id', '=', id).executeTakeFirst();
+    if (!row) return undefined;
+    const lift = row.lifted_at && row.lifted_by && row.lifted_by_name && row.lift_context && row.lift_key && row.lift_nonce
+      && row.lift_ciphertext && row.lift_tag
+      ? { reason: this.open<{ text: string }>(row.lift_context, row.lift_key, row.lift_nonce, row.lift_ciphertext, row.lift_tag).text,
+        liftedBy: { accountId: row.lifted_by, displayName: row.lifted_by_name }, liftedAt: row.lifted_at }
+      : null;
+    return {
+      id: row.id, clientId: row.client_id, matterId: row.matter_id,
+      reason: this.open<{ text: string }>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag).text,
+      imposedBy: { accountId: row.imposed_by, displayName: row.imposed_by_name }, imposedAt: row.imposed_at, lift,
+    };
+  }
+
+  async grantStartException(input: {
+    id: string; assessmentId: string; permittedActions: ('documents' | 'time')[]; expiresOn: string;
+    sealed: SealedComplianceData; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.grant_aml_start_exception(
+      ${input.id}::uuid, ${input.assessmentId}::uuid, ${input.permittedActions}::text[], ${input.expiresOn}::date,
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async approveStartException(id: string, actorId: string, trx: Kysely<Database>): Promise<void> {
+    await sql`select app.approve_aml_start_exception(${id}::uuid, ${actorId}::uuid)`.execute(trx);
+  }
+
+  async findStartException(matterId: string, id: string, executor: Kysely<Database> = this.db): Promise<StartException | undefined> {
+    const row = await executor.selectFrom('aml_start_exceptions as e')
+      .innerJoin('accounts as g', 'g.id', 'e.granted_by')
+      .leftJoin('aml_exception_approvals as p', 'p.exception_id', 'e.id')
+      .leftJoin('accounts as a', 'a.id', 'p.approved_by')
+      .selectAll('e')
+      .select(['g.display_name as granted_by_name', 'p.approved_at', 'a.id as approver_id', 'a.display_name as approver_name'])
+      .where('e.id', '=', id).where('e.matter_id', '=', matterId).executeTakeFirst();
+    if (!row) return undefined;
+    return {
+      id: row.id, matterId: row.matter_id, assessmentId: row.assessment_id, permittedActions: row.permitted_actions,
+      expiresOn: row.expires_on,
+      grounds: this.open<{ text: string }>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag).text,
+      grantedBy: { accountId: row.granted_by, displayName: row.granted_by_name }, grantedAt: row.granted_at,
+      approval: row.approved_at && row.approver_id && row.approver_name
+        ? { approvedBy: { accountId: row.approver_id, displayName: row.approver_name }, approvedAt: row.approved_at }
+        : null,
+    };
+  }
+
+  async reviewQueue(): Promise<ReviewQueueItem[]> {
+    const rows = (await sql<{ matter_id: string; reference: string; state: Gate['state']; due_since: string | null;
+      work_allowed_until: string | null; review_due_on: string | null }>`
+      select q.matter_id, m.reference, q.state, q.due_since::text, q.work_allowed_until::text, q.review_due_on::text
+      from app.aml_review_queue(200) q join app.matters m on m.id = q.matter_id
+    `.execute(this.db)).rows;
+    return rows.map((row) => ({ matterId: row.matter_id, reference: row.reference, state: row.state, dueSince: row.due_since,
+      workAllowedUntil: row.work_allowed_until, reviewDueOn: row.review_due_on }));
   }
 
   private open<T>(context: string, keyVersion: number, nonce: Buffer, ciphertext: Buffer, authTag: Buffer): T {

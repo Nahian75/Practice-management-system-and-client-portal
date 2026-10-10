@@ -2,7 +2,7 @@
 
 **Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f and Compliance steps 15a, 15b and 15c-1 to 15c-3, plus
+the security-reviewed Finance steps 14a to 14f and Compliance steps 15a, 15b and 15c, plus
 Playwright end-to-end tests for the staff app, Tasks, Notifications and the
 client portal.
 
@@ -49,7 +49,14 @@ functions. Parallel test files call `ensureAmlFramework`, which publishes firm
 controls and a country list only when none are current: approving a newer
 version makes every cleared matter due for review, so parallel files must not
 supersede each other's framework. Tests that deliberately supersede one run as
-`*.exclusive.spec.ts`.
+`*.exclusive.spec.ts`. Tests of other modules call `clearMatterForTests` so
+gated work can proceed; it clears through the same functions a firm would use.
+The AML test key is fixed, like the mail key, because firm-wide Compliance
+lists decrypt rows that other workers and earlier runs created.
+
+In the browser tests, the `aml-setup` Playwright project publishes and approves
+the framework through the API once, before any test, and `openMatter` clears
+each matter it opens unless told not to.
 
 ## Email tests
 

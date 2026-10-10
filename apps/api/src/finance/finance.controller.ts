@@ -138,7 +138,7 @@ export class FinanceController {
       case 'not_found':
         throw new NotFoundException('No matter with this id');
       case 'not_open':
-        throw new ConflictException('Time is recorded only on open matters');
+        throw new ConflictException('Time is recorded only on open matters with current compliance clearance');
       case 'missing_rate':
         throw new ConflictException('No staff rate applies on this date');
       case 'changed_meanwhile':

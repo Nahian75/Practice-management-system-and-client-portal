@@ -1009,6 +1009,22 @@ export interface AmlSeniorApprovalsTable {
   id: DatabaseSet<string>; clearance_id: DatabaseSet<string>; approved_by: DatabaseSet<string>; approved_at: DatabaseSet<Date>;
 }
 
+export interface AmlHoldsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; matter_id: DatabaseSet<string | null>;
+  imposed_by: DatabaseSet<string>; imposed_at: DatabaseSet<Date>;
+}
+export interface AmlHoldLiftsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; hold_id: DatabaseSet<string>; lifted_by: DatabaseSet<string>; lifted_at: DatabaseSet<Date>;
+}
+export interface AmlStartExceptionsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; matter_id: DatabaseSet<string>; assessment_id: DatabaseSet<string>;
+  permitted_actions: DatabaseSet<('documents' | 'time')[]>; expires_on: DatabaseSet<string>;
+  granted_by: DatabaseSet<string>; granted_at: DatabaseSet<Date>;
+}
+export interface AmlExceptionApprovalsTable {
+  id: DatabaseSet<string>; exception_id: DatabaseSet<string>; approved_by: DatabaseSet<string>; approved_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1025,12 +1041,16 @@ export interface Database {
   aml_client_changes: AmlClientChangesTable;
   aml_country_list_approvals: AmlCountryListApprovalsTable;
   aml_country_list_versions: AmlCountryListVersionsTable;
+  aml_exception_approvals: AmlExceptionApprovalsTable;
+  aml_hold_lifts: AmlHoldLiftsTable;
+  aml_holds: AmlHoldsTable;
   aml_measure_results: AmlMeasureResultsTable;
   aml_measures: AmlMeasuresTable;
   aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;
   aml_risk_assessments: AmlRiskAssessmentsTable;
   aml_senior_approvals: AmlSeniorApprovalsTable;
   aml_source_conclusions: AmlSourceConclusionsTable;
+  aml_start_exceptions: AmlStartExceptionsTable;
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;

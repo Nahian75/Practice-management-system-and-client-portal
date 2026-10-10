@@ -16,7 +16,7 @@ import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.j
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import type {
-  AssessmentWork, CddCase, Clearance, Gate, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
 
@@ -542,6 +542,73 @@ export class ComplianceService {
       throw error;
     }
   }
+
+  listHolds(activeOnly: boolean, before?: string) { return this.records.listHolds(activeOnly, before).then(page); }
+
+  /** Exactly one of `clientId` and `matterId`; a client hold covers every matter of that client. */
+  async imposeHold(target: { clientId: string | null; matterId: string | null }, reason: string,
+    by: ComplianceActor): Promise<Change<Hold>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const id = await this.records.newId(trx);
+        await this.records.imposeHold({ id, ...target, sealed: this.cipher.seal({ text: reason }, `aml-hold:${id}`),
+          actorId: by.accountId }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.hold_imposed', outcome: 'success',
+          resource: { type: 'aml_hold', id }, metadata: {}, ...by.context }, trx);
+        return this.records.findHold(id, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return databaseOutcome(error); }
+  }
+
+  async liftHold(holdId: string, reason: string, by: ComplianceActor): Promise<Change<Hold>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const id = await this.records.newId(trx);
+        await this.records.liftHold({ id, holdId, sealed: this.cipher.seal({ text: reason }, `aml-hold-lift:${id}`),
+          actorId: by.accountId }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.hold_lifted', outcome: 'success',
+          resource: { type: 'aml_hold', id: holdId }, metadata: {}, ...by.context }, trx);
+        return this.records.findHold(holdId, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return databaseOutcome(error); }
+  }
+
+  async grantStartException(matterId: string, assessmentId: string,
+    input: { permittedActions: ('documents' | 'time')[]; expiresOn: string; grounds: string },
+    by: ComplianceActor): Promise<Change<StartException>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        await this.records.assertMatterAccess(matterId, by.accountId, trx);
+        if (!await this.records.workBelongs(matterId, assessmentId, null, trx)) return undefined;
+        const id = await this.records.newId(trx);
+        await this.records.grantStartException({ id, assessmentId, permittedActions: input.permittedActions,
+          expiresOn: input.expiresOn, sealed: this.cipher.seal({ text: input.grounds }, `aml-exception:${id}`),
+          actorId: by.accountId }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.start_exception_granted', outcome: 'success',
+          resource: { type: 'aml_start_exception', id }, metadata: { matterId }, ...by.context }, trx);
+        return this.records.findStartException(matterId, id, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
+  }
+
+  /** Like senior approval, a firm-wide Partner decision that needs no place on the matter team. */
+  async approveStartException(matterId: string, exceptionId: string, by: ComplianceActor): Promise<Change<StartException>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        if (!await this.records.findStartException(matterId, exceptionId, trx)) return undefined;
+        await this.records.approveStartException(exceptionId, by.accountId, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.start_exception_approved', outcome: 'success',
+          resource: { type: 'aml_start_exception', id: exceptionId }, metadata: { matterId }, ...by.context }, trx);
+        return this.records.findStartException(matterId, exceptionId, trx);
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
+  }
+
+  reviewQueue() { return this.records.reviewQueue(); }
 
   /**
    * Runs one write against an assessment named under its matter and returns the work as it now stands.

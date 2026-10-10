@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, revokeTestRole, type TestAccount } from '../../test/accounts.js';
 import { testAppDatabaseUrl, testOwnerDatabaseUrl } from '../../test/database.js';
 import { createDatabase } from '../database/database.js';
@@ -41,6 +42,9 @@ describe('bank statement and reconciliation database rules', () => {
         { matter_id: matter.id, account_id: partner.id, role: 'supervising_partner', added_by: feeEarner.id },
       ]).execute();
       return matter.id;
+    }).then(async (matterId) => {
+      await clearMatterForTests(db, matterId);
+      return matterId;
     });
   }
 

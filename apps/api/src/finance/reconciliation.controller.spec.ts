@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
@@ -54,6 +55,9 @@ describe('bank statement and reconciliation API', () => {
         { matter_id: matter.id, account_id: partner.id, role: 'supervising_partner', added_by: feeEarner.id },
       ]).execute();
       return matter.id;
+    }).then(async (matterId) => {
+      await clearMatterForTests(db, matterId);
+      return matterId;
     });
   }
 

@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMatterForTests } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
@@ -47,7 +48,7 @@ describe('client payment API', () => {
   }
 
   async function setupMatter() {
-    return db.transaction().execute(async (trx) => {
+    const matterId = await db.transaction().execute(async (trx) => {
       const client = await trx.insertInto('clients').values({ kind: 'individual', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
       await trx.insertInto('client_individuals').values({
         client_id: client.id, given_names: 'API', family_name: unique(), address_line1: '2 Client Road',
@@ -59,13 +60,18 @@ describe('client payment API', () => {
         { matter_id: matter.id, account_id: feeEarner.id, role: 'fee_earner', added_by: feeEarner.id },
         { matter_id: matter.id, account_id: partner.id, role: 'supervising_partner', added_by: feeEarner.id },
       ]).execute();
-      const document = await trx.insertInto('documents').values({ matter_id: matter.id, title: 'Authority', category: 'evidence', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
+      return matter.id;
+    });
+    // The evidence is an ordinary matter document, so it follows clearance.
+    await clearMatterForTests(db, matterId);
+    return db.transaction().execute(async (trx) => {
+      const document = await trx.insertInto('documents').values({ matter_id: matterId, title: 'Authority', category: 'evidence', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
       await trx.insertInto('document_versions').values({
         document_id: document.id, file_name: 'authority.pdf', media_type: 'application/pdf', size_bytes: 123,
         sha256: randomBytes(32), storage_key: randomUUID(), key_version: 1, key_nonce: randomBytes(12),
         wrapped_key: randomBytes(32), key_tag: randomBytes(16), uploaded_by: feeEarner.id,
       }).execute();
-      return { matterId: matter.id, evidenceId: document.id };
+      return { matterId, evidenceId: document.id };
     });
   }
 

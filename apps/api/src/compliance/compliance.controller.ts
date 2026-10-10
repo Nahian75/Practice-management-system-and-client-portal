@@ -14,7 +14,7 @@ import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from '../documents/content-disposition.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type {
-  AssessmentWork, CddCase, Clearance, Gate, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
+  AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
 } from './compliance.js';
 import { ComplianceService, type Change, type ComplianceActor } from './compliance.service.js';
 
@@ -240,6 +240,27 @@ const optionalClearance = z.object({ clearance: clearanceSchema.nullable() });
 const gateSchema = z.object({ state: z.enum(['pending', 'cleared', 'review_due', 'held']), dueSince: date.nullable(),
   workAllowedUntil: date.nullable(), clearanceId: z.uuid().nullable() });
 
+const holdBody = z.strictObject({ clientId: z.uuid().optional(), matterId: z.uuid().optional(), reason: riskText })
+  .refine((value) => (value.clientId === undefined) !== (value.matterId === undefined), 'Name exactly one client or matter');
+const liftBody = z.strictObject({ reason: riskText });
+const holdSchema = z.object({ id: z.uuid(), clientId: z.uuid(), matterId: z.uuid().nullable(), reason: z.string(),
+  imposedBy: person, imposedAt: z.iso.datetime(),
+  lift: z.object({ reason: z.string(), liftedBy: person, liftedAt: z.iso.datetime() }).nullable() });
+const holdPage = z.object({ holds: z.array(holdSchema), next: z.uuid().nullable() });
+const holdQuery = z.strictObject({ before: z.uuid().optional(), all: z.enum(['true']).optional() });
+const exceptionBody = z.strictObject({
+  permittedActions: z.array(z.enum(['documents', 'time'])).min(1).max(2)
+    .refine((actions) => new Set(actions).size === actions.length, 'Each action may appear once')
+    .transform((actions) => [...actions].sort()),
+  expiresOn: date, grounds: riskText,
+});
+const exceptionSchema = z.object({ id: z.uuid(), matterId: z.uuid(), assessmentId: z.uuid(),
+  permittedActions: z.array(z.enum(['documents', 'time'])), expiresOn: date, grounds: z.string(),
+  grantedBy: person, grantedAt: z.iso.datetime(), approval: z.object({ approvedBy: person, approvedAt: z.iso.datetime() }).nullable() });
+const reviewQueueSchema = z.object({ matters: z.array(z.object({ matterId: z.uuid(), reference: z.string(),
+  state: z.enum(['pending', 'cleared', 'review_due', 'held']), dueSince: date.nullable(), workAllowedUntil: date.nullable(),
+  reviewDueOn: date.nullable() })) });
+
 function actorFor(session: ResolvedSession, request: Request): ComplianceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
@@ -298,6 +319,15 @@ function changedClearance(result: Change<Clearance>) {
   if (result.outcome === 'conflict') throw new ConflictException('The clearance or approval is refused; complete or reassess the work first');
   return serializeClearance(result.value);
 }
+
+const serializeHold = (value: Hold) => ({
+  ...value, imposedAt: value.imposedAt.toISOString(),
+  lift: value.lift ? { ...value.lift, liftedAt: value.lift.liftedAt.toISOString() } : null,
+});
+const serializeException = (value: StartException) => ({
+  ...value, grantedAt: value.grantedAt.toISOString(),
+  approval: value.approval ? { ...value.approval, approvedAt: value.approval.approvedAt.toISOString() } : null,
+});
 
 function changedWork(result: Change<AssessmentWork>) {
   if (result.outcome === 'not_found') throw new NotFoundException('No risk assessment with this id');
@@ -648,6 +678,57 @@ export class ComplianceController {
     const value = await this.compliance.gate(matterId, session.account.id);
     if (!value) throw new NotFoundException('No matter with this id');
     return value;
+  }
+
+  @Get('compliance/holds') @RequirePermission('aml.approve') @ResponseSchema(holdPage)
+  async holds(@Query({ schema: holdQuery }) query: z.infer<typeof holdQuery>) {
+    const page = await this.compliance.listHolds(query.all !== 'true', query.before);
+    return { holds: page.items.map(serializeHold), next: page.next };
+  }
+
+  @Post('compliance/holds') @RequirePermission('aml.approve') @ResponseSchema(holdSchema)
+  async imposeHold(@Body({ schema: holdBody }) body: z.infer<typeof holdBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.imposeHold({ clientId: body.clientId ?? null, matterId: body.matterId ?? null },
+      body.reason, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No client or matter with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('The hold could not be recorded');
+    return serializeHold(result.value);
+  }
+
+  @Post('compliance/holds/:holdId/lift') @RequirePermission('aml.approve') @ResponseSchema(holdSchema)
+  async liftHold(@Param('holdId', { schema: z.uuid() }) holdId: string, @Body({ schema: liftBody }) body: z.infer<typeof liftBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.liftHold(holdId, body.reason, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No hold with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('This hold has already been lifted');
+    return serializeHold(result.value);
+  }
+
+  @Get('compliance/reviews') @RequirePermission('aml.approve') @ResponseSchema(reviewQueueSchema)
+  async reviewQueue() {
+    return { matters: await this.compliance.reviewQueue() };
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/start-exceptions') @RequirePermission('aml.approve') @ResponseSchema(exceptionSchema)
+  async grantStartException(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @Body({ schema: exceptionBody }) body: z.infer<typeof exceptionBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.grantStartException(matterId, assessmentId, body, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No risk assessment with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('An early start needs a current low-risk assessment, no hold and at most 30 days');
+    return serializeException(result.value);
+  }
+
+  @Post('matters/:matterId/start-exceptions/:exceptionId/approval') @RequirePermission('aml.firm_approve') @ResponseSchema(exceptionSchema)
+  async approveStartException(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('exceptionId', { schema: z.uuid() }) exceptionId: string,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.approveStartException(matterId, exceptionId, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No early-start exception with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('The exception needs a different partner and must not have expired');
+    return serializeException(result.value);
   }
 
   @Get('matters/:matterId/aml-risk/:assessmentId/work') @RequirePermission('aml.view_evidence') @ResponseSchema(workSchema)

@@ -111,3 +111,16 @@ export interface Clearance {
 }
 export type GateState = 'pending' | 'cleared' | 'review_due' | 'held';
 export interface Gate { state: GateState; dueSince: string | null; workAllowedUntil: string | null; clearanceId: string | null }
+
+export interface Hold {
+  id: string; clientId: string; matterId: string | null; reason: string; imposedBy: Person; imposedAt: Date;
+  lift: { reason: string; liftedBy: Person; liftedAt: Date } | null;
+}
+export interface StartException {
+  id: string; matterId: string; assessmentId: string; permittedActions: ('documents' | 'time')[]; expiresOn: string;
+  grounds: string; grantedBy: Person; grantedAt: Date; approval: { approvedBy: Person; approvedAt: Date } | null;
+}
+export interface ReviewQueueItem {
+  matterId: string; reference: string; state: GateState; dueSince: string | null;
+  workAllowedUntil: string | null; reviewDueOn: string | null;
+}
