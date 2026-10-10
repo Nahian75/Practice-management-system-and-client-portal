@@ -3,14 +3,18 @@ import { sql, type Kysely } from 'kysely';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import { DATABASE } from '../database/database.module.js';
 import type {
-  AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship,
+  AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlMeasureKind, AmlOfficerKind, AmlOutcome, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship,
   Database, DocumentMediaType,
 } from '../database/schema.js';
 import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
 import type {
-  CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
+
+/** Must match app.is_enhanced_aml_measure in migration 0051. */
+const ENHANCED_MEASURES = new Set<AmlMeasureKind>(['additional_sources', 'ownership_background', 'transaction_reasons',
+  'source_of_funds', 'source_of_wealth', 'enhanced_monitoring']);
 
 interface EvidenceMetadata { fileName: string; documentIdentifier: string | null; providerPayloadHash: string | null }
 interface VerificationDetails { documentIdentifier: string | null; providerResult: string | null; reliance: Record<string, unknown> | null }
@@ -476,6 +480,84 @@ export class ComplianceRepository {
       reviewDueOn: row.review_due_on, reviewGraceDays: row.review_grace_days,
       narrative: this.open<RiskNarrative>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag),
       controls, preparedBy: { accountId: row.prepared_by, displayName: row.prepared_by_name }, submittedAt: row.submitted_at,
+    };
+  }
+
+  /** Whether the assessment, and the measure when given, belong to the matter named in the URL. */
+  async workBelongs(matterId: string, assessmentId: string, measureId: string | null, executor: Kysely<Database> = this.db) {
+    let query = executor.selectFrom('aml_risk_assessments as r').select('r.id')
+      .where('r.id', '=', assessmentId).where('r.matter_id', '=', matterId);
+    if (measureId) {
+      query = query.innerJoin('aml_measures as m', 'm.assessment_id', 'r.id').where('m.id', '=', measureId);
+    }
+    return (await query.executeTakeFirst()) !== undefined;
+  }
+
+  async addMeasure(input: { id: string; assessmentId: string; kind: AmlMeasureKind; sealed: SealedComplianceData; actorId: string },
+    trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.add_aml_measure(
+      ${input.id}::uuid, ${input.assessmentId}::uuid, ${input.kind},
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async recordMeasureResult(input: {
+    id: string; measureId: string; outcome: AmlOutcome; evidenceIds: string[]; sealed: SealedComplianceData; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.record_aml_measure_result(
+      ${input.id}::uuid, ${input.measureId}::uuid, ${input.outcome}, ${input.evidenceIds}::uuid[],
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async recordSourceConclusion(input: {
+    id: string; assessmentId: string; kind: 'funds' | 'wealth'; subjectId: string | null;
+    amountMinPence: string; amountMaxPence: string; outcome: AmlOutcome; evidenceIds: string[];
+    sealed: SealedComplianceData; actorId: string;
+  }, trx: Kysely<Database>): Promise<void> {
+    const { sealed } = input;
+    await sql`select app.record_aml_source_conclusion(
+      ${input.id}::uuid, ${input.assessmentId}::uuid, ${input.kind}, ${input.subjectId}::uuid,
+      ${input.amountMinPence}::bigint, ${input.amountMaxPence}::bigint, ${input.outcome}, ${input.evidenceIds}::uuid[],
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async findAssessmentWork(matterId: string, assessmentId: string, actorId: string, accessChecked = false,
+    executor: Kysely<Database> = this.db): Promise<AssessmentWork | undefined> {
+    if (!accessChecked) await this.assertMatterAccess(matterId, actorId, executor);
+    if (!await this.workBelongs(matterId, assessmentId, null, executor)) return undefined;
+    const [measures, results, conclusions] = await Promise.all([
+      executor.selectFrom('aml_measures as m').innerJoin('accounts as a', 'a.id', 'm.recorded_by')
+        .selectAll('m').select('a.display_name').where('m.assessment_id', '=', assessmentId).orderBy('m.recorded_at').orderBy('m.id').execute(),
+      executor.selectFrom('aml_measure_results as r').innerJoin('aml_measures as m', 'm.id', 'r.measure_id')
+        .innerJoin('accounts as a', 'a.id', 'r.recorded_by')
+        .selectAll('r').select('a.display_name').where('m.assessment_id', '=', assessmentId).orderBy('r.recorded_at').orderBy('r.id').execute(),
+      executor.selectFrom('aml_source_conclusions as c').innerJoin('accounts as a', 'a.id', 'c.recorded_by')
+        .selectAll('c').select('a.display_name').where('c.assessment_id', '=', assessmentId).orderBy('c.recorded_at').orderBy('c.id').execute(),
+    ]);
+    const reasoning = (row: { encryption_context: string; key_version: number; nonce: Buffer; ciphertext: Buffer; auth_tag: Buffer }) =>
+      this.open<{ text: string }>(row.encryption_context, row.key_version, row.nonce, row.ciphertext, row.auth_tag).text;
+    return {
+      assessmentId,
+      measures: measures.map((m) => ({
+        id: m.id, kind: m.kind, enhanced: ENHANCED_MEASURES.has(m.kind), description: reasoning(m),
+        recordedBy: { accountId: m.recorded_by, displayName: m.display_name }, recordedAt: m.recorded_at,
+        results: results.filter((r) => r.measure_id === m.id).map((r) => ({
+          id: r.id, outcome: r.outcome, evidenceIds: r.evidence_ids, reasoning: reasoning(r),
+          recordedBy: { accountId: r.recorded_by, displayName: r.display_name }, recordedAt: r.recorded_at,
+        })),
+      })),
+      conclusions: conclusions.map((c) => ({
+        id: c.id, kind: c.kind, subjectId: c.subject_id, amountMinPence: c.amount_min_pence, amountMaxPence: c.amount_max_pence,
+        outcome: c.outcome, evidenceIds: c.evidence_ids, reasoning: reasoning(c),
+        recordedBy: { accountId: c.recorded_by, displayName: c.display_name }, recordedAt: c.recorded_at,
+      })),
     };
   }
 

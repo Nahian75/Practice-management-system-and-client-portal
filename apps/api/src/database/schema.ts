@@ -973,6 +973,29 @@ export interface AmlRiskAssessmentControlsTable {
   assessment_id: DatabaseSet<string>; control_version_id: DatabaseSet<string>; kind: DatabaseSet<AmlControlKind>;
 }
 
+export type AmlMeasureKind = 'identity' | 'beneficial_ownership' | 'authority' | 'purpose_nature'
+  | 'ongoing_monitoring' | 'additional_sources' | 'ownership_background' | 'transaction_reasons'
+  | 'source_of_funds' | 'source_of_wealth' | 'enhanced_monitoring' | 'other';
+export type AmlOutcome = 'satisfied' | 'not_satisfied';
+interface AmlSealedColumns {
+  encryption_context: DatabaseSet<string>; key_version: DatabaseSet<number>; nonce: DatabaseSet<Buffer>;
+  ciphertext: DatabaseSet<Buffer>; auth_tag: DatabaseSet<Buffer>;
+}
+export interface AmlMeasuresTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; assessment_id: DatabaseSet<string>; kind: DatabaseSet<AmlMeasureKind>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlMeasureResultsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; measure_id: DatabaseSet<string>; outcome: DatabaseSet<AmlOutcome>;
+  evidence_ids: DatabaseSet<string[]>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlSourceConclusionsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; assessment_id: DatabaseSet<string>; kind: DatabaseSet<'funds' | 'wealth'>;
+  subject_id: DatabaseSet<string | null>; amount_min_pence: DatabaseSet<string>; amount_max_pence: DatabaseSet<string>;
+  outcome: DatabaseSet<AmlOutcome>; evidence_ids: DatabaseSet<string[]>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -987,8 +1010,11 @@ export interface Database {
   aml_cdd_verifications: AmlCddVerificationsTable;
   aml_country_list_approvals: AmlCountryListApprovalsTable;
   aml_country_list_versions: AmlCountryListVersionsTable;
+  aml_measure_results: AmlMeasureResultsTable;
+  aml_measures: AmlMeasuresTable;
   aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;
   aml_risk_assessments: AmlRiskAssessmentsTable;
+  aml_source_conclusions: AmlSourceConclusionsTable;
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;

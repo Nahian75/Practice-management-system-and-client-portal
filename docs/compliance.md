@@ -5,8 +5,8 @@ design. Steps 15a and 15b are built: permissions, protected nominated-officer an
 appointments, fixed firm-control versions with separate Partner approval,
 training completions and independent-review records, plus versioned client CDD,
 encrypted identity facts and separately protected evidence. Step 15c-1 adds
-partner-approved high-risk-country lists and permanent matter risk assessments.
-The rest of step 15c and steps 15d to 15f remain planned.
+partner-approved high-risk-country lists and permanent matter risk assessments;
+step 15c-2 adds CDD/EDD measures and source-of-funds/wealth conclusions. The rest of step 15c and steps 15d to 15f remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -607,6 +607,30 @@ content, copied answers and the in-scope and lowering rules. Each database
 safeguard and the copied-answer check was deliberately broken once in the
 test database or a restored file copy, and a test failed each time.
 
+## Step 15c-2 API
+
+- `POST /matters/:matterId/aml-risk/:assessmentId/measures` adds a discrete
+  measure (`identity`, `beneficial_ownership`, `authority`, `purpose_nature`,
+  `ongoing_monitoring`, the enhanced kinds `additional_sources`,
+  `ownership_background`, `transaction_reasons`, `source_of_funds`,
+  `source_of_wealth`, `enhanced_monitoring`, or `other`) with an encrypted
+  description.
+- `POST .../measures/:measureId/results` records `satisfied` or
+  `not_satisfied` with encrypted reasoning and up to 50 evidence ids. Results are
+  append-only; the latest one counts.
+- `POST .../sources` records a source-of-funds or source-of-wealth conclusion:
+  the relevant person from the relied-on CDD case, a pence range, outcome,
+  evidence and encrypted reasoning.
+- `GET .../work` returns the measures, their results and the conclusions.
+
+Work is accepted only for the latest assessment version of an open matter the
+caller's team holds, or any matter for Compliance. Evidence and people must come
+from the CDD case the assessment relies on; an assessment without one accepts
+no evidence links. An assessment named under the wrong matter answers 404.
+Audit metadata holds only the matter id, because even a measure's kind can hint
+at PEP or high-risk status. All three tables are insert-only through protected
+functions and immutable for the owner.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -624,7 +648,7 @@ and updated documentation before the next step.
   and ongoing-review queue. Built in four parts:
   - **15c-1. Built 2026-10-10.** Partner-approved high-risk-country list
     versions and permanent matter risk-assessment versions.
-  - **15c-2.** Discrete CDD/EDD measures and source-of-funds/wealth conclusions.
+  - **15c-2. Built 2026-10-10.** Discrete CDD/EDD measures and source-of-funds/wealth conclusions.
   - **15c-3.** Compliance and senior-management clearance, its fixed snapshot
     and the live gate state.
   - **15c-4.** Gate enforcement in time, billing, documents and Finance, the

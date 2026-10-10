@@ -34,6 +34,10 @@ adds high-risk-country lists and matter risk assessments.
 | POST | `/matters/:matterId/aml-risk` | `aml.assess`; matter team, or Compliance | Fix a permanent assessment version with scope, rating, factors, jurisdictions, value band, review plan and encrypted written answers; 409 when a database rule refuses it |
 | GET | `/matters/:matterId/aml-risk` | `aml.view_evidence`; same record rule | `{assessments,next}`: 100 summaries without written answers |
 | GET | `/matters/:matterId/aml-risk/:assessmentId` | `aml.view_evidence`; same record rule | Full assessment with decrypted answers and governing controls |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/measures` | `aml.assess`; matter team, or Compliance | Add a discrete CDD/EDD measure with an encrypted description; latest assessment of an open matter only |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/measures/:measureId/results` | `aml.assess`; same | Append `satisfied`/`not_satisfied` with encrypted reasoning and evidence from the relied-on CDD case |
+| POST | `/matters/:matterId/aml-risk/:assessmentId/sources` | `aml.assess`; same | Append a source-of-funds/wealth conclusion: person, pence range, outcome, evidence, encrypted reasoning |
+| GET | `/matters/:matterId/aml-risk/:assessmentId/work` | `aml.view_evidence`; same record rule | Measures with their results, and source conclusions |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

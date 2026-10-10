@@ -14,7 +14,7 @@ import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from '../documents/content-disposition.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type {
-  CddCase, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
+  AssessmentWork, CddCase, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
 } from './compliance.js';
 import { ComplianceService, type Change, type ComplianceActor } from './compliance.service.js';
 
@@ -207,6 +207,28 @@ const riskPage = z.object({
   next: z.uuid().nullable(),
 });
 
+const measureKind = z.enum(['identity', 'beneficial_ownership', 'authority', 'purpose_nature', 'ongoing_monitoring',
+  'additional_sources', 'ownership_background', 'transaction_reasons', 'source_of_funds', 'source_of_wealth',
+  'enhanced_monitoring', 'other']);
+const outcome = z.enum(['satisfied', 'not_satisfied']);
+const evidenceIds = z.array(z.uuid()).max(50).refine((ids) => new Set(ids).size === ids.length, 'Each evidence file may appear once');
+const pence = z.string().regex(/^[0-9]{1,15}$/, 'A whole number of pence');
+const measureBody = z.strictObject({ kind: measureKind, description: riskText });
+const measureResultBody = z.strictObject({ outcome, evidenceIds, reasoning: riskText });
+const sourceBody = z.strictObject({
+  kind: z.enum(['funds', 'wealth']), subjectId: z.uuid().nullable(), amountMinPence: pence, amountMaxPence: pence,
+  outcome, evidenceIds, reasoning: riskText,
+}).refine((value) => BigInt(value.amountMaxPence) >= BigInt(value.amountMinPence),
+  { path: ['amountMaxPence'], message: 'The maximum cannot be below the minimum' });
+const recordedBy = { recordedBy: person, recordedAt: z.iso.datetime() };
+const workSchema = z.object({
+  assessmentId: z.uuid(),
+  measures: z.array(z.object({ id: z.uuid(), kind: measureKind, enhanced: z.boolean(), description: z.string(), ...recordedBy,
+    results: z.array(z.object({ id: z.uuid(), outcome, evidenceIds: z.array(z.uuid()), reasoning: z.string(), ...recordedBy })) })),
+  conclusions: z.array(z.object({ id: z.uuid(), kind: z.enum(['funds', 'wealth']), subjectId: z.uuid().nullable(),
+    amountMinPence: z.string(), amountMaxPence: z.string(), outcome, evidenceIds: z.array(z.uuid()), reasoning: z.string(), ...recordedBy })),
+});
+
 function actorFor(session: ResolvedSession, request: Request): ComplianceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
@@ -247,6 +269,19 @@ const summarizeRisk = (value: RiskAssessment) => ({
   id: value.id, version: value.version, inScope: value.inScope, rating: value.rating,
   reviewDueOn: value.reviewDueOn, preparedBy: value.preparedBy, submittedAt: value.submittedAt.toISOString(),
 });
+
+const serializeWork = (value: AssessmentWork) => ({
+  assessmentId: value.assessmentId,
+  measures: value.measures.map((m) => ({ ...m, recordedAt: m.recordedAt.toISOString(),
+    results: m.results.map((r) => ({ ...r, recordedAt: r.recordedAt.toISOString() })) })),
+  conclusions: value.conclusions.map((c) => ({ ...c, recordedAt: c.recordedAt.toISOString() })),
+});
+
+function changedWork(result: Change<AssessmentWork>) {
+  if (result.outcome === 'not_found') throw new NotFoundException('No risk assessment with this id');
+  if (result.outcome === 'conflict') throw new ConflictException('Only the current assessment of an open matter can change, with its own CDD evidence');
+  return serializeWork(result.value);
+}
 
 function changedCdd(result: Change<CddCase>) {
   if (result.outcome === 'not_found') throw new NotFoundException('No CDD draft with this id');
@@ -561,5 +596,38 @@ export class ComplianceController {
     const value = await this.compliance.findRiskAssessment(matterId, assessmentId, session.account.id);
     if (!value) throw new NotFoundException('No risk assessment with this id');
     return serializeRisk(value);
+  }
+
+  @Get('matters/:matterId/aml-risk/:assessmentId/work') @RequirePermission('aml.view_evidence') @ResponseSchema(workSchema)
+  async assessmentWork(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string, @CurrentSession() session: ResolvedSession) {
+    const value = await this.compliance.findAssessmentWork(matterId, assessmentId, session.account.id);
+    if (!value) throw new NotFoundException('No risk assessment with this id');
+    return serializeWork(value);
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/measures') @RequirePermission('aml.assess') @ResponseSchema(workSchema)
+  async addMeasure(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @Body({ schema: measureBody }) body: z.infer<typeof measureBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    return changedWork(await this.compliance.addMeasure(matterId, assessmentId, body, actorFor(session, request)));
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/measures/:measureId/results') @RequirePermission('aml.assess') @ResponseSchema(workSchema)
+  async recordMeasureResult(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @Param('measureId', { schema: z.uuid() }) measureId: string,
+    @Body({ schema: measureResultBody }) body: z.infer<typeof measureResultBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    return changedWork(await this.compliance.recordMeasureResult(matterId, assessmentId, measureId, body, actorFor(session, request)));
+  }
+
+  @Post('matters/:matterId/aml-risk/:assessmentId/sources') @RequirePermission('aml.assess') @ResponseSchema(workSchema)
+  async recordSourceConclusion(@Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Param('assessmentId', { schema: z.uuid() }) assessmentId: string,
+    @Body({ schema: sourceBody }) body: z.infer<typeof sourceBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    return changedWork(await this.compliance.recordSourceConclusion(matterId, assessmentId, body, actorFor(session, request)));
   }
 }

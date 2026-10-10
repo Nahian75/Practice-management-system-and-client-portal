@@ -7,7 +7,7 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { sql, type Kysely } from 'kysely';
 import { text } from '../common/validation/safe-text.js';
 import type {
-  AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType,
+  AmlControlKind, AmlExpectedValue, AmlMeasureKind, AmlOfficerKind, AmlOutcome, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType,
 } from '../database/schema.js';
 import { FileInspection, FileRefusedError, type RefusalReason } from '../documents/file-inspection.js';
 import { UploadFormError } from '../documents/upload-request.js';
@@ -16,7 +16,7 @@ import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.j
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import type {
-  CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
+  AssessmentWork, CddCase, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
 } from './compliance.js';
 
@@ -446,6 +446,66 @@ export class ComplianceService {
       if (hiddenRecord(error)) return undefined;
       throw error;
     }
+  }
+
+  async findAssessmentWork(matterId: string, assessmentId: string, actorId: string) {
+    try {
+      return await this.records.findAssessmentWork(matterId, assessmentId, actorId);
+    } catch (error) {
+      if (hiddenRecord(error)) return undefined;
+      throw error;
+    }
+  }
+
+  addMeasure(matterId: string, assessmentId: string, input: { kind: AmlMeasureKind; description: string },
+    by: ComplianceActor): Promise<Change<AssessmentWork>> {
+    return this.changeWork(matterId, assessmentId, null, 'aml.measure_added', by, async (trx) => {
+      const id = await this.records.newId(trx);
+      await this.records.addMeasure({ id, assessmentId, kind: input.kind,
+        sealed: this.cipher.seal({ text: input.description }, `aml-measure:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  recordMeasureResult(matterId: string, assessmentId: string, measureId: string,
+    input: { outcome: AmlOutcome; evidenceIds: string[]; reasoning: string }, by: ComplianceActor): Promise<Change<AssessmentWork>> {
+    return this.changeWork(matterId, assessmentId, measureId, 'aml.measure_result_recorded', by, async (trx) => {
+      const id = await this.records.newId(trx);
+      await this.records.recordMeasureResult({ id, measureId, outcome: input.outcome, evidenceIds: input.evidenceIds,
+        sealed: this.cipher.seal({ text: input.reasoning }, `aml-measure-result:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  recordSourceConclusion(matterId: string, assessmentId: string, input: {
+    kind: 'funds' | 'wealth'; subjectId: string | null; amountMinPence: string; amountMaxPence: string;
+    outcome: AmlOutcome; evidenceIds: string[]; reasoning: string;
+  }, by: ComplianceActor): Promise<Change<AssessmentWork>> {
+    return this.changeWork(matterId, assessmentId, null, 'aml.source_conclusion_recorded', by, async (trx) => {
+      const id = await this.records.newId(trx);
+      const { reasoning, ...facts } = input;
+      await this.records.recordSourceConclusion({ ...facts, id, assessmentId,
+        sealed: this.cipher.seal({ text: reasoning }, `aml-source:${id}`), actorId: by.accountId }, trx);
+    });
+  }
+
+  /**
+   * Runs one write against an assessment named under its matter and returns the work as it now stands.
+   * Audit metadata holds ids only: even a measure's kind can hint at PEP or high-risk status.
+   */
+  private async changeWork(matterId: string, assessmentId: string, measureId: string | null, action: string,
+    by: ComplianceActor, write: (trx: Kysely<Database>) => Promise<void>): Promise<Change<AssessmentWork>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        await this.records.assertMatterAccess(matterId, by.accountId, trx);
+        if (!await this.records.workBelongs(matterId, assessmentId, measureId, trx)) return undefined;
+        await write(trx);
+        const work = await this.records.findAssessmentWork(matterId, assessmentId, by.accountId, true, trx);
+        if (!work) return undefined;
+        await this.audit.record({ actor: by.actor, action, outcome: 'success',
+          resource: { type: 'aml_risk_assessment', id: assessmentId }, metadata: { matterId }, ...by.context }, trx);
+        return work;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return protectedOutcome(error); }
   }
 
   /**

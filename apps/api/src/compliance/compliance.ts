@@ -1,4 +1,4 @@
-import type { AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlOfficerKind, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, DocumentMediaType } from '../database/schema.js';
+import type { AmlCddStatus, AmlControlKind, AmlExpectedValue, AmlMeasureKind, AmlOfficerKind, AmlOutcome, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, DocumentMediaType } from '../database/schema.js';
 
 export interface Person { accountId: string; displayName: string }
 
@@ -89,3 +89,17 @@ export interface RiskAssessment {
   narrative: RiskNarrative; controls: { id: string; kind: AmlControlKind; version: number }[];
   preparedBy: Person; submittedAt: Date;
 }
+
+export interface MeasureResult {
+  id: string; outcome: AmlOutcome; evidenceIds: string[]; reasoning: string; recordedBy: Person; recordedAt: Date;
+}
+export interface Measure {
+  id: string; kind: AmlMeasureKind; enhanced: boolean; description: string;
+  recordedBy: Person; recordedAt: Date; results: MeasureResult[];
+}
+export interface SourceConclusion {
+  id: string; kind: 'funds' | 'wealth'; subjectId: string | null; amountMinPence: string; amountMaxPence: string;
+  outcome: AmlOutcome; evidenceIds: string[]; reasoning: string; recordedBy: Person; recordedAt: Date;
+}
+/** The measures and source conclusions recorded against one assessment version. */
+export interface AssessmentWork { assessmentId: string; measures: Measure[]; conclusions: SourceConclusion[] }
