@@ -1044,11 +1044,26 @@ export interface AmlSanctionsChecksTable {
   failure: DatabaseSet<string | null>; checked_by: DatabaseSet<string | null>; checked_at: DatabaseSet<Date>;
 }
 
+export interface AmlScreeningsTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; list_id: DatabaseSet<string>; subject_ref: DatabaseSet<string>;
+  screened_by: DatabaseSet<string | null>; screened_at: DatabaseSet<Date>;
+}
+export interface AmlScreeningCandidatesTable {
+  id: DatabaseSet<string>; screening_id: DatabaseSet<string>; list_id: DatabaseSet<string>; unique_id: DatabaseSet<string>;
+  matched_name: DatabaseSet<string>; birth_agreement: DatabaseSet<'match' | 'conflict' | 'unknown'>;
+  designation_print: DatabaseSet<Buffer>; carried_from: DatabaseSet<string | null>;
+}
+export interface AmlCandidateResolutionsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; candidate_id: DatabaseSet<string>; outcome: DatabaseSet<'false_positive' | 'confirmed'>;
+  resolved_by: DatabaseSet<string>; resolved_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
   aml_control_approvals: AmlControlApprovalsTable;
   aml_control_versions: AmlControlVersionsTable;
+  aml_candidate_resolutions: AmlCandidateResolutionsTable;
   aml_cdd_authorities: AmlCddAuthoritiesTable;
   aml_cdd_case_controls: AmlCddCaseControlsTable;
   aml_cdd_cases: AmlCddCasesTable;
@@ -1071,6 +1086,8 @@ export interface Database {
   aml_sanctions_designations: AmlSanctionsDesignationsTable;
   aml_sanctions_lists: AmlSanctionsListsTable;
   aml_sanctions_names: AmlSanctionsNamesTable;
+  aml_screening_candidates: AmlScreeningCandidatesTable;
+  aml_screenings: AmlScreeningsTable;
   aml_senior_approvals: AmlSeniorApprovalsTable;
   aml_source_conclusions: AmlSourceConclusionsTable;
   aml_start_exceptions: AmlStartExceptionsTable;

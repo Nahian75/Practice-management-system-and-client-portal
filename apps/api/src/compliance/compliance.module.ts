@@ -8,6 +8,7 @@ import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceController } from './compliance.controller.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import { ComplianceService } from './compliance.service.js';
+import { SanctionsScreeningService } from './sanctions-screening.service.js';
 import { SanctionsController } from './sanctions.controller.js';
 import { SanctionsRepository } from './sanctions.repository.js';
 import { SanctionsRefresher, SanctionsService } from './sanctions.service.js';
@@ -16,6 +17,6 @@ import { SanctionsRefresher, SanctionsService } from './sanctions.service.js';
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
   controllers: [ComplianceController, SanctionsController],
   providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher,
-    SanctionsRepository, SanctionsService, SanctionsRefresher],
+    SanctionsRepository, SanctionsService, SanctionsRefresher, SanctionsScreeningService],
 })
 export class ComplianceModule {}

@@ -690,11 +690,12 @@ export class ComplianceRepository {
     };
   }
 
-  async reviewQueue(): Promise<ReviewQueueItem[]> {
+  async reviewQueue(before?: string): Promise<ReviewQueueItem[]> {
     const rows = (await sql<{ matter_id: string; reference: string; state: Gate['state']; due_since: string | null;
       work_allowed_until: string | null; review_due_on: string | null }>`
       select q.matter_id, m.reference, q.state, q.due_since::text, q.work_allowed_until::text, q.review_due_on::text
-      from app.aml_review_queue(200) q join app.matters m on m.id = q.matter_id
+      from app.aml_review_queue(100, ${before ?? null}::uuid) q join app.matters m on m.id = q.matter_id
+      order by q.matter_id desc
     `.execute(this.db)).rows;
     return rows.map((row) => ({ matterId: row.matter_id, reference: row.reference, state: row.state, dueSince: row.due_since,
       workAllowedUntil: row.work_allowed_until, reviewDueOn: row.review_due_on }));

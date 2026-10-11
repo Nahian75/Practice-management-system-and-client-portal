@@ -3,7 +3,9 @@ import { sql, type Kysely } from 'kysely';
 import { ComplianceDataCipher } from '../src/compliance/compliance-data-cipher.js';
 import type { Database } from '../src/database/schema.js';
 import { createTestAccount, grantTestRole, type TestAccount } from './accounts.js';
+import { parseSanctionsList } from '../src/compliance/sanctions-list.js';
 import { testEnv } from './database.js';
+import { csvStream, sanctionsCsv } from './sanctions.js';
 
 // Builds AML records through the same protected database functions the API uses.
 // Nothing here bypasses a rule; it only saves each test from repeating the steps.
@@ -73,7 +75,7 @@ export async function createTeamMatter(db: Kysely<Database>, feeEarner: TestAcco
 const sealed = (value: unknown, context: string) => cipher.seal(value, context);
 
 /** Submits a complete one-subject CDD case for an individual client. */
-export async function submitTestCdd(db: Kysely<Database>, clientId: string, complianceId: string) {
+export async function submitTestCdd(db: Kysely<Database>, clientId: string, complianceId: string, subjectName = 'Test Client') {
   const { today } = await londonDates(db);
   const caseId = (await sql<{ id: string }>`select app.create_aml_cdd_case(
     ${clientId}, 'Ongoing legal services for the client', 'CDD before accepting the instructions', ${complianceId}
@@ -87,7 +89,7 @@ export async function submitTestCdd(db: Kysely<Database>, clientId: string, comp
     1::smallint, ${Buffer.alloc(12, 4)}, ${Buffer.alloc(32, 5)}, ${Buffer.alloc(16, 6)}, ${complianceId}
   )`.execute(db);
   const subjectId = randomUUID();
-  const subject = sealed({ name: 'Test Client', dateOfBirth: '1980-01-02' }, `aml-subject:${subjectId}`);
+  const subject = sealed({ name: subjectName, dateOfBirth: '1980-01-02' }, `aml-subject:${subjectId}`);
   await sql`select app.add_aml_cdd_subject(
     ${subjectId}, ${caseId}, 'individual', 'client',
     ${subject.context}, ${subject.keyVersion}::smallint, ${subject.nonce}, ${subject.ciphertext}, ${subject.authTag}, ${complianceId}
@@ -198,6 +200,10 @@ async function approveCountryList(db: Kysely<Database>, countries: string[]): Pr
 
 export async function decideTestClearance(db: Kysely<Database>, assessmentId: string, actorId: string,
   decision: 'approved' | 'refused' = 'approved') {
+  // Clearance needs current, clear sanctions screening of the client and its CDD subjects.
+  const { clientId } = await db.selectFrom('aml_risk_assessments').select('client_id as clientId')
+    .where('id', '=', assessmentId).executeTakeFirstOrThrow();
+  await screenTestClient(db, clientId);
   const id = randomUUID();
   const seal = sealed({ text: 'Test clearance reasoning.' }, `aml-clearance:${id}`);
   await sql`select app.decide_aml_clearance(${id}, ${assessmentId}, ${decision},
@@ -244,4 +250,48 @@ export async function grantTestStartException(db: Kysely<Database>, assessmentId
   await sql`select app.grant_aml_start_exception(${id}, ${assessmentId}, ${actions}::text[], ${expiresOn}::date,
     ${seal.context}, ${seal.keyVersion}::smallint, ${seal.nonce}, ${seal.ciphertext}, ${seal.authTag}, ${actorId})`.execute(db);
   return id;
+}
+
+/**
+ * Makes the active sanctions list fresh without creating a new version: the active list's
+ * own hash is replayed, which records an "unchanged" check. Only an empty database gets a
+ * tiny fixture list. A new version would leave every earlier screening out of date.
+ */
+export async function ensureSanctionsList(db: Kysely<Database>): Promise<string> {
+  return db.transaction().execute(async (trx) => {
+    await sql`select pg_advisory_xact_lock(hashtextextended('test.aml_sanctions', 0))`.execute(trx);
+    const status = (await sql<{ list_id: string | null; fresh: boolean }>`select list_id, fresh from app.aml_sanctions_status()`
+      .execute(trx)).rows[0]!;
+    if (status.list_id && status.fresh) return status.list_id;
+    if (status.list_id) {
+      const active = await trx.selectFrom('aml_sanctions_lists').select(['report_date', 'sha256', 'byte_size'])
+        .where('id', '=', status.list_id).executeTakeFirstOrThrow();
+      await sql`select app.import_aml_sanctions_list(${active.report_date}::date, ${active.sha256}, ${active.byte_size},
+        '[]'::jsonb, '[]'::jsonb, null)`.execute(trx);
+      return status.list_id;
+    }
+    const list = await parseSanctionsList(csvStream(sanctionsCsv('01-Jan-2000', [{ uniqueId: 'TST-BASE01', names: ['Test', 'Designated Person'] }])));
+    const designations = list.designations.map((d) => ({ unique_id: d.uniqueId, kind: d.kind, regime: d.regime,
+      date_designated: d.dateDesignated, births: d.births, nationalities: d.nationalities }));
+    const names = list.designations.flatMap((d) => d.names.map((n) => ({ unique_id: d.uniqueId, name: n.name,
+      normalized: n.normalized, tokens: n.tokens, is_primary: n.isPrimary })));
+    return (await sql<{ list_id: string }>`select list_id from app.import_aml_sanctions_list(${list.reportDate}::date, ${list.sha256},
+      ${list.byteSize}, ${JSON.stringify(designations)}::jsonb, ${JSON.stringify(names)}::jsonb, null)`.execute(trx)).rows[0]!.list_id;
+  });
+}
+
+/**
+ * Records a clear screening of the client record and each subject of its latest submitted
+ * CDD case against the active list, as the API's matcher does for names not on the list.
+ */
+export async function screenTestClient(db: Kysely<Database>, clientId: string): Promise<void> {
+  const listId = await ensureSanctionsList(db);
+  const latest = await db.selectFrom('aml_cdd_cases').select('id').where('client_id', '=', clientId)
+    .where('status', '=', 'submitted').orderBy('version', 'desc').limit(1).executeTakeFirst();
+  const subjects = latest
+    ? (await db.selectFrom('aml_cdd_subjects').select('id').where('cdd_case_id', '=', latest.id).execute()).map((row) => row.id)
+    : [];
+  for (const ref of ['client', ...subjects]) {
+    await sql`select app.record_aml_screening(${clientId}::uuid, ${listId}::uuid, ${ref}, '[]'::jsonb, null)`.execute(db);
+  }
 }

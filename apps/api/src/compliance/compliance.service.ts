@@ -15,6 +15,7 @@ import { isLimitsAlert, VirusScanner } from '../documents/virus-scanner.js';
 import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.js';
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
+import { SanctionsScreeningService } from './sanctions-screening.service.js';
 import type {
   AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
   RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
@@ -66,7 +67,7 @@ function page<T extends { id: string }>(items: T[]): { items: T[]; next: string 
 export class ComplianceService {
   constructor(private readonly records: ComplianceRepository, private readonly audit: AuditService,
     private readonly cipher: ComplianceDataCipher, private readonly evidenceVault: AmlEvidenceVault,
-    private readonly scanner: VirusScanner) {}
+    private readonly scanner: VirusScanner, private readonly screening: SanctionsScreeningService) {}
 
   async listAppointments(before?: string) { return page(await this.records.listAppointments(before)); }
 
@@ -338,6 +339,11 @@ export class ComplianceService {
           metadata: { clientId, version: item.version, subjects: item.subjects.length, evidence: item.evidence.length }, ...by.context }, trx);
         return item;
       });
+      // The new subjects are screened at once; a failure leaves the client unscreened, which the gate refuses.
+      if (value) {
+        await this.screening.screenClient(clientId, { actor: by.actor, accountId: by.accountId, context: by.context })
+          .catch(() => undefined);
+      }
       return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
     } catch (error) { return protectedOutcome(error); }
   }
@@ -608,7 +614,10 @@ export class ComplianceService {
     } catch (error) { return protectedOutcome(error); }
   }
 
-  reviewQueue() { return this.records.reviewQueue(); }
+  async reviewQueue(before?: string) {
+    const items = await this.records.reviewQueue(before);
+    return { items, next: items.length === 100 ? items.at(-1)!.matterId : null };
+  }
 
   /**
    * Runs one write against an assessment named under its matter and returns the work as it now stands.

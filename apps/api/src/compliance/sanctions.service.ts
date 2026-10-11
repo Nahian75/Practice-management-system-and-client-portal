@@ -7,6 +7,7 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { MAX_SANCTIONS_LIST_BYTES, parseSanctionsList, SanctionsListError } from './sanctions-list.js';
+import { SanctionsScreeningService } from './sanctions-screening.service.js';
 import { SanctionsRepository, type SanctionsFailure, type SanctionsListVersion } from './sanctions.repository.js';
 
 const DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -21,8 +22,10 @@ interface Importer { actor: AuditActor; accountId: string | null; context?: Requ
 
 @Injectable()
 export class SanctionsService {
+  private readonly logger = new Logger(SanctionsService.name);
+
   constructor(private readonly records: SanctionsRepository, private readonly audit: AuditService,
-    @Inject(ENV) private readonly env: Env) {}
+    private readonly screening: SanctionsScreeningService, @Inject(ENV) private readonly env: Env) {}
 
   status() { return this.records.status(); }
 
@@ -52,7 +55,19 @@ export class SanctionsService {
       }
       return { outcome: imported.changed ? 'imported' as const : 'unchanged' as const, list };
     });
+    if (result?.outcome === 'imported') this.rescreenInBackground();
     return result ?? { outcome: 'refused', reason: 'older_report' };
+  }
+
+  /**
+   * Every newly activated list is screened against every client with an open matter.
+   * It runs after the import is committed, outside the request; tests screen clients directly.
+   */
+  private rescreenInBackground(): void {
+    if (this.env.NODE_ENV === 'test') return;
+    this.screening.rescreenAll()
+      .then((count) => this.logger.log(`Rescreened ${count} clients against the new sanctions list`))
+      .catch(() => this.logger.error('Rescreening against the new sanctions list failed'));
   }
 
   /** Downloads the official list from SANCTIONS_LIST_URL. A failure leaves the last good version active. */

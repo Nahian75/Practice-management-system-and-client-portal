@@ -152,7 +152,7 @@ describe('compliance gate enforcement', () => {
     const cleared = await createTeamMatter(db, feeEarner, partner);
     await clearMatterForTests(db, cleared.matterId);
 
-    const queue = (await sql<{ matter_id: string; state: string }>`select matter_id, state from app.aml_review_queue(200)`.execute(db)).rows;
+    const queue = (await sql<{ matter_id: string; state: string }>`select matter_id, state from app.aml_review_queue(100, null)`.execute(db)).rows;
     expect(queue.find((row) => row.matter_id === pending.matterId)?.state).toBe('pending');
     expect(queue.find((row) => row.matter_id === held.matterId)?.state).toBe('held');
     expect(queue.some((row) => row.matter_id === cleared.matterId)).toBe(false);

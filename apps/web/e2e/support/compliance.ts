@@ -19,10 +19,14 @@ function complianceOfficers(request: APIRequestContext): Promise<Officers> {
 /**
  * Clears a matter's compliance gate through the real API, as a firm would for
  * low-risk work outside the Money Laundering Regulations: an assessment by one
- * Compliance holder, cleared by another. The AML framework comes from aml.setup.ts.
+ * Compliance holder, cleared by another, after screening the client. The AML framework
+ * and sanctions list come from aml.setup.ts.
  */
-export async function clearMatter(request: APIRequestContext, matterId: string): Promise<void> {
+export async function clearMatter(request: APIRequestContext, matterId: string, clientId: string): Promise<void> {
   const { preparer, approver } = await complianceOfficers(request);
+  // Clearance needs the client screened against the sanctions list aml.setup.ts uploaded.
+  const screened = await approver.post(`/api/compliance/sanctions/clients/${clientId}/screenings`);
+  expect(screened.status(), await screened.text()).toBe(201);
   const assessed = await preparer.post(`/api/matters/${matterId}/aml-risk`, {
     data: {
       inScope: false, rating: 'standard', jurisdictions: ['GB'], expectedValue: 'under_10k',

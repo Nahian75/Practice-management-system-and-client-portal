@@ -45,12 +45,16 @@ adds high-risk-country lists and matter risk assessments.
 | GET | `/compliance/holds` | `aml.approve` | Active holds (`?all=true` for all), 100 at a time |
 | POST | `/compliance/holds` | `aml.approve` | Hold one `matterId` or a whole `clientId` with an encrypted reason |
 | POST | `/compliance/holds/:holdId/lift` | `aml.approve` | Lift a hold once, with an encrypted reason |
-| GET | `/compliance/reviews` | `aml.approve` | Open matters pending, held, due, or due within 30 days |
+| GET | `/compliance/reviews` | `aml.approve` | `{matters,next}`: open matters pending, held, due, or due within 30 days; 100 at a time, newest first |
 | POST | `/matters/:matterId/aml-risk/:assessmentId/start-exceptions` | `aml.approve` | Early start for time/documents, at most 30 days, low-risk only |
 | POST | `/matters/:matterId/start-exceptions/:exceptionId/approval` | `aml.firm_approve` | A different partner approves the early start |
 | GET | `/compliance/sanctions/status` | `aml.sanctions` | Active list version, report date, last success/failure and `fresh` |
 | GET | `/compliance/sanctions/lists` | `aml.sanctions` | `{lists,next}`: imported versions, newest first |
 | POST | `/compliance/sanctions/lists` | `aml.sanctions` | Upload the official CSV as multipart `file`: `imported` or `unchanged`; 409 for an older report, 422 for another file |
+| POST | `/compliance/sanctions/clients/:clientId/screenings` | `aml.sanctions` | Screen the client record and its latest CDD subjects now; `{state}` |
+| GET | `/compliance/sanctions/clients/:clientId` | `aml.sanctions` | `{state}`: `clear`, `unscreened`, `stale`, `possible_match` or `confirmed` |
+| GET | `/compliance/sanctions/candidates` | `aml.sanctions` | `{candidates,next}`: unresolved candidates on each subject's latest screening |
+| POST | `/compliance/sanctions/candidates/:candidateId/resolution` | `aml.sanctions` | `{outcome: false_positive or confirmed, reasoning}` once; returns the client's new `{state}` |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

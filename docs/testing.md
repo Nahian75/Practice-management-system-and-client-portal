@@ -59,7 +59,12 @@ the framework through the API once, before any test, and `openMatter` clears
 each matter it opens unless told not to.
 
 Sanctions tests never use the network. `test/sanctions.ts` builds CSVs in the
-official layout with the real header row, and refresh tests pass a fake `fetch`.
+official layout with the real header row, and refresh tests pass a fake `fetch`. `screenTestClient` records a clear screening
+through the real database function, and `decideTestClearance` calls it first,
+because clearance needs clear screening. `ensureSanctionsList` keeps the active
+list fresh by replaying its own hash rather than activating a new version, which
+would leave every earlier screening out of date. Screening tests use names no
+other test uses, so only their own clients can match.
 
 ## Email tests
 

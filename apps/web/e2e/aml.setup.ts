@@ -24,4 +24,13 @@ setup('publishes the approved AML framework every matter clearance relies on', a
   });
   expect(list.status(), await list.text()).toBe(201);
   expect((await partner.api.post(`/api/compliance/country-lists/${((await list.json()) as { id: string }).id}/approval`)).status()).toBe(201);
+
+  // A minimal list in the official layout: the parser finds its columns by name.
+  const sanctions = ['Report Date: 01-Jan-2000',
+    'Unique ID,Name 1,Name 2,Name 3,Name 4,Name 5,Name 6,Name type,Regime Name,Designation Type,Date Designated,D.O.B,Nationality(/ies)',
+    'E2E0001,Test,,,,,Designated Person,Primary Name,The Test (Sanctions) Regulations,Individual,01/01/2020,,', ''].join(String.fromCharCode(13, 10));
+  const uploaded = await compliance.api.post('/api/compliance/sanctions/lists', {
+    multipart: { file: { name: 'UK-Sanctions-List.csv', mimeType: 'text/csv', buffer: Buffer.from(sanctions) } },
+  });
+  expect(uploaded.status(), await uploaded.text()).toBe(201);
 });

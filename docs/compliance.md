@@ -9,8 +9,8 @@ lists, matter risk assessments, CDD/EDD measures and source-of-funds/wealth
 conclusions; Compliance clearance with senior-management approval; and a
 compliance gate that PostgreSQL enforces on time, billing, documents and money,
 with holds, an early-start exception and a review queue. Step 15d-1 imports the
-official UK Sanctions List. The rest of step 15d and steps 15e and 15f remain
-planned.
+official UK Sanctions List and step 15d-2 screens clients and their CDD subjects
+against it. Step 15d-3 and steps 15e and 15f remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -696,8 +696,9 @@ commit in a defined order.
   mandatory high-risk factors, by someone other than the preparer, while no hold
   is active. `POST /matters/:matterId/start-exceptions/:id/approval` needs a
   Partner other than the granter and preparer. A newer assessment version ends it.
-- `GET /compliance/reviews` (`aml.approve`) lists up to 200 open matters that
-  are pending, held, due for review or due within 30 days, held first.
+- `GET /compliance/reviews` (`aml.approve`) lists open matters that are pending,
+  held, due for review or due within 30 days, 100 at a time, newest first, with a
+  `before` cursor (changed in step 15d-2, so a long backlog never hides a matter).
 
 Audit metadata for holds is empty, so the audit log does not show which client
 or matter is held.
@@ -733,6 +734,44 @@ refusing the official file.
 - Every import, unchanged check and failure is kept. The list is `fresh` while
   a check succeeded in the last 48 hours. A failed refresh leaves the last good
   version active and is visible in the status.
+
+## Step 15d-2 screening
+
+Each client is screened as its client record (name and date of birth) and as
+every subject of its latest submitted CDD case. CDD names are decrypted in the
+API only to search; they are never stored with a result, and the audit record
+holds only the client id and how many subjects were screened, never a name or a
+match.
+
+- **Matching** proposes candidates for a person to resolve. A list name is a
+  candidate when it equals the subject's normalized name, or when both have at
+  least two words and every word of the shorter appears in the longer. One shared
+  word never matches. A date of birth is recorded as `match`, `conflict` or
+  `unknown` against the designation's (often partial) dates, but never used to
+  dismiss a match.
+- **When:** submitting a CDD case screens that client at once. Every newly
+  activated list rescreens every client with an open matter in the background.
+  `POST /compliance/sanctions/clients/:clientId/screenings` (`aml.sanctions`)
+  screens on demand.
+- **Resolution:** `GET /compliance/sanctions/candidates` lists unresolved
+  candidates on each subject's latest screening; `POST
+  /compliance/sanctions/candidates/:id/resolution` records `false_positive` or
+  `confirmed` with encrypted reasoning, once, by a live Compliance holder. A false
+  positive carries forward to later screenings only for the same subject and
+  designation, and only while neither has changed since: a client edit, a newer
+  CDD case or any change to the designation's names, kind or dates reopens it.
+
+`app.aml_sanctions_state` gives each client one position, worst first:
+`confirmed`, `possible_match`, `stale` (no fresh list), `unscreened` (the client
+record or a CDD subject has no screening against the active list since its
+identity last changed), or `clear`. A confirmed match stays in force across new
+lists. Its effects:
+
+- `possible_match` or `confirmed` makes every matter of the client `held`, so
+  all gated work stops with the same generic refusal as any other hold.
+- Clearance needs `clear`, enforced by a trigger on every clearance insert.
+- Money needs `clear` as well as a cleared gate. A new list therefore blocks money,
+  but not other work, until the client is rescreened.
 
 ## Build order
 
@@ -771,7 +810,7 @@ and updated documentation before the next step.
   Built in three parts:
   - **15d-1. Built 2026-10-11.** List import, versions, scheduled refresh and
     staleness.
-  - **15d-2.** Screening of clients and CDD subjects, candidate resolution,
+  - **15d-2. Built 2026-10-11.** Screening of clients and CDD subjects, candidate resolution,
     rescreening on each new list, and sanctions holds in the gate.
   - **15d-3.** Confirmed designations: frozen funds, licences and Finance
     enforcement.

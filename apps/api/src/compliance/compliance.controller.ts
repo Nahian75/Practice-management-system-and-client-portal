@@ -259,7 +259,7 @@ const exceptionSchema = z.object({ id: z.uuid(), matterId: z.uuid(), assessmentI
   grantedBy: person, grantedAt: z.iso.datetime(), approval: z.object({ approvedBy: person, approvedAt: z.iso.datetime() }).nullable() });
 const reviewQueueSchema = z.object({ matters: z.array(z.object({ matterId: z.uuid(), reference: z.string(),
   state: z.enum(['pending', 'cleared', 'review_due', 'held']), dueSince: date.nullable(), workAllowedUntil: date.nullable(),
-  reviewDueOn: date.nullable() })) });
+  reviewDueOn: date.nullable() })), next: z.uuid().nullable() });
 
 function actorFor(session: ResolvedSession, request: Request): ComplianceActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
@@ -706,8 +706,9 @@ export class ComplianceController {
   }
 
   @Get('compliance/reviews') @RequirePermission('aml.approve') @ResponseSchema(reviewQueueSchema)
-  async reviewQueue() {
-    return { matters: await this.compliance.reviewQueue() };
+  async reviewQueue(@Query({ schema: pageQuery }) query: z.infer<typeof pageQuery>) {
+    const page = await this.compliance.reviewQueue(query.before);
+    return { matters: page.items, next: page.next };
   }
 
   @Post('matters/:matterId/aml-risk/:assessmentId/start-exceptions') @RequirePermission('aml.approve') @ResponseSchema(exceptionSchema)

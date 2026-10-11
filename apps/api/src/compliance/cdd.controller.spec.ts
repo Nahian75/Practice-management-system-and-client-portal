@@ -5,7 +5,7 @@ import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
-import { ensureAmlFramework } from '../../test/aml.js';
+import { ensureAmlFramework, ensureSanctionsList } from '../../test/aml.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -100,6 +100,7 @@ describe('Client CDD API', () => {
     today = (await sql<{ today: string }>`select (clock_timestamp() at time zone 'Europe/London')::date::text as today`
       .execute(db)).rows[0]!.today;
     await ensureAmlFramework(db);
+    await ensureSanctionsList(db);
   });
   afterAll(async () => app.close());
   beforeEach(async () => {
@@ -176,6 +177,9 @@ describe('Client CDD API', () => {
 
     const audit = await db.selectFrom('audit_events').select(['action', 'metadata']).where('resource_id', '=', caseId).execute();
     expect(audit.map((event) => event.action)).toContain('aml.cdd_submitted');
+    // Submission screens the client record and the new subject against the sanctions list at once.
+    const screened = await db.selectFrom('aml_screenings').select('subject_ref').where('client_id', '=', clientId).execute();
+    expect(screened.map((row) => row.subject_ref).sort()).toEqual(['client', subjectId].sort());
     expect(JSON.stringify(audit)).not.toContain('123456789');
   });
 

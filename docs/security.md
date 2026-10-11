@@ -29,7 +29,9 @@ adds database-forced high ratings for mandatory enhanced-due-diligence factors,
 encrypted risk reasoning, matter-team rechecks and protected write flags that
 are cleared before each function returns. Step 15c-4 enforces the compliance gate
 in PostgreSQL triggers on every time, billing, document and money table, with
-one generic refusal and shared/exclusive advisory locks against races with holds.
+one generic refusal and shared/exclusive advisory locks against races with holds. Step 15d-2 screens clients
+and CDD subjects against the official list, holds any unresolved or confirmed
+match, and keeps names and match status out of audit metadata.
 
 This file lists only the controls that are actually in place.
 

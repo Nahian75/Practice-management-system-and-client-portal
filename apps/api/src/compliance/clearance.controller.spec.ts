@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { TestAccount } from '../../test/accounts.js';
 import {
   addTestMeasure, createAmlStaff, createTeamMatter, ensureAmlFramework, recordTestMeasureResult,
-  recordTestSourceConclusion, submitTestAssessment, submitTestCdd,
+  recordTestSourceConclusion, screenTestClient, submitTestAssessment, submitTestCdd,
 } from '../../test/aml.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { SessionsService } from '../auth/sessions/sessions.service.js';
@@ -50,6 +50,7 @@ describe('clearance and gate API', () => {
       await recordTestMeasureResult(db, await addTestMeasure(db, assessmentId, kind, feeEarner.id), feeEarner.id);
     }
     if (rating === 'high') await recordTestSourceConclusion(db, assessmentId, feeEarner.id, { subjectId: cdd.subjectId });
+    await screenTestClient(db, clientId);
     return { matterId, assessmentId };
   }
 
