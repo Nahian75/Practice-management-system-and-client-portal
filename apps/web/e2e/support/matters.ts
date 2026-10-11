@@ -31,6 +31,6 @@ export async function openMatter(
   });
   expect(opened.status()).toBe(201);
   const matter = (await opened.json()) as { id: string; reference: string; status: string };
-  if (cleared) await clearMatter(api, matter.id, clientId);
+  if (cleared) await clearMatter(matter.id, clientId);
   return { ...matter, title, clientId };
 }

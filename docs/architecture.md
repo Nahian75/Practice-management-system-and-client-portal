@@ -19,8 +19,9 @@ immutable matching, fixed client reconciliations, Compliance sign-off and
 five-week status, staff workspaces and reviewed balance, authority and VAT
 safeguards. The Compliance / AML design is approved; steps 15a and 15b add the
 firm-wide foundations plus versioned client CDD, identity/ownership/authority
-facts and separately encrypted evidence; step 15c-1 adds high-risk-country lists
-and matter risk assessments.
+facts and separately encrypted evidence; steps 15c and 15d add risk assessments,
+clearance, the enforced compliance gate, and sanctions screening, holds, freezes
+and licences.
 
 This file describes the target shape. Sections are updated as each part is built.
 

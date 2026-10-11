@@ -8,9 +8,10 @@ encrypted identity facts and separately protected evidence; high-risk-country
 lists, matter risk assessments, CDD/EDD measures and source-of-funds/wealth
 conclusions; Compliance clearance with senior-management approval; and a
 compliance gate that PostgreSQL enforces on time, billing, documents and money,
-with holds, an early-start exception and a review queue. Step 15d-1 imports the
-official UK Sanctions List and step 15d-2 screens clients and their CDD subjects
-against it. Step 15d-3 and steps 15e and 15f remain planned.
+with holds, an early-start exception and a review queue. Step 15d imports the
+official UK Sanctions List, screens clients and their CDD subjects against it,
+holds possible matches, and freezes funds for confirmed designations unless a
+recorded licence permits the action. Steps 15e and 15f remain planned.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -773,6 +774,30 @@ lists. Its effects:
 - Money needs `clear` as well as a cleared gate. A new list therefore blocks money,
   but not other work, until the client is rescreened.
 
+## Step 15d-3 frozen funds and licences
+
+- **Freezing:** confirming a candidate records each of the client's matters with a
+  positive client-ledger balance in `aml_frozen_funds`. A bank-confirmed receipt
+  for a client with a possible or confirmed match is still recorded, because it
+  already happened, and is frozen at once. `GET
+  /compliance/sanctions/frozen-funds?clientId=` (`aml.sanctions`) lists them.
+- **Licences:** `POST /compliance/sanctions/licences` (`aml.sanctions`) records an
+  OFSI, OTSI or other licence for a client whose designation is confirmed: kind,
+  reference, the actions it permits (`time`, `documents`, `billing`, `money`),
+  dates, and encrypted conditions. Money is only ever licensed up to a stated
+  pence limit. `POST .../licences/:id/revocation` revokes it once; `GET
+  .../licences?clientId=` lists them.
+- **Enforcement:** a confirmed designation refuses every gated action unless a
+  live, unrevoked licence permits it, and for money only while the payment
+  requests (not refused or cancelled) and ledger allocations since the licence
+  was recorded, plus this one, stay within its limit. A licence lifts only the
+  designation: holds, clearance and review rules still apply, and a possible
+  match is never licensable. The refusal stays the same generic 409.
+- **Accounts:** `GET /matters/:matterId/money-status` (`finance.view_all`) returns
+  `allowed`, `frozen` (a confirmed designation without a licence for money) or
+  `contact_compliance`, and the limit, use and expiry of a licence that permits
+  money. It never says why.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -805,14 +830,14 @@ and updated documentation before the next step.
   - An overdue review blocks money movement at once. Time, documents and
     billing continue for a grace period of 0 to 90 days fixed in the approved
     assessment's monitoring plan.
-- **15d.** Official UK Sanctions List import, candidate screening/resolution,
+- **15d. Built 2026-10-11.** Official UK Sanctions List import, candidate screening/resolution,
   rescreening, holds, frozen funds, licence conditions and Finance enforcement.
   Built in three parts:
   - **15d-1. Built 2026-10-11.** List import, versions, scheduled refresh and
     staleness.
   - **15d-2. Built 2026-10-11.** Screening of clients and CDD subjects, candidate resolution,
     rescreening on each new list, and sanctions holds in the gate.
-  - **15d-3.** Confirmed designations: frozen funds, licences and Finance
+  - **15d-3. Built 2026-10-11.** Confirmed designations: frozen funds, licences and Finance
     enforcement.
 - **15e.** Encrypted internal disclosures, nominated-officer access, external
   SAR/DAML decision/status records and confidentiality-safe holds.

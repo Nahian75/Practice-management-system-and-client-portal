@@ -1,4 +1,5 @@
-import { expect, type APIRequestContext } from '@playwright/test';
+import { expect, request as playwrightRequest, type APIRequestContext } from '@playwright/test';
+import { E2E_WEB_URL } from '../../playwright.config';
 import { apiSessionFor } from './session';
 
 /** A date `days` from today as YYYY-MM-DD. Close enough to London's date for the generous limits used here. */
@@ -7,12 +8,22 @@ export const isoDay = (days = 0) => new Date(Date.now() + days * 86_400_000).toI
 type Officers = { preparer: APIRequestContext; approver: APIRequestContext };
 let officers: Promise<Officers> | undefined;
 
-/** Two Compliance holders per worker: one assesses, the other clears, as the database requires. */
-function complianceOfficers(request: APIRequestContext): Promise<Officers> {
-  officers ??= (async () => ({
-    preparer: (await apiSessionFor(request, ['compliance'])).api,
-    approver: (await apiSessionFor(request, ['compliance'])).api,
-  }))();
+/**
+ * Two Compliance holders per worker: one assesses, the other clears, as the database requires.
+ * They are set up through the worker's own request context, never a test's, which Playwright
+ * disposes when that test ends; and a failed setup is not kept, so the next test retries it.
+ */
+function complianceOfficers(): Promise<Officers> {
+  officers ??= (async () => {
+    const own = await playwrightRequest.newContext({ baseURL: E2E_WEB_URL });
+    return {
+      preparer: (await apiSessionFor(own, ['compliance'])).api,
+      approver: (await apiSessionFor(own, ['compliance'])).api,
+    };
+  })().catch((error: unknown) => {
+    officers = undefined;
+    throw error;
+  });
   return officers;
 }
 
@@ -22,8 +33,8 @@ function complianceOfficers(request: APIRequestContext): Promise<Officers> {
  * Compliance holder, cleared by another, after screening the client. The AML framework
  * and sanctions list come from aml.setup.ts.
  */
-export async function clearMatter(request: APIRequestContext, matterId: string, clientId: string): Promise<void> {
-  const { preparer, approver } = await complianceOfficers(request);
+export async function clearMatter(matterId: string, clientId: string): Promise<void> {
+  const { preparer, approver } = await complianceOfficers();
   // Clearance needs the client screened against the sanctions list aml.setup.ts uploaded.
   const screened = await approver.post(`/api/compliance/sanctions/clients/${clientId}/screenings`);
   expect(screened.status(), await screened.text()).toBe(201);

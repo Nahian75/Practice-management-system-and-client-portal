@@ -1058,6 +1058,22 @@ export interface AmlCandidateResolutionsTable extends AmlSealedColumns {
   resolved_by: DatabaseSet<string>; resolved_at: DatabaseSet<Date>;
 }
 
+export type AmlLicenceAction = 'billing' | 'documents' | 'money' | 'time';
+export interface AmlFrozenFundsTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; matter_id: DatabaseSet<string>; amount_pence: DatabaseSet<string>;
+  reason: DatabaseSet<'balance_at_confirmation' | 'receipt'>; finance_transaction_id: DatabaseSet<string | null>;
+  frozen_at: DatabaseSet<Date>;
+}
+export interface AmlSanctionsLicencesTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; authority: DatabaseSet<'ofsi' | 'otsi' | 'other'>;
+  licence_kind: DatabaseSet<'specific' | 'general'>; reference: DatabaseSet<string>;
+  permitted_actions: DatabaseSet<AmlLicenceAction[]>; money_limit_pence: DatabaseSet<string | null>;
+  effective_from: DatabaseSet<string>; expires_on: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlLicenceRevocationsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; licence_id: DatabaseSet<string>; revoked_by: DatabaseSet<string>; revoked_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1076,7 +1092,9 @@ export interface Database {
   aml_country_list_approvals: AmlCountryListApprovalsTable;
   aml_country_list_versions: AmlCountryListVersionsTable;
   aml_exception_approvals: AmlExceptionApprovalsTable;
+  aml_frozen_funds: AmlFrozenFundsTable;
   aml_hold_lifts: AmlHoldLiftsTable;
+  aml_licence_revocations: AmlLicenceRevocationsTable;
   aml_holds: AmlHoldsTable;
   aml_measure_results: AmlMeasureResultsTable;
   aml_measures: AmlMeasuresTable;
@@ -1084,6 +1102,7 @@ export interface Database {
   aml_risk_assessments: AmlRiskAssessmentsTable;
   aml_sanctions_checks: AmlSanctionsChecksTable;
   aml_sanctions_designations: AmlSanctionsDesignationsTable;
+  aml_sanctions_licences: AmlSanctionsLicencesTable;
   aml_sanctions_lists: AmlSanctionsListsTable;
   aml_sanctions_names: AmlSanctionsNamesTable;
   aml_screening_candidates: AmlScreeningCandidatesTable;

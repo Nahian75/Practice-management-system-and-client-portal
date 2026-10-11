@@ -38,7 +38,7 @@ export async function clientWithMatter(request: APIRequestContext) {
   });
   expect(opened.status()).toBe(201);
   const matter = { ...((await opened.json()) as { id: string; reference: string }), title };
-  await clearMatter(feeEarner.api, matter.id, clientId);
+  await clearMatter(matter.id, clientId);
 
   const granted = await feeEarner.api.post(`/api/clients/${clientId}/portal-access`, { data: {} });
   expect(granted.status()).toBe(201);

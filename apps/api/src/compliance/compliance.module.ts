@@ -9,13 +9,13 @@ import { ComplianceController } from './compliance.controller.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import { ComplianceService } from './compliance.service.js';
 import { SanctionsScreeningService } from './sanctions-screening.service.js';
-import { SanctionsController } from './sanctions.controller.js';
+import { MoneyStatusController, SanctionsController } from './sanctions.controller.js';
 import { SanctionsRepository } from './sanctions.repository.js';
 import { SanctionsRefresher, SanctionsService } from './sanctions.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
-  controllers: [ComplianceController, SanctionsController],
+  controllers: [ComplianceController, SanctionsController, MoneyStatusController],
   providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher,
     SanctionsRepository, SanctionsService, SanctionsRefresher, SanctionsScreeningService],
 })

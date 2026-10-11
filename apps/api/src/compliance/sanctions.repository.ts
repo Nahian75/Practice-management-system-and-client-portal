@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { Database } from '../database/schema.js';
+import type { AmlLicenceAction, Database } from '../database/schema.js';
 import type { SealedComplianceData } from './compliance-data-cipher.js';
 import type { ParsedSanctionsList } from './sanctions-list.js';
 import type { Candidate, ListName } from './sanctions-matching.js';
@@ -22,6 +22,20 @@ export type SubjectToScreen =
 export interface OpenCandidate {
   candidateId: string; clientId: string; clientReference: string; subjectRef: string; uniqueId: string;
   matchedName: string; birthAgreement: Candidate['birthAgreement']; screenedAt: Date;
+}
+
+export interface Licence {
+  id: string; clientId: string; authority: 'ofsi' | 'otsi' | 'other'; kind: 'specific' | 'general'; reference: string;
+  permittedActions: AmlLicenceAction[]; moneyLimitPence: string | null; effectiveFrom: string; expiresOn: string;
+  conditions: SealedComplianceData; recordedBy: string; recordedAt: Date; revokedAt: Date | null;
+}
+export interface FrozenFunds {
+  id: string; clientId: string; matterId: string; amountPence: string; reason: 'balance_at_confirmation' | 'receipt';
+  financeTransactionId: string | null; frozenAt: Date;
+}
+export interface MoneyStatus {
+  status: 'allowed' | 'frozen' | 'contact_compliance';
+  licence: { id: string; limitPence: string; usedPence: string; expiresOn: string } | null;
 }
 
 export interface SanctionsStatus {
@@ -153,6 +167,54 @@ export class SanctionsRepository {
   async candidateClient(candidateId: string, trx: Kysely<Database>): Promise<string> {
     return (await trx.selectFrom('aml_screening_candidates as c').innerJoin('aml_screenings as s', 's.id', 'c.screening_id')
       .select('s.client_id').where('c.id', '=', candidateId).executeTakeFirstOrThrow()).client_id;
+  }
+
+  async recordLicence(input: Omit<Licence, 'recordedBy' | 'recordedAt' | 'revokedAt'> & { actorId: string },
+    trx: Kysely<Database>): Promise<void> {
+    const sealed = input.conditions;
+    await sql`select app.record_aml_licence(
+      ${input.id}::uuid, ${input.clientId}::uuid, ${input.authority}, ${input.kind}, ${input.reference},
+      ${input.permittedActions}::text[], ${input.moneyLimitPence}::bigint, ${input.effectiveFrom}::date, ${input.expiresOn}::date,
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async revokeLicence(input: { id: string; licenceId: string; sealed: SealedComplianceData; actorId: string }, trx: Kysely<Database>) {
+    const { sealed } = input;
+    await sql`select app.revoke_aml_licence(
+      ${input.id}::uuid, ${input.licenceId}::uuid,
+      ${sealed.context}, ${sealed.keyVersion}::smallint, ${sealed.nonce}, ${sealed.ciphertext}, ${sealed.authTag},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async licences(clientId: string, executor: Kysely<Database> = this.db): Promise<Licence[]> {
+    const rows = await executor.selectFrom('aml_sanctions_licences as l')
+      .leftJoin('aml_licence_revocations as v', 'v.licence_id', 'l.id')
+      .selectAll('l').select('v.revoked_at')
+      .where('l.client_id', '=', clientId).orderBy('l.recorded_at', 'desc').execute();
+    return rows.map((row) => ({ id: row.id, clientId: row.client_id, authority: row.authority, kind: row.licence_kind,
+      reference: row.reference, permittedActions: row.permitted_actions, moneyLimitPence: row.money_limit_pence,
+      effectiveFrom: row.effective_from, expiresOn: row.expires_on,
+      conditions: { context: row.encryption_context, keyVersion: row.key_version, nonce: row.nonce, ciphertext: row.ciphertext, authTag: row.auth_tag },
+      recordedBy: row.recorded_by, recordedAt: row.recorded_at, revokedAt: row.revoked_at }));
+  }
+
+  async frozenFunds(clientId: string): Promise<FrozenFunds[]> {
+    const rows = await this.db.selectFrom('aml_frozen_funds').selectAll().where('client_id', '=', clientId)
+      .orderBy('frozen_at', 'desc').limit(500).execute();
+    return rows.map((row) => ({ id: row.id, clientId: row.client_id, matterId: row.matter_id, amountPence: row.amount_pence,
+      reason: row.reason, financeTransactionId: row.finance_transaction_id, frozenAt: row.frozen_at }));
+  }
+
+  async moneyStatus(matterId: string): Promise<MoneyStatus> {
+    const row = (await sql<{ status: MoneyStatus['status']; licence_id: string | null; limit_pence: string | null;
+      used_pence: string | null; licence_expires_on: string | null }>`
+      select status, licence_id, limit_pence::text, used_pence::text, licence_expires_on::text from app.aml_money_status(${matterId}::uuid)
+    `.execute(this.db)).rows[0]!;
+    return { status: row.status, licence: row.licence_id && row.limit_pence && row.used_pence && row.licence_expires_on
+      ? { id: row.licence_id, limitPence: row.limit_pence, usedPence: row.used_pence, expiresOn: row.licence_expires_on } : null };
   }
 
   async clientsToRescreen(after: string | null): Promise<string[]> {

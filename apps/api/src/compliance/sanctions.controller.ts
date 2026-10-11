@@ -27,8 +27,52 @@ const candidatePage = z.object({ candidates: z.array(z.object({ candidateId: z.u
   subjectRef: z.string(), uniqueId: z.string(), matchedName: z.string(), birthAgreement: z.enum(['match', 'conflict', 'unknown']),
   screenedAt: z.iso.datetime() })), next: z.uuid().nullable() });
 const resolutionBody = z.strictObject({ outcome: z.enum(['false_positive', 'confirmed']), reasoning: text(10_000, 20) });
+const licenceAction = z.enum(['billing', 'documents', 'money', 'time']);
+const licenceBody = z.strictObject({
+  clientId: z.uuid(), authority: z.enum(['ofsi', 'otsi', 'other']), kind: z.enum(['specific', 'general']), reference: text(100),
+  permittedActions: z.array(licenceAction).min(1).max(4).refine((actions) => new Set(actions).size === actions.length, 'Each action may appear once')
+    .transform((actions) => [...actions].sort()),
+  moneyLimitPence: z.string().regex(/^[0-9]{1,12}$/).nullable(), effectiveFrom: date, expiresOn: date, conditions: text(10_000, 20),
+}).refine((value) => value.permittedActions.includes('money') === (value.moneyLimitPence !== null),
+  { path: ['moneyLimitPence'], message: 'Money is licensed only with a limit, and a limit only with money' })
+  .refine((value) => value.expiresOn >= value.effectiveFrom, { path: ['expiresOn'], message: 'Expires before it starts' });
+const revocationBody = z.strictObject({ reason: text(10_000, 20) });
+const licenceSchema = z.object({ id: z.uuid(), clientId: z.uuid(), authority: z.enum(['ofsi', 'otsi', 'other']),
+  kind: z.enum(['specific', 'general']), reference: z.string(), permittedActions: z.array(licenceAction),
+  moneyLimitPence: z.string().nullable(), effectiveFrom: date, expiresOn: date, conditions: z.string(), recordedBy: z.uuid(),
+  recordedAt: z.iso.datetime(), revokedAt: z.iso.datetime().nullable() });
+const licenceList = z.object({ licences: z.array(licenceSchema) });
+const frozenList = z.object({ frozenFunds: z.array(z.object({ id: z.uuid(), clientId: z.uuid(), matterId: z.uuid(),
+  amountPence: z.string(), reason: z.enum(['balance_at_confirmation', 'receipt']), financeTransactionId: z.uuid().nullable(),
+  frozenAt: z.iso.datetime() })) });
+const clientQuery = z.strictObject({ clientId: z.uuid() });
 
 const serializeVersion = (value: SanctionsListVersion) => ({ ...value, importedAt: value.importedAt.toISOString() });
+const okSchema = z.object({ revoked: z.literal(true) });
+const serializeLicence = (value: { recordedAt: Date; revokedAt: Date | null } & Record<string, unknown>) => ({
+  ...value, recordedAt: value.recordedAt.toISOString(), revokedAt: value.revokedAt?.toISOString() ?? null });
+
+const moneyStatusSchema = z.object({ status: z.enum(['allowed', 'frozen', 'contact_compliance']),
+  licence: z.object({ id: z.uuid(), limitPence: z.string(), usedPence: z.string(), expiresOn: date }).nullable() });
+
+/**
+ * What Accounts may know before moving money on a matter: allowed, frozen or contact
+ * Compliance, and the limits of a licence that permits money. Never the reason.
+ */
+@Controller('matters')
+export class MoneyStatusController {
+  constructor(private readonly screening: SanctionsScreeningService) {}
+
+  @Get(':matterId/money-status') @RequirePermission('finance.view_all') @ResponseSchema(moneyStatusSchema)
+  async moneyStatus(@Param('matterId', { schema: z.uuid() }) matterId: string) {
+    try {
+      return await this.screening.moneyStatus(matterId);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'P0002') throw new NotFoundException('No matter with this id');
+      throw error;
+    }
+  }
+}
 
 @Controller('compliance/sanctions')
 export class SanctionsController {
@@ -66,6 +110,38 @@ export class SanctionsController {
     if (result.outcome === 'not_found') throw new NotFoundException('No sanctions candidate with this id');
     if (result.outcome === 'conflict') throw new ConflictException('This candidate has already been resolved');
     return { state: result.state };
+  }
+
+  @Post('licences') @RequirePermission('aml.sanctions') @ResponseSchema(licenceSchema)
+  async recordLicence(@Body({ schema: licenceBody }) body: z.infer<typeof licenceBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.screening.recordLicence(body, {
+      actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) });
+    if (result.outcome === 'not_found') throw new NotFoundException('No client with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('A licence is recorded only for a confirmed designation');
+    const licence = (await this.screening.licences(body.clientId)).find((item) => item.id === result.licenceId)!;
+    return serializeLicence(licence);
+  }
+
+  @Post('licences/:licenceId/revocation') @RequirePermission('aml.sanctions') @ResponseSchema(okSchema)
+  async revokeLicence(@Param('licenceId', { schema: z.uuid() }) licenceId: string,
+    @Body({ schema: revocationBody }) body: z.infer<typeof revocationBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.screening.revokeLicence(licenceId, body.reason, {
+      actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) });
+    if (result.outcome === 'not_found') throw new NotFoundException('No licence with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('This licence has already been revoked');
+    return { revoked: true };
+  }
+
+  @Get('licences') @RequirePermission('aml.sanctions') @ResponseSchema(licenceList)
+  async licences(@Query({ schema: clientQuery }) query: z.infer<typeof clientQuery>) {
+    return { licences: (await this.screening.licences(query.clientId)).map(serializeLicence) };
+  }
+
+  @Get('frozen-funds') @RequirePermission('aml.sanctions') @ResponseSchema(frozenList)
+  async frozenFunds(@Query({ schema: clientQuery }) query: z.infer<typeof clientQuery>) {
+    return { frozenFunds: (await this.screening.frozenFunds(query.clientId)).map((item) => ({ ...item, frozenAt: item.frozenAt.toISOString() })) };
   }
 
   @Get('status') @RequirePermission('aml.sanctions') @ResponseSchema(statusSchema)

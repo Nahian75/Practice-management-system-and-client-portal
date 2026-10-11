@@ -2,7 +2,7 @@
 
 **Current state (2026-10-10):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f and Compliance steps 15a, 15b and 15c, plus
+the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15d, plus
 Playwright end-to-end tests for the staff app, Tasks, Notifications and the
 client portal.
 

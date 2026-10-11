@@ -55,6 +55,11 @@ adds high-risk-country lists and matter risk assessments.
 | GET | `/compliance/sanctions/clients/:clientId` | `aml.sanctions` | `{state}`: `clear`, `unscreened`, `stale`, `possible_match` or `confirmed` |
 | GET | `/compliance/sanctions/candidates` | `aml.sanctions` | `{candidates,next}`: unresolved candidates on each subject's latest screening |
 | POST | `/compliance/sanctions/candidates/:candidateId/resolution` | `aml.sanctions` | `{outcome: false_positive or confirmed, reasoning}` once; returns the client's new `{state}` |
+| POST | `/compliance/sanctions/licences` | `aml.sanctions` | Record a licence for a confirmed designation; money only with a pence limit |
+| POST | `/compliance/sanctions/licences/:licenceId/revocation` | `aml.sanctions` | Revoke a licence once, with an encrypted reason |
+| GET | `/compliance/sanctions/licences?clientId=` | `aml.sanctions` | The client's licences with decrypted conditions |
+| GET | `/compliance/sanctions/frozen-funds?clientId=` | `aml.sanctions` | Balances frozen on confirmation and receipts frozen on arrival |
+| GET | `/matters/:matterId/money-status` | `finance.view_all` | `allowed`, `frozen` or `contact_compliance`, with any money licence's limit, use and expiry |
 | POST | `/matters/:matterId/tasks` | `tasks.create` + team, open matter | `{title, description?, dueOn?, priority?, assigneeId}` -> 201 with the task. The assignee must be active on the same team; 404 outside the team, 409 matter or team state changed |
 | GET | `/matters/:matterId/tasks` | `tasks.view` + team | `{tasks, next}`: 100 at a time, newest first; `?before=<next>` continues the list. 404 outside the team |
 | GET | `/tasks/:taskId` | `tasks.view` + team | The task with assignee and creator display names and its oldest-first change history. 404 outside the team |

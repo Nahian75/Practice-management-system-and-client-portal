@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-10):** The database foundation through Compliance
-step 15d-2 exists, with separate owner and application roles and forward-only
-migrations through `0055`.
+step 15d-3 exists, with separate owner and application roles and forward-only
+migrations through `0056`.
 
 ## Database
 
@@ -90,6 +90,7 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `aml_holds`, `aml_hold_lifts`, `aml_start_exceptions`, `aml_exception_approvals` | `0053_compliance_gate.sql` | Insert-only holds and lifts by Compliance; time- and document-only early starts approved by a separate partner. `zz_aml_gate` triggers on time, billing, document and money tables call `app.assert_aml_gate`; `app.aml_review_queue` lists matters needing attention | [compliance.md](compliance.md#step-15c-4-enforcement-and-api) |
 | `aml_sanctions_lists`, `aml_sanctions_designations`, `aml_sanctions_names`, `aml_sanctions_checks` | `0054_sanctions_lists.sql` | Immutable list versions imported in one transaction by a protected function; names keep normalized text and a GIN-indexed token array for screening. Every import, unchanged check and failure is recorded; `app.aml_sanctions_status` reports freshness (48 hours) | [compliance.md](compliance.md#step-15d-1-sanctions-list) |
 | `aml_screenings`, `aml_screening_candidates`, `aml_candidate_resolutions` | `0055_sanctions_screening.sql` | Screenings only against the active list, of the client record or one of its CDD subjects; candidates keep a fingerprint of the designation so a change reopens a false positive. Compliance-only resolutions with encrypted reasoning. `app.aml_sanctions_state` feeds the gate, money and a clearance trigger. Insert-only; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15d-2-screening) |
+| `aml_frozen_funds`, `aml_sanctions_licences`, `aml_licence_revocations` | `0056_sanctions_freezes.sql` | Frozen balances and receipts written only by the confirmation function and a receipt trigger. Licences only for confirmed designations, money only with a limit; `app.assert_aml_gate_amount` enforces the licence and its limit. Insert-only; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15d-3-frozen-funds-and-licences) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

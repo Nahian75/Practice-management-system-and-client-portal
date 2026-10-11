@@ -5,7 +5,11 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import type { CddSubjectDetails } from './compliance.js';
 import { findCandidates, searchTerms, type Candidate, type ScreenedSubject } from './sanctions-matching.js';
+import type { AmlLicenceAction } from '../database/schema.js';
 import { SanctionsRepository, type SanctionsState } from './sanctions.repository.js';
+
+type Actor = { actor: AuditActor; accountId: string; context?: RequestContext };
+const errorCode = (error: unknown) => (error instanceof Error && 'code' in error ? error.code : undefined);
 
 export interface Screener { actor: AuditActor; accountId: string | null; context?: RequestContext }
 export type ScreeningOutcome = { outcome: 'screened'; state: SanctionsState } | { outcome: 'not_found' } | { outcome: 'no_list' };
@@ -90,4 +94,51 @@ export class SanctionsScreeningService {
   }
 
   sanctionsState(clientId: string) { return this.records.sanctionsState(clientId); }
+
+  /** Only for a confirmed designation. Money is always licensed up to a stated limit. */
+  async recordLicence(input: {
+    clientId: string; authority: 'ofsi' | 'otsi' | 'other'; kind: 'specific' | 'general'; reference: string;
+    permittedActions: AmlLicenceAction[]; moneyLimitPence: string | null; effectiveFrom: string; expiresOn: string; conditions: string;
+  }, by: Actor): Promise<{ outcome: 'recorded'; licenceId: string } | { outcome: 'not_found' } | { outcome: 'conflict' }> {
+    try {
+      const licenceId = await this.records.transaction(async (trx) => {
+        const id = await this.records.newId(trx);
+        await this.records.recordLicence({ ...input, id, conditions: this.cipher.seal({ text: input.conditions }, `aml-licence:${id}`),
+          actorId: by.accountId }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.licence_recorded', outcome: 'success',
+          resource: { type: 'aml_sanctions_licence', id }, metadata: { clientId: input.clientId }, ...by.context }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', licenceId };
+    } catch (error) {
+      if (errorCode(error) === 'P0002') return { outcome: 'not_found' };
+      if (errorCode(error) === '23514') return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async revokeLicence(licenceId: string, reason: string, by: Actor): Promise<{ outcome: 'revoked' } | { outcome: 'not_found' } | { outcome: 'conflict' }> {
+    try {
+      await this.records.transaction(async (trx) => {
+        const id = await this.records.newId(trx);
+        await this.records.revokeLicence({ id, licenceId, sealed: this.cipher.seal({ text: reason }, `aml-licence-revocation:${id}`),
+          actorId: by.accountId }, trx);
+        await this.audit.record({ actor: by.actor, action: 'aml.licence_revoked', outcome: 'success',
+          resource: { type: 'aml_sanctions_licence', id: licenceId }, metadata: {}, ...by.context }, trx);
+      });
+      return { outcome: 'revoked' };
+    } catch (error) {
+      if (errorCode(error) === 'P0002') return { outcome: 'not_found' };
+      if (errorCode(error) === '23505') return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async licences(clientId: string) {
+    return (await this.records.licences(clientId)).map(({ conditions, ...licence }) => ({
+      ...licence, conditions: this.cipher.open<{ text: string }>(conditions).text }));
+  }
+
+  frozenFunds(clientId: string) { return this.records.frozenFunds(clientId); }
+  moneyStatus(matterId: string) { return this.records.moneyStatus(matterId); }
 }

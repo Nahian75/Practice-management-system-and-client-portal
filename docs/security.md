@@ -31,7 +31,9 @@ are cleared before each function returns. Step 15c-4 enforces the compliance gat
 in PostgreSQL triggers on every time, billing, document and money table, with
 one generic refusal and shared/exclusive advisory locks against races with holds. Step 15d-2 screens clients
 and CDD subjects against the official list, holds any unresolved or confirmed
-match, and keeps names and match status out of audit metadata.
+match, and keeps names and match status out of audit metadata. Step 15d-3 freezes
+balances and receipts for confirmed designations, permits only licensed actions
+within a money limit, and shows Accounts the operational outcome without the reason.
 
 This file lists only the controls that are actually in place.
 
