@@ -1,6 +1,6 @@
 # Authorization
 
-**Current state (2026-10-10):** Layers 1 and 2 built, including the
+**Current state (2026-10-11):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
 issued billing records. Finance-wide bank, cash-book and ledger reads are
@@ -17,8 +17,10 @@ to do so firm-wide. Step 15c-1 applies the same split to matter risk
 assessments, using active matter-team membership, and lets only a Partner other
 than the preparer approve a high-risk-country list. Step 15c-3 gives `aml.approve`
 only to Compliance, never to an assessment's preparer, and needs a third person,
-a Partner, for high-risk or PEP senior-management approval. Step 15d-1 adds the Compliance-only
-`aml.sanctions` for importing and reading sanctions lists.
+a Partner, for high-risk or PEP senior-management approval. Step 15d adds the
+Compliance-only `aml.sanctions`. Step 15e gives every staff role submission-only
+`aml.internal_report`; reading and deciding require both a live Compliance role
+and current nominated-officer appointment in PostgreSQL.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -108,6 +110,22 @@ Each module adds its own permissions when it is built. These exist now:
 | `aml.firm_approve` - approve a firm-control version prepared by someone else | | ✓ | | | |
 | `aml.assess` - prepare CDD for a client allowed by the record rule | | ✓ | ✓ | | ✓ |
 | `aml.view_evidence` - read protected CDD detail and evidence under the same record rule | | ✓ | ✓ | | ✓ |
+| `aml.approve` - decide AML clearance and ordinary holds | | | | | ✓ |
+| `aml.sanctions` - import/screen/resolve sanctions records and licences | | | | | ✓ |
+| `aml.internal_report` - submit a confidential internal disclosure, never read it back | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `aml.retention` - schedule retention, record legal holds and run controlled disposal | | | | | ✓ |
+| `aml.export` - create and download fixed ordinary AML regulatory bundles | | | | | ✓ |
+
+Restricted-report reads and decisions deliberately have no role permission that
+an administrator can grant. Each protected database function locks and rechecks
+the active account, active `compliance` role and current nominated-officer
+appointment. Losing any one removes access on the next request; a concurrent
+read and role/appointment loss commit in a defined order.
+
+Step 15f ordinary retention and export routes require active Compliance plus
+`aml.retention` or `aml.export`; protected database functions recheck the role.
+The Compliance client picker is not a grant of general client access: it is a
+bounded four-field protected function for these firm-wide workflows.
 
 Administrators deliberately cannot read the audit log: the people who change
 accounts should not be the only ones checking what changed.

@@ -1,8 +1,10 @@
 # Notifications
 
-**Current state (2026-10-08):** First-version design approved by the project
+**Current state (2026-10-12):** First-version design approved by the project
 owner. Steps 13a to 13d are built, tested and security-reviewed. Review items
-N1 and N2 are fixed in migration `0041` and the mail worker.
+N1 and N2 are fixed in migration `0041` and the mail worker. Compliance step
+15f adds a separate content-free navigation count; it does not create ordinary
+notification or email rows.
 
 How Stass tells staff about work that needs their attention, without putting
 client information into email or losing messages when the API restarts.
@@ -58,6 +60,10 @@ client information into email or losing messages when the API restarts.
   for one task, due date and reminder point.
 - Client sessions cannot call staff notification routes. Holding a staff role
   alone does not reveal a task notification after matter membership ends.
+- The Compliance navigation count is computed on request and names no client,
+  matter or event. It counts only ordinary sanctions candidates, non-restricted
+  holds, due retention and stale sanctions data. Restricted reports and holds
+  linked to them never enter this count, the inbox or the email outbox.
 
 ## Records
 

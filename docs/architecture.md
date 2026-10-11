@@ -1,6 +1,6 @@
 # Architecture
 
-**Current state (2026-10-10):** The API foundation and the Clients, Matters,
+**Current state (2026-10-11):** The API foundation and the Clients, Matters,
 Documents and client portal modules are built, with separate staff and client
 screens. The client portal, Tasks and Notifications modules are
 security-reviewed. Tasks steps
@@ -21,7 +21,8 @@ safeguards. The Compliance / AML design is approved; steps 15a and 15b add the
 firm-wide foundations plus versioned client CDD, identity/ownership/authority
 facts and separately encrypted evidence; steps 15c and 15d add risk assessments,
 clearance, the enforced compliance gate, and sanctions screening, holds, freezes
-and licences.
+and licences; step 15e adds the separately encrypted nominated-officer restricted-report boundary;
+step 15f adds retention/disposal, separated exports and the staff/Compliance screens.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -67,7 +68,7 @@ authorization decisions.
 | Tasks | Steps 12a to 12c built and security-reviewed: database safeguards and insert-only history, permissions, audit, create/read/change staff API and staff screens (`apps/api/src/tasks/`, `apps/web/src/app/(staff)/tasks/`, [tasks.md](tasks.md), [review](reviews/2026-10-07-tasks.md)) |
 | Notifications | Steps 13a to 13d built and security-reviewed: persistent encrypted email outbox, leased worker and retries; insert-only staff task notifications, transactional audit and list/read API; generic assignment email and 09:00 Europe/London due reminders with database-bounded catch-up and final live-state/address checks; staff header count and inbox ([notifications.md](notifications.md), [review](reviews/2026-10-08-notifications.md)) |
 | Finance | Steps 14a to 14f built and security-reviewed: exact GBP strings, permissions, immutable rates/time corrections, billing snapshots, encrypted bank/payee details, balanced postings, receipts, allocations, running ledgers/cash books, client-payment reservations, four-eyes approval, bank outcomes, safe CSV statements, immutable matching/reversals, fixed client reconciliation with liability balances, Compliance sign-off, five-week status, numeric VAT documents, audited exports and role-sensitive staff screens (`apps/api/src/finance/`, `apps/web/src/app/(staff)/finance/`, [finance.md](finance.md), [review](reviews/2026-10-10-finance.md)) |
-| Compliance / AML | Steps 15a and 15b built: separated permissions, protected officer appointments, immutable firm controls and Partner approval, training/reviews, versioned client CDD, encrypted subjects and verification facts, ownership/authority graphs and separately protected evidence. Step 15c-1: approved high-risk-country lists and permanent matter risk assessments ([compliance.md](compliance.md)) |
+| Compliance / AML | Steps 15a to 15f built: firm controls and appointments, versioned CDD/evidence, matter risk and gate enforcement, sanctions screening/freezes/licences, separately encrypted internal disclosures with nominated-officer-only SAR/DAML records, controlled retention/disposal, separated regulatory exports and staff screens ([compliance.md](compliance.md)) |
 | HR | Not started |
 | AI | Not started |
-| Web app | Staff screens and the read-only client portal are built: set-up, security headers, API pass-through, account set-up and recovery, clients, matters, documents, tasks, notifications, Finance and staff administration (`apps/web/`). The web foundation, portal and every implemented domain through Finance are security-reviewed ([web.md](web.md)) |
+| Web app | Staff screens and the read-only client portal are built: set-up, security headers, API pass-through, account set-up and recovery, clients, matters, documents, tasks, notifications, Finance, Compliance and staff administration (`apps/web/`). The web foundation, portal and every implemented domain through Finance are security-reviewed; Compliance review follows step 15f ([web.md](web.md)) |

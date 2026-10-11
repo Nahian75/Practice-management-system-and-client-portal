@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-10):** Health, authentication, staff management,
+**Current state (2026-10-11):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
 are built. Tasks and Notifications are built. Finance steps 14a to 14f add
 rates, time and billing plus the encrypted bank register, receipts, allocation
@@ -8,14 +8,34 @@ corrections, derived ledger/cash-book APIs and the client-payment request,
 approval and bank-outcome workflow, safe bank-statement imports, immutable
 matching, client reconciliation, Compliance sign-off, five-week status, safe
 exports and the capability response used by the staff Finance workspace.
-Compliance steps 15a and 15b add firm controls and versioned client CDD,
-encrypted identity/ownership/authority facts and protected evidence. Step 15c-1
-adds high-risk-country lists and matter risk assessments.
+Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance,
+gate enforcement, sanctions screening/freezes/licences, and separately encrypted
+nominated-officer restricted reports and SAR/DAML records, plus retention,
+disposal, fixed regulatory exports and the staff-screen capability responses.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| POST | `/compliance/restricted-reports` | `aml.internal_report`; every active staff role | JSON report or multipart report followed by one protected attachment -> neutral `{receiptId,received}` only |
+| GET | `/compliance/restricted-reports` | Current nominated officer + active Compliance, rechecked in PostgreSQL | 100 safe restricted-queue summaries; `before` continues the keyset page |
+| GET | `/compliance/restricted-reports/:reportId` | Current nominated officer + active Compliance | Decrypted report, attachments, decision, external report and DAML/DATF history; records a protected access event |
+| POST | `/compliance/restricted-reports/:reportId/decision` | Current nominated officer + active Compliance | `{externalReportRequired,legalGrounds,imposeHold}` -> the sole permanent decision and optional generic protected hold |
+| POST | `/compliance/restricted-reports/:reportId/external-report` | Current nominated officer + active Compliance | Records a SAR/terrorist-financing filing only after a report-required decision; does not submit it externally |
+| POST | `/compliance/restricted-reports/:reportId/external-report/:externalId/events` | Current nominated officer + active Compliance | Appends a received DAML/DATF status, encrypted legal basis/reference and any permitted activity |
+| GET | `/compliance/restricted-reports/:reportId/attachments/:attachmentId/content` | Current nominated officer + active Compliance | Audited encrypted-file download with no-store/restrictive headers |
+| GET | `/compliance/restricted-reports/:reportId/accesses` | Current nominated officer + active Compliance | Separate insert-only view/download access history |
+| POST | `/compliance/restricted-reports/:reportId/exports` | Current nominated officer + active Compliance | Creates a fixed separately encrypted restricted JSON bundle for a recorded regulatory purpose |
+| GET | `/compliance/restricted-reports/:reportId/exports/:exportId/content` | Current nominated officer + active Compliance | Integrity-checked restricted export download; records an `export` access event and uses attachment/no-store headers |
+| GET | `/compliance/access` | `aml.approve` | `{canRestricted,attentionCount}` for the staff workspace. The count contains ordinary queues only and excludes restricted reports and linked holds |
+| GET | `/compliance/clients` | `aml.approve` | At most 500 id/reference/kind/name choices for firm-wide Compliance forms; PostgreSQL rechecks the live role |
+| GET/POST | `/compliance/retention` | `aml.retention` | List schedules, or record the evidenced relationship end, five-year regulation 40 rule and encrypted evidence; all matters must be closed |
+| GET | `/compliance/retention/:scheduleId` | `aml.retention` | Schedule with decrypted evidence and its permanent legal-hold event history |
+| POST | `/compliance/retention/:scheduleId/legal-holds` | `aml.retention` | Append `imposed`, `reviewed` or `released` with encrypted authority/reason and the required review date |
+| POST | `/compliance/retention/:scheduleId/dispose` | `aml.retention` | Recheck due date, closed relationship, holds and officer boundary; delete stored objects and AML content, leaving content-free tombstones |
+| GET | `/compliance/retention/disposals` | `aml.retention` | Safe prepared/completed disposal-run history and record counts |
+| GET/POST | `/compliance/exports` | `aml.export` | List or create fixed encrypted ordinary AML JSON bundles; restricted material is never included |
+| GET | `/compliance/exports/:exportId/content` | `aml.export` | Audited integrity-checked ordinary export download with attachment/no-store headers |
 | POST | `/clients/:clientId/cdd` | `aml.assess`; visible client, or Compliance | `{intendedRelationship,reason}` -> the sole live versioned draft; 409 while another draft exists |
 | GET | `/clients/:clientId/cdd` | `aml.view_evidence`; same record rule | `{cases,next}`: 100 safe summaries, newest first; `before` continues without identity or evidence detail |
 | GET | `/clients/:clientId/cdd/:caseId` | `aml.view_evidence`; same record rule | Protected full CDD detail. Cross-client or hidden ids answer 404 |

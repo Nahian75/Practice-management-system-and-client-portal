@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { clientName, type Client } from '@/lib/clients';
+import type { CddSummary } from '@/lib/compliance';
 import { CLIENT_KIND_LABELS, countryName, formatCalendarDate, formatDate, ORGANISATION_TYPE_LABELS } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type MatterSummary } from '@/lib/matters';
 import { PortalAccess, type PortalCandidate, type PortalPerson } from './portal-access';
@@ -33,7 +34,10 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     );
   }
 
-  const matters = await apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`);
+  const [matters, cdd] = await Promise.all([
+    apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`),
+    apiGet<{ cases: CddSummary[]; next: string | null }>(`/clients/${encodeURIComponent(clientId)}/cdd`),
+  ]);
   // Only for roles that manage portal access; for others the API refuses and the section is left out.
   const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
   const portalCandidates: PortalCandidate[] =
@@ -129,6 +133,11 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
       )}
 
       {portal.body && <PortalAccess clientId={client.id} people={portal.body.people} candidates={portalCandidates} />}
+
+      {cdd.body && <section aria-labelledby="aml-heading"><h2 id="aml-heading">Identity and due diligence</h2>
+        <p>{cdd.body.cases.length ? `Latest case: version ${cdd.body.cases[0]!.version}, ${cdd.body.cases[0]!.status}.` : 'No CDD case has been started.'}</p>
+        <p><Link href={`/clients/${client.id}/compliance`}>Open client AML record</Link></p>
+      </section>}
 
       <h2>Matters</h2>
       {matters.status !== 200 || !matters.body || matters.body.matters.length === 0 ? (

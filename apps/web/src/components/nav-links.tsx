@@ -8,28 +8,34 @@ const LINKS = [
   { href: '/clients', label: 'Clients' },
   { href: '/matters', label: 'Matters' },
   { href: '/finance', label: 'Finance' },
+  { href: '/compliance', label: 'Compliance' },
+  { href: '/report-concern', label: 'Report a concern' },
   { href: '/notifications', label: 'Notifications' },
   { href: '/staff', label: 'Staff' },
 ] as const;
 
 /** The main sections. The current one is marked for screen readers as well as by sight. */
-export function NavLinks({ unreadCount, canViewFinance }: { unreadCount: number; canViewFinance: boolean }) {
+export function NavLinks({ unreadCount, canViewFinance, canViewCompliance, complianceAttention }:
+  { unreadCount: number; canViewFinance: boolean; canViewCompliance: boolean; complianceAttention: number }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Main" className="nav">
       <ul>
-        {LINKS.filter(({ href }) => href !== '/finance' || canViewFinance).map(({ href, label }) => {
+        {LINKS.filter(({ href }) => (href !== '/finance' || canViewFinance) &&
+          (href !== '/compliance' || canViewCompliance)).map(({ href, label }) => {
           const current = href === '/' ? pathname === '/' : pathname.startsWith(href);
           const notifications = href === '/notifications';
+          const compliance = href === '/compliance';
           return (
             <li key={href}>
               <Link
                 href={href}
                 aria-current={current ? 'page' : undefined}
-                aria-label={notifications ? `Notifications, ${unreadCount} unread` : undefined}
+                aria-label={notifications ? `Notifications, ${unreadCount} unread` :
+                  compliance ? `Compliance, ${complianceAttention} ordinary actions require attention` : undefined}
               >
-                {label}{notifications && ` (${unreadCount})`}
+                {label}{notifications && ` (${unreadCount})`}{compliance && complianceAttention > 0 && ` (${complianceAttention})`}
               </Link>
             </li>
           );

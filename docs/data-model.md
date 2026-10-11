@@ -1,8 +1,8 @@
 # Data Model
 
-**Current state (2026-10-10):** The database foundation through Compliance
-step 15d-3 exists, with separate owner and application roles and forward-only
-migrations through `0056`.
+**Current state (2026-10-11):** The database foundation through Compliance
+step 15f exists, with separate owner and application roles and forward-only
+migrations through `0058`.
 
 ## Database
 
@@ -91,6 +91,11 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `aml_sanctions_lists`, `aml_sanctions_designations`, `aml_sanctions_names`, `aml_sanctions_checks` | `0054_sanctions_lists.sql` | Immutable list versions imported in one transaction by a protected function; names keep normalized text and a GIN-indexed token array for screening. Every import, unchanged check and failure is recorded; `app.aml_sanctions_status` reports freshness (48 hours) | [compliance.md](compliance.md#step-15d-1-sanctions-list) |
 | `aml_screenings`, `aml_screening_candidates`, `aml_candidate_resolutions` | `0055_sanctions_screening.sql` | Screenings only against the active list, of the client record or one of its CDD subjects; candidates keep a fingerprint of the designation so a change reopens a false positive. Compliance-only resolutions with encrypted reasoning. `app.aml_sanctions_state` feeds the gate, money and a clearance trigger. Insert-only; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15d-2-screening) |
 | `aml_frozen_funds`, `aml_sanctions_licences`, `aml_licence_revocations` | `0056_sanctions_freezes.sql` | Frozen balances and receipts written only by the confirmation function and a receipt trigger. Licences only for confirmed designations, money only with a limit; `app.assert_aml_gate_amount` enforces the licence and its limit. Insert-only; owner update/delete/truncate refused | [compliance.md](compliance.md#step-15d-3-frozen-funds-and-licences) |
+| `aml_internal_reports`, `aml_internal_report_attachments`, `aml_internal_report_decisions`, `aml_external_reports`, `aml_daml_datf_events` | `0057_restricted_reports.sql` | No direct application reads or writes. Submission rechecks active staff; every read/decision rechecks and locks a live Compliance role plus nominated-officer appointment. Narratives, metadata, external references and per-file keys use the separate suspicion key and record-purpose contexts. Decisions and events are append-only; owner direct inserts/changes/truncation are refused | [compliance.md](compliance.md#step-15e-restricted-reports) |
+| `aml_restricted_hold_links`, `aml_restricted_access_log` | `0057_restricted_reports.sql` | Links a generic operational hold without exposing its cause and requires a current nominated officer to release it. Sensitive views/downloads append a separate officer-only access record. Direct reads/writes by the app and all later owner changes are refused | [compliance.md](compliance.md#step-15e-restricted-reports) |
+| `aml_retention_schedules`, `aml_legal_hold_events` | `0058_compliance_retention_exports.sql` | One evidenced relationship-end schedule per client, with the database-derived five-year regulation 40 disposal date. Longer retention uses an encrypted permanent legal-hold event ordered by trusted time. Protected functions require active Compliance; direct app access and owner mutation are refused | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
+| `aml_exports`, `aml_restricted_exports` | `0058_compliance_retention_exports.sql` | Fixed AES-GCM JSON bundles with byte count and SHA-256 integrity. Ordinary CDD exports use the AML key; restricted-report exports use the separate suspicion key and nominated-officer read path. Neither table is directly readable or writable by the app | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
+| `aml_disposal_runs`, `aml_disposed_records` | `0058_compliance_retention_exports.sql` | Resumable prepare/delete/finalize disposal. Preparation fixes private-object keys; finalization rechecks every gate, removes AML content through the sole deletion mode, clears keys and retains only content-free ids/kinds/rule/time/actor tombstones | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

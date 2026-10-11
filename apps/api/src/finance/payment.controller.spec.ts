@@ -178,13 +178,13 @@ describe('client payment API', () => {
   it('rolls back requests and approvals when their audit record fails', async () => {
     const audit = app.get(AuditService);
     const failedRequestPurpose = `Rollback ${unique()}`;
-    const createSpy = vi.spyOn(audit, 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+    const createSpy = vi.spyOn(audit, 'record').mockRejectedValue(new Error('audit unavailable'));
     expect((await as(requesterToken).post('/finance/payment-requests', { ...requestBody(), purpose: failedRequestPurpose })).status).toBe(500);
     createSpy.mockRestore();
     expect(await db.selectFrom('client_payment_requests').select('id').where('purpose', '=', failedRequestPurpose).executeTakeFirst()).toBeUndefined();
 
     const created = await as(requesterToken).post('/finance/payment-requests', requestBody());
-    const approveSpy = vi.spyOn(audit, 'record').mockRejectedValueOnce(new Error('audit unavailable'));
+    const approveSpy = vi.spyOn(audit, 'record').mockRejectedValue(new Error('audit unavailable'));
     expect((await as(approverToken).post(`/finance/payment-requests/${created.body.id}/approve`, {})).status).toBe(500);
     approveSpy.mockRestore();
     expect(await db.selectFrom('client_payment_events').select('id').where('payment_request_id', '=', created.body.id).executeTakeFirst()).toBeUndefined();

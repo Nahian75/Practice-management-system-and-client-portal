@@ -1,7 +1,7 @@
 # Compliance and AML
 
 **Current state (2026-10-11):** The project owner approved this first-version
-design. Steps 15a to 15c are built: permissions, protected nominated-officer and
+design. Steps 15a to 15f are built: permissions, protected nominated-officer and
 deputy appointments, fixed firm-control versions with separate Partner approval,
 training completions and independent-review records; versioned client CDD,
 encrypted identity facts and separately protected evidence; high-risk-country
@@ -11,7 +11,9 @@ compliance gate that PostgreSQL enforces on time, billing, documents and money,
 with holds, an early-start exception and a review queue. Step 15d imports the
 official UK Sanctions List, screens clients and their CDD subjects against it,
 holds possible matches, and freezes funds for confirmed designations unless a
-recorded licence permits the action. Steps 15e and 15f remain planned.
+recorded licence permits the action. Step 15e adds separately encrypted internal
+disclosures and nominated-officer-only SAR/DAML records. Step 15f adds controlled
+retention/disposal, separated regulatory exports and the staff/Compliance screens.
 
 How Stass helps an SRA-regulated firm in England and Wales record and enforce
 its anti-money-laundering, counter-terrorist-financing, proliferation-financing
@@ -86,7 +88,7 @@ regulated sector.
 
 ## Roles and permissions
 
-Step 15a and 15b permissions exist now; later-step permission names remain planned.
+The first-version permissions now exist through step 15f.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance |
 |---|---:|---:|---:|---:|---:|
@@ -98,6 +100,8 @@ Step 15a and 15b permissions exist now; later-step permission names remain plann
 | `aml.firm_approve` - approve a fixed firm-control version | | yes | | | |
 | `aml.sanctions` - resolve candidates, record licences and control freezes | | | | | yes |
 | `aml.internal_report` - send a confidential internal disclosure | yes | yes | yes | yes | yes |
+| `aml.retention` - retention schedules, legal holds and controlled disposal | | | | | yes |
+| `aml.export` - fixed ordinary AML regulatory exports | | | | | yes |
 
 `aml.internal_report` permits submission only. It never permits listing or
 reading a submitted report. `aml.suspicion_manage` is not a role permission:
@@ -340,10 +344,12 @@ new reference version and queue affected records for review.
 
 ## Data protection, retention and disposal
 
-- AML narratives, identity identifiers, provider responses, adverse information,
-  source evidence and internal disclosures use an AML-specific AES-256-GCM key
-  outside PostgreSQL with record/purpose context binding. Files remain encrypted
-  in private object storage with a distinct compliance object namespace.
+- AML narratives, identity identifiers, provider responses, adverse information
+  and source evidence use `AML_ENCRYPTION_KEY`. Internal disclosures, decisions,
+  external references, DAML/DATF events and their per-file keys use the separate
+  `SUSPICION_ENCRYPTION_KEY`. Both use AES-256-GCM outside PostgreSQL with
+  record/purpose context binding. Restricted files use the private
+  `compliance/restricted/<uuid>` object namespace.
 - Response schemas allow-list fields. Logs, audit metadata, URLs, email and
   ordinary notifications exclude names searched, document numbers, PEP or hit
   status, risk reasons, source-of-funds/wealth detail, suspicion, SAR data and
@@ -798,6 +804,118 @@ lists. Its effects:
   `contact_compliance`, and the limit, use and expiry of a licence that permits
   money. It never says why.
 
+## Step 15e restricted reports
+
+- `POST /compliance/restricted-reports` needs `aml.internal_report`, which every
+  staff role holds. JSON submits the client id, optional consistent matter and
+  Finance-transaction ids, observation date and observed facts. Multipart accepts
+  the same fields before one inspected attachment. It returns only
+  `{receiptId,received:true}`; the reporter cannot list or reopen the report.
+- `GET /compliance/restricted-reports[?before=]` and `GET
+  /compliance/restricted-reports/:reportId` are staff routes without a role-derived
+  permission: PostgreSQL admits only an active Compliance holder with a current
+  nominated-officer appointment. The list is a 100-item keyset queue with only
+  id, observation/submission dates and whether a decision exists. Detail decrypts
+  the facts, linked ids, attachment metadata, permanent decision, external filing
+  and DAML/DATF event history. Sensitive responses are `private, no-store`.
+- `POST .../:reportId/decision` records exactly one permanent decision: whether
+  an external report is required and the encrypted legal grounds. It may impose
+  a generic client or matter hold. Ordinary Compliance can see only “Protected
+  compliance review” and cannot lift that hold; a current nominated officer can.
+- `POST .../:reportId/external-report` is accepted only after a report-required
+  decision. It records `sar` or `terrorist_financing_report`, submission time,
+  encrypted external reference and whether DAML/DATF was actually requested.
+  It records an external filing; it does not submit one.
+- `POST .../:reportId/external-report/:externalId/events` appends a received
+  `requested`, `granted`, `refused`, `withdrawn` or `expired` event only where the
+  filing requested DAML/DATF. Its external reference, legal basis and permitted
+  activity are encrypted. Expiry never releases a transaction automatically.
+- `GET .../:reportId/attachments/:attachmentId/content` streams an authorised
+  attachment with restrictive download headers. `GET .../:reportId/accesses`
+  returns the separate insert-only view/download history to nominated officers.
+
+Narratives and exact external facts are AES-256-GCM ciphertext under
+`SUSPICION_ENCRYPTION_KEY`; attachments use random per-file keys wrapped by that
+key. Configuration refuses reuse with TOTP, mail, Finance, ordinary document or
+AML keys. Application direct table reads/writes are revoked. Protected functions
+recheck and lock the live account, Compliance role and appointment, so a read and
+concurrent role loss commit in a defined order. Owner update/delete/truncate and
+owner direct inserts are refused. The ordinary audit log receives only
+`compliance.restricted_record_changed`, a random report id and empty metadata;
+successful views/downloads go to the separately protected access log. No normal
+notification, email, matter history, search result or portal route is created.
+
+### Step 15e verification
+
+Focused HTTP tests cover neutral receipts, submission by ordinary staff,
+nominated-officer-only queues/details, live-role loss, no-store responses,
+permanent decisions, generic protected holds, SAR filing prerequisites,
+DAML/DATF prerequisites, encrypted attachment upload/download, separate access
+history and content-free ordinary audit records. Database tests prove revoked
+direct reads/writes, protected-only insertion, context binding, linked-record and
+future-date checks, nominated-officer rechecks, one decision, owner immutability
+and role-removal serialization. Cipher and vault tests prove key/context
+separation, non-plaintext ciphertext, the restricted namespace and streaming
+round trips. Fifteen deliberate mutations of these controls each made a focused
+test fail and were restored before the clean run. The clean verification run
+passed 291 focused API tests, the full 1,802-test API suite, the API type-check
+and production build, and all 78 web end-to-end tests (including the web
+production build).
+
+## Step 15f retention, exports and screens
+
+- `GET/POST /compliance/retention` lists or records a client relationship end.
+  PostgreSQL locks the client, requires every matter to be closed, accepts the
+  five-year regulation 40 period, calculates `dispose_after` and archives an active client. The
+  evidence for the date is AES-256-GCM ciphertext. Only one schedule exists for
+  a client.
+- `POST /compliance/retention/:id/legal-holds` appends an encrypted `imposed`,
+  `reviewed` or `released` event. Active events require a non-past review date;
+  release has none. Latest state is ordered by trusted `recorded_at` with the id
+  only as a deterministic tie-break, never by random UUID order.
+- Disposal is prepare/delete/finalize. `prepare_aml_disposal` locks and rechecks
+  the due date, archived client, closed matters and current legal/operational
+  holds, requires a live nominated officer if restricted material exists, and
+  returns the exact ordinary and restricted object keys. The service deletes
+  those objects idempotently. `finalize_aml_disposal` repeats every check,
+  records content-free tombstones and removes the client AML rows in dependency
+  order. A prepared run is resumable; completion clears its object-key array.
+- Ordinary `POST/GET /compliance/exports` bundles the fixed CDD, matter-risk,
+  measures, clearance, sanctions, hold and licence records as JSON under
+  `AML_ENCRYPTION_KEY`. The download verifies SHA-256 and is audited. Restricted
+  `POST/GET .../restricted-reports/:id/exports` contains that report only, uses
+  `SUSPICION_ENCRYPTION_KEY`, requires a current nominated officer and records a
+  separate `export` access event. The two paths and tables never combine.
+- `/compliance/access` returns the restricted capability and a content-free
+  ordinary attention count. The count covers unresolved sanctions candidates,
+  non-restricted active holds, due retention and stale sanctions data; it
+  excludes restricted reports and every hold linked to one. `/compliance/clients`
+  is a protected, bounded four-field picker for firm-wide Compliance forms, not
+  general client-list permission.
+- Every staff role gets `/report-concern`, with a neutral receipt and no history.
+  Compliance gets ordinary dashboard, client CDD, matter-risk, retention,
+  disposal and ordinary-export screens. The nominated-officer queue is revealed
+  only by the live capability and keeps narrative out of its list. There are no
+  portal routes or portal navigation for AML.
+
+### Step 15f verification
+
+Focused migration and HTTP tests cover closed-relationship scheduling,
+automatic archival, encrypted evidence, chronological legal-hold state,
+date/hold/role refusal, revoked app reads, owner immutability, object-key
+preparation, content erasure and tombstones, encrypted fixed exports, download
+integrity/headers/audit, separate officer exports and exclusion of restricted
+facts from ordinary bundles and attention counts. Browser tests cover neutral
+staff reporting, ordinary Compliance work, a complete protected CDD workflow
+and the separately authorized queue, including 390-pixel layout and axe checks.
+Five deliberate 15f mutations were caught and restored: UUID-only hold ordering,
+an overlong retention request, a cacheable export, restricted-report leakage in
+the general count and omission of the disposal officer check. Final full-suite
+validation passed 101 API test files with 1,821 tests, the API production build
+and type-check, the web type-check and production build, the all-files hidden-
+character scan, `git diff --check`, the offline production dependency audit
+with zero cached vulnerabilities, and all 83 Playwright tests.
+
 ## Build order
 
 Every implementation step gets positive and negative tests, concurrency and
@@ -839,12 +957,13 @@ and updated documentation before the next step.
     rescreening on each new list, and sanctions holds in the gate.
   - **15d-3. Built 2026-10-11.** Confirmed designations: frozen funds, licences and Finance
     enforcement.
-- **15e.** Encrypted internal disclosures, nominated-officer access, external
-  SAR/DAML decision/status records and confidentiality-safe holds.
-- **15f.** Retention/legal holds/disposal, regulatory exports, staff and
+- **15e. Built 2026-10-11.** Encrypted internal disclosures, nominated-officer
+  access, external SAR/DAML decision/status records, protected attachments,
+  separate access history and confidentiality-safe holds.
+- **15f. Built 2026-10-11.** Retention/legal holds/disposal, regulatory exports, staff and
   Compliance screens, safe notifications, narrow-screen and accessibility
   tests.
-- Security review against the then-current MLR, SRA/LSAG, sanctions, NCA and
+- **Security review.** Review against the then-current MLR, SRA/LSAG, sanctions, NCA and
   data-protection guidance.
 
 ## Approval

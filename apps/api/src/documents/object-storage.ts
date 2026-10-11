@@ -6,7 +6,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const STORAGE_KEY = new RegExp(`^(?:${UUID}|compliance/${UUID})$`);
+const STORAGE_KEY = new RegExp(`^(?:${UUID}|compliance/${UUID}|compliance/restricted/${UUID})$`);
 
 export class ObjectNotFoundError extends Error {
   override readonly name = 'ObjectNotFoundError';
@@ -72,7 +72,7 @@ export class ObjectStorage implements OnApplicationShutdown {
 
 function checked(key: string): string {
   if (!STORAGE_KEY.test(key)) {
-    throw new Error('A storage key is a lower-case UUID, optionally in the compliance namespace');
+    throw new Error('A storage key is a lower-case UUID in an approved private namespace');
   }
   return key;
 }

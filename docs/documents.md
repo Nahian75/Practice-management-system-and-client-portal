@@ -94,6 +94,11 @@ see there.
   active-content checks, malware scan and S3-compatible store, but uses its
   own `AML_ENCRYPTION_KEY`, `compliance/<uuid>` namespace, database tables and
   authorization. It is never an ordinary document and cannot be client-shared.
+- Restricted-report attachments use the same inspection and streaming cipher but
+  have a third boundary: `SUSPICION_ENCRYPTION_KEY`, the
+  `compliance/restricted/<uuid>` namespace, no direct application-table reads,
+  and nominated-officer-only metadata/download functions. They never enter
+  ordinary CDD exports, matter history, notifications or the client portal.
 
 ## How a file's type is checked
 

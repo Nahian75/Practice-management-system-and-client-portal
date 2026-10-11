@@ -12,11 +12,22 @@ import { SanctionsScreeningService } from './sanctions-screening.service.js';
 import { MoneyStatusController, SanctionsController } from './sanctions.controller.js';
 import { SanctionsRepository } from './sanctions.repository.js';
 import { SanctionsRefresher, SanctionsService } from './sanctions.service.js';
+import { RestrictedReportsController } from './restricted-reports.controller.js';
+import { RestrictedReportsRepository } from './restricted-reports.repository.js';
+import { RestrictedReportsService } from './restricted-reports.service.js';
+import { SuspicionDataCipher } from './suspicion-data-cipher.js';
+import { SuspicionEvidenceVault } from './suspicion-evidence-vault.js';
+import { RestrictedExportsController, RetentionController } from './retention.controller.js';
+import { RetentionRepository } from './retention.repository.js';
+import { RetentionService } from './retention.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
-  controllers: [ComplianceController, SanctionsController, MoneyStatusController],
+  controllers: [ComplianceController, SanctionsController, MoneyStatusController, RestrictedReportsController,
+    RetentionController, RestrictedExportsController],
   providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher,
-    SanctionsRepository, SanctionsService, SanctionsRefresher, SanctionsScreeningService],
+    SanctionsRepository, SanctionsService, SanctionsRefresher, SanctionsScreeningService,
+    RestrictedReportsRepository, RestrictedReportsService, SuspicionDataCipher, SuspicionEvidenceVault,
+    RetentionRepository, RetentionService],
 })
 export class ComplianceModule {}

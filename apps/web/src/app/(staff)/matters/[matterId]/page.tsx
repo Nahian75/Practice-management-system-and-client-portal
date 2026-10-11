@@ -6,7 +6,8 @@ import { MatterDetails } from '@/components/matter-details';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, currentAccount } from '@/lib/api';
 import type { DocumentSummary } from '@/lib/documents';
-import { formatDate, formatDateTime } from '@/lib/format';
+import type { ComplianceGate } from '@/lib/compliance';
+import { formatCalendarDate, formatDate, formatDateTime } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type ComplianceAccess, type ConflictCheck, type Matter } from '@/lib/matters';
 import type { Task } from '@/lib/tasks';
 import { ClearanceForm } from './clearance-form';
@@ -52,13 +53,14 @@ export default async function MatterPage({
     ? await apiGet<{ accesses: ComplianceAccess[] }>(`/matters/${encodeURIComponent(matter.id)}/compliance-accesses`)
     : undefined;
   const closed = matter.status === 'closed';
-  const [documents, tasks] = await Promise.all([
+  const [documents, tasks, amlGate] = await Promise.all([
     apiGet<{ documents: DocumentSummary[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/documents`, {
       before: typeof documentsBefore === 'string' ? documentsBefore : undefined,
     }),
     apiGet<{ tasks: Task[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/tasks`, {
       before: typeof tasksBefore === 'string' ? tasksBefore : undefined,
     }),
+    apiGet<ComplianceGate>(`/matters/${encodeURIComponent(matter.id)}/aml-gate`),
   ]);
 
   return (
@@ -92,6 +94,13 @@ export default async function MatterPage({
       )}
 
       <MatterDetails matter={matter} />
+
+      {amlGate.body && <section aria-labelledby="aml-heading"><h2 id="aml-heading">Compliance clearance</h2>
+        <div className={`notice ${amlGate.body.state === 'cleared' ? '' : 'notice-warning'}`}><p><strong>{amlState(amlGate.body.state)}.</strong>{' '}
+          {amlGate.body.dueSince ? `Review due since ${formatCalendarDate(amlGate.body.dueSince)}.` : ''}
+          {amlGate.body.workAllowedUntil ? ` Existing work may continue until ${formatCalendarDate(amlGate.body.workAllowedUntil)}.` : ''}</p></div>
+        <p><Link href={`/matters/${matter.id}/compliance`}>Open matter AML assessment</Link></p>
+      </section>}
 
       <TasksSection matter={matter} tasks={tasks.body?.tasks} next={tasks.body?.next ?? null} />
 
@@ -160,4 +169,8 @@ export default async function MatterPage({
       )}
     </>
   );
+}
+
+function amlState(state: ComplianceGate['state']) {
+  return ({ pending: 'Compliance work pending', cleared: 'Compliance cleared', review_due: 'Compliance review due', held: 'Contact Compliance' } as const)[state];
 }

@@ -11,6 +11,7 @@ const TEST_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 11).toString('base64');
 // Firm-wide Compliance lists (such as active holds) decrypt rows that other test
 // workers and earlier runs created, so the AML key is shared in the same way.
 const TEST_AML_ENCRYPTION_KEY = Buffer.alloc(32, 13).toString('base64');
+const TEST_SUSPICION_ENCRYPTION_KEY = Buffer.alloc(32, 17).toString('base64');
 
 function required(name: string): string {
   const value = process.env[name];
@@ -38,6 +39,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     MAIL_ENCRYPTION_KEY: TEST_MAIL_ENCRYPTION_KEY,
     FINANCE_ENCRYPTION_KEY: TEST_FINANCE_ENCRYPTION_KEY,
     AML_ENCRYPTION_KEY: TEST_AML_ENCRYPTION_KEY,
+    SUSPICION_ENCRYPTION_KEY: TEST_SUSPICION_ENCRYPTION_KEY,
     // Requests from supertest arrive over loopback; believing their X-Forwarded-For
     // lets each test choose the address it is rate-limited under.
     TRUSTED_PROXIES: ['loopback'],

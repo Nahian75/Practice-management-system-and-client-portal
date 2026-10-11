@@ -1,10 +1,10 @@
 # Web app
 
-**Current state (2026-10-09):** The staff app screens through Finance step
-14f and portal administration are built. Portal step 11d adds the
+**Current state (2026-10-12):** The staff app screens through Finance step
+14f and Compliance step 15f, and portal administration are built. Portal step 11d adds the
 read-only client screens, using the same secure pass-through and a separate
 client layout. The staff and client sides are security-reviewed through the
-portal work; the task screens were checked again with the Tasks module review.
+portal work; the task and Finance screens were checked again with their module reviews.
 
 The staff app and client portal, in the same browser app with separate layouts.
 
@@ -35,6 +35,35 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 - Pages that show data are rendered on the server, which calls the API with
   the visitor's cookie. Forms send JSON to `/api/...` from the browser.
 - The web app holds no secrets and never talks to the database.
+
+## Built in Compliance step 15f
+
+- Every staff role sees `/report-concern`. It sends JSON without a file or
+  multipart with one file, shows only a neutral receipt and never provides a
+  report-history link or general notification.
+- Only a successful `/compliance/access` capability check reveals the
+  `/compliance` workspace. Its navigation attention count contains ordinary
+  sanctions/hold/retention work only; restricted reports and their linked holds
+  are excluded in PostgreSQL.
+- The dashboard shows ordinary review, hold, sanctions and retention work,
+  and lets Compliance resolve screening candidates, impose or lift operational
+  holds and validate/activate an official UK Sanctions List CSV.
+  `/compliance/retention` records relationship ends and legal-hold events and
+  requires typing `DISPOSE` before the irreversible action. `/compliance/exports`
+  creates and downloads fixed ordinary bundles.
+- The “Nominated-officer records” link and pages exist only when the capability
+  says the current Compliance account has a live appointment. Queue summaries
+  contain no narrative. Detail supports permanent decisions, external filing,
+  DAML/DATF events, protected attachments/exports and the separate access log.
+- Client and matter pages show safe AML state and link to internal CDD/risk
+  work. A protected CDD workspace records people/entities, evidence,
+  verification, ownership/control and authority before immutable submission or
+  abandonment. A matter assessment workspace records measures and results,
+  source conclusions, Compliance clearance and separate senior approval.
+  Compliance-only client headings come from the narrow four-field picker, not
+  the ordinary client-detail route. No Compliance route exists in the portal.
+- Playwright covers the three confidentiality boundaries, a complete protected
+  CDD workflow, desktop and 390 px layout, and axe on each completed workflow.
 
 ## Built in 9a
 
@@ -316,6 +345,7 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **12c** | Tasks on the matter and task detail pages: create, list, edit, reassign, complete, cancel, reopen and history |
 | **13d** | Notifications: staff header unread count, inbox, mark read, task links and older pages |
 | **14f** | Matter time/finance; Accounts billing, receipts, payment and reconciliation workspaces; Compliance read-only ledgers and sign-off; audited CSV exports |
+| **15f** | Confidential staff concern; Compliance dashboard and operational actions; client CDD and matter assessment work; retention/legal holds/disposal; ordinary exports; separately revealed nominated-officer records and restricted exports |
 | | Security review of the web app |
 
 ## Testing

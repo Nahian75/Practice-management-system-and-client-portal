@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
-import { E2E_AML_ENCRYPTION_KEY, E2E_FINANCE_ENCRYPTION_KEY, E2E_MAIL_ENCRYPTION_KEY, E2E_WEB_URL } from '../../playwright.config';
+import { E2E_AML_ENCRYPTION_KEY, E2E_FINANCE_ENCRYPTION_KEY, E2E_MAIL_ENCRYPTION_KEY,
+  E2E_SUSPICION_ENCRYPTION_KEY, E2E_WEB_URL } from '../../playwright.config';
 import { e2eDatabaseUrl } from './database.mjs';
 
 export interface TestStaff {
@@ -50,6 +51,7 @@ export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ e
         MAIL_ENCRYPTION_KEY: E2E_MAIL_ENCRYPTION_KEY,
         FINANCE_ENCRYPTION_KEY: E2E_FINANCE_ENCRYPTION_KEY,
         AML_ENCRYPTION_KEY: E2E_AML_ENCRYPTION_KEY,
+        SUSPICION_ENCRYPTION_KEY: E2E_SUSPICION_ENCRYPTION_KEY,
         LOG_LEVEL: 'error',
       },
       encoding: 'utf8',
@@ -63,7 +65,7 @@ export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ e
 /** The token from a link to `path` in an email Mailpit caught for this address. */
 export async function emailedToken(email: string, path: string, context = ''): Promise<string> {
   // Emails leave through the API's outbox, which falls behind when every test worker is sending at once.
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 40_000;
   while (Date.now() < deadline) {
     const search = await fetch(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
     const { messages } = (await search.json()) as { messages: { ID: string }[] };

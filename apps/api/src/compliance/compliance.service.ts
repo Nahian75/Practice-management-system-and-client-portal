@@ -550,6 +550,7 @@ export class ComplianceService {
   }
 
   listHolds(activeOnly: boolean, before?: string) { return this.records.listHolds(activeOnly, before).then(page); }
+  findHold(id: string) { return this.records.findHold(id); }
 
   /** Exactly one of `clientId` and `matterId`; a client hold covers every matter of that client. */
   async imposeHold(target: { clientId: string | null; matterId: string | null }, reason: string,

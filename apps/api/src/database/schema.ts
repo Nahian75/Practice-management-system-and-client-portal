@@ -1074,6 +1074,68 @@ export interface AmlLicenceRevocationsTable extends AmlSealedColumns {
   id: DatabaseSet<string>; licence_id: DatabaseSet<string>; revoked_by: DatabaseSet<string>; revoked_at: DatabaseSet<Date>;
 }
 
+export interface AmlInternalReportsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; matter_id: DatabaseSet<string | null>;
+  finance_transaction_id: DatabaseSet<string | null>; observed_on: DatabaseSet<string>;
+  submitted_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>;
+}
+export interface AmlInternalReportAttachmentsTable {
+  id: DatabaseSet<string>; report_id: DatabaseSet<string>; metadata_context: DatabaseSet<string>;
+  metadata_key_version: DatabaseSet<number>; metadata_nonce: DatabaseSet<Buffer>; metadata_ciphertext: DatabaseSet<Buffer>;
+  metadata_auth_tag: DatabaseSet<Buffer>; media_type: DatabaseSet<DocumentMediaType>; size_bytes: DatabaseSet<number>;
+  sha256: DatabaseSet<Buffer>; storage_key: DatabaseSet<string>; file_key_version: DatabaseSet<number>;
+  file_key_nonce: DatabaseSet<Buffer>; wrapped_file_key: DatabaseSet<Buffer>; file_key_tag: DatabaseSet<Buffer>;
+  uploaded_at: DatabaseSet<Date>;
+}
+export interface AmlInternalReportDecisionsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; report_id: DatabaseSet<string>; external_report_required: DatabaseSet<boolean>;
+  decided_by: DatabaseSet<string>; decided_at: DatabaseSet<Date>;
+}
+export interface AmlExternalReportsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; internal_report_id: DatabaseSet<string>;
+  report_kind: DatabaseSet<'sar' | 'terrorist_financing_report'>; daml_datf_requested: DatabaseSet<boolean>;
+  submitted_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlDamlDatfEventsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; external_report_id: DatabaseSet<string>;
+  outcome: DatabaseSet<'requested' | 'granted' | 'refused' | 'withdrawn' | 'expired'>;
+  received_at: DatabaseSet<Date>; expires_at: DatabaseSet<Date | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlRestrictedHoldLinksTable { report_id: DatabaseSet<string>; hold_id: DatabaseSet<string> }
+export interface AmlRestrictedAccessLogTable {
+  id: DatabaseSet<string>; report_id: DatabaseSet<string>; attachment_id: DatabaseSet<string | null>;
+  action: DatabaseSet<'view' | 'download' | 'export'>; accessed_by: DatabaseSet<string>; accessed_at: DatabaseSet<Date>;
+}
+export interface AmlRetentionSchedulesTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; relationship_ended_on: DatabaseSet<string>;
+  retention_years: DatabaseSet<number>; dispose_after: DatabaseSet<string>; governing_rule: DatabaseSet<string>;
+  evidence_context: DatabaseSet<string>; evidence_key_version: DatabaseSet<number>; evidence_nonce: DatabaseSet<Buffer>;
+  evidence_ciphertext: DatabaseSet<Buffer>; evidence_auth_tag: DatabaseSet<Buffer>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlLegalHoldEventsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; schedule_id: DatabaseSet<string>; action: DatabaseSet<'imposed' | 'reviewed' | 'released'>;
+  review_on: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface AmlExportsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; sha256: DatabaseSet<Buffer>; byte_size: DatabaseSet<number>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface AmlRestrictedExportsTable extends AmlSealedColumns {
+  id: DatabaseSet<string>; report_id: DatabaseSet<string>; sha256: DatabaseSet<Buffer>; byte_size: DatabaseSet<number>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface AmlDisposalRunsTable {
+  id: DatabaseSet<string>; schedule_id: DatabaseSet<string>; client_id: DatabaseSet<string>; governing_rule: DatabaseSet<string>;
+  state: DatabaseSet<'prepared' | 'completed'>; object_keys: DatabaseSet<string[]>;
+  prepared_by: DatabaseSet<string>; prepared_at: DatabaseSet<Date>; completed_by: DatabaseSet<string | null>;
+  completed_at: DatabaseSet<Date | null>; record_count: DatabaseSet<number | null>;
+}
+export interface AmlDisposedRecordsTable {
+  id: DatabaseSet<string>; run_id: DatabaseSet<string>; record_id: DatabaseSet<string>; record_kind: DatabaseSet<string>;
+  governing_rule: DatabaseSet<string>; disposed_by: DatabaseSet<string>; disposed_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1096,6 +1158,19 @@ export interface Database {
   aml_hold_lifts: AmlHoldLiftsTable;
   aml_licence_revocations: AmlLicenceRevocationsTable;
   aml_holds: AmlHoldsTable;
+  aml_internal_reports: AmlInternalReportsTable;
+  aml_internal_report_attachments: AmlInternalReportAttachmentsTable;
+  aml_internal_report_decisions: AmlInternalReportDecisionsTable;
+  aml_external_reports: AmlExternalReportsTable;
+  aml_daml_datf_events: AmlDamlDatfEventsTable;
+  aml_restricted_hold_links: AmlRestrictedHoldLinksTable;
+  aml_restricted_access_log: AmlRestrictedAccessLogTable;
+  aml_retention_schedules: AmlRetentionSchedulesTable;
+  aml_legal_hold_events: AmlLegalHoldEventsTable;
+  aml_exports: AmlExportsTable;
+  aml_restricted_exports: AmlRestrictedExportsTable;
+  aml_disposal_runs: AmlDisposalRunsTable;
+  aml_disposed_records: AmlDisposedRecordsTable;
   aml_measure_results: AmlMeasureResultsTable;
   aml_measures: AmlMeasuresTable;
   aml_risk_assessment_controls: AmlRiskAssessmentControlsTable;

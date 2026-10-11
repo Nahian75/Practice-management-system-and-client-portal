@@ -1,10 +1,10 @@
 # Testing
 
-**Current state (2026-10-10):** Unit, HTTP and database integration tests for
+**Current state (2026-10-12):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
-the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15d, plus
-Playwright end-to-end tests for the staff app, Tasks, Notifications and the
-client portal.
+the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
+plus Playwright end-to-end tests for the staff app, Tasks, Notifications,
+Compliance and the client portal.
 
 ## Tools
 
@@ -51,12 +51,28 @@ version makes every cleared matter due for review, so parallel files must not
 supersede each other's framework. Tests that deliberately supersede one run as
 `*.exclusive.spec.ts`. Tests of other modules call `clearMatterForTests` so
 gated work can proceed; it clears through the same functions a firm would use.
-The AML test key is fixed, like the mail key, because firm-wide Compliance
+The AML and separate suspicion-report test keys are fixed, like the mail key, because firm-wide Compliance
 lists decrypt rows that other workers and earlier runs created.
 
 In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears
 each matter it opens unless told not to.
+
+Step 15f adds focused migration and HTTP tests for retention eligibility,
+chronological legal-hold release, direct-access denial, object-key preparation,
+content-free tombstones, nominated-officer disposal, encrypted ordinary and
+restricted exports, integrity/no-store downloads and exclusion of restricted
+facts from both ordinary exports and the general attention count. Browser tests
+cover the neutral staff report, ordinary Compliance dashboard/retention flow,
+a complete protected CDD subject/evidence/verification/submission workflow,
+the separately revealed officer queue, 390-pixel layout and axe checks.
+Five deliberate 15f mutations were caught and restored: UUID-only legal-hold
+ordering, a 6-10-year request window, a cacheable regulatory download, a
+general attention count that leaked restricted-report existence and disposal
+without the live nominated-officer check.
+The final clean run passed 101 API files/1,821 tests and 83/83 Playwright tests,
+including the web production build. API production build, both strict type-
+checks, the all-files hidden-character scan and `git diff --check` also passed.
 
 Sanctions tests never use the network. `test/sanctions.ts` builds CSVs in the
 official layout with the real header row, and refresh tests pass a fake `fetch`. `screenTestClient` records a clear screening

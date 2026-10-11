@@ -45,6 +45,9 @@ export const PERMISSIONS = [
   'aml.view_evidence',
   'aml.approve',
   'aml.sanctions',
+  'aml.internal_report',
+  'aml.retention',
+  'aml.export',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -68,7 +71,7 @@ export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'complian
 
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
-  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'aml.officers.manage'],
+  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'aml.officers.manage', 'aml.internal_report'],
   partner: [
     'staff.view',
     'clients.create',
@@ -93,6 +96,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.firm_approve',
     'aml.assess',
     'aml.view_evidence',
+    'aml.internal_report',
   ],
   fee_earner: [
     'clients.create',
@@ -114,11 +118,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'finance.matter.view',
     'aml.assess',
     'aml.view_evidence',
+    'aml.internal_report',
   ],
   accounts: [
     'finance.matter.view', 'finance.view_all', 'rates.manage', 'bills.manage',
     'client_money.record', 'client_money.request', 'client_money.approve',
     'finance.reconcile',
+    'aml.internal_report',
   ],
   compliance: [
     'staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view',
@@ -128,6 +134,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.view_evidence',
     'aml.approve',
     'aml.sanctions',
+    'aml.internal_report',
+    'aml.retention',
+    'aml.export',
   ],
 };
 

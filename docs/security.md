@@ -1,6 +1,6 @@
 # Security
 
-**Current state (2026-10-10):** Core API, staff-web, client-portal, task and
+**Current state (2026-10-12):** Core API, staff-web, client-portal, task and
 notification controls are built and reviewed. Notifications steps 13a to 13d add the
 persistent encrypted email outbox, insert-only staff task notifications,
 database-controlled one-way reads, live matter-access checks, staff-only
@@ -34,6 +34,13 @@ and CDD subjects against the official list, holds any unresolved or confirmed
 match, and keeps names and match status out of audit metadata. Step 15d-3 freezes
 balances and receipts for confirmed designations, permits only licensed actions
 within a money limit, and shows Accounts the operational outcome without the reason.
+Step 15e puts internal suspicion reports, attachments, decisions and external
+SAR/DAML event records behind a separate key, object namespace, access log and
+live nominated-officer check. Step 15f adds exact five-year relationship-end
+retention, encrypted legal-hold evidence, transaction-locked object/database
+disposal, content-free tombstones, segregated regulatory exports and a
+restricted-content-free attention count. The Compliance security review is in
+[`reviews/2026-10-11-compliance.md`](reviews/2026-10-11-compliance.md).
 
 This file lists only the controls that are actually in place.
 
@@ -311,6 +318,23 @@ neither the limit nor the recorded address.
   under a random `compliance/<uuid>` object key. Uploads reuse strict type,
   active-content and malware inspection but never enter the ordinary document
   tables, sharing routes or client portal.
+- Internal disclosures, SAR/DAML decisions, exact external references and
+  restricted attachment metadata use a separate `SUSPICION_ENCRYPTION_KEY`.
+  Restricted files use per-file keys wrapped by it and random
+  `compliance/restricted/<uuid>` objects. Only protected database functions can
+  read ciphertext, and those lock a live Compliance role and nominated-officer
+  appointment; successful views/downloads enter a separate protected access log.
+- Retention schedules and legal-hold reasons are ordinary AML ciphertext.
+  Disposal is the sole mode that relaxes AML immutability: a protected prepare
+  step fixes private object keys, the service deletes them, and a protected
+  finalize step rechecks due date, closure, legal/operational holds and any
+  nominated-officer requirement before erasing content. Only content-free
+  tombstones remain.
+- Ordinary and restricted regulatory exports are different encrypted tables,
+  keys and read functions. Downloads recompute SHA-256 and set attachment,
+  `private, no-store`, `nosniff` and sandbox CSP headers. The general Compliance
+  attention badge is calculated in PostgreSQL and excludes restricted records
+  and restricted-linked holds.
 
 ## Application secrets
 
@@ -320,6 +344,7 @@ neither the limit nor the recorded address.
 | `MAIL_ENCRYPTION_KEY` | Encrypts queued email addresses, subjects and bodies | Pending mail cannot be delivered; people may need a new invitation or reset link | With a copy of the database, an attacker could read pending email, including one-time links. Rotate the key; old pending rows fail their integrity check and must be requested again |
 | `FINANCE_ENCRYPTION_KEY` | Encrypts bank details and keys their duplicate fingerprint | Full bank details become unreadable; safe register and ledger history remain | With a copy of the database, an attacker could read bank details and test guessed details. Replace the key through a designed re-encryption migration; do not silently discard old key material |
 | `AML_ENCRYPTION_KEY` | Encrypts AML identity/source metadata and wraps protected evidence file keys | Protected CDD identity details and evidence become unreadable; safe ids/status history remains | With database plus object storage, an attacker could read highly sensitive identity evidence. Isolate and rotate through a designed re-encryption process; never reuse another application key |
+| `SUSPICION_ENCRYPTION_KEY` | Encrypts internal disclosures, decisions, external SAR/DAML facts and wraps restricted attachment keys | Restricted reports and attachments become unreadable; content-free ids and operational holds remain | With database plus object storage, an attacker could read exceptionally sensitive suspicion material. Keep it in a separate secret boundary, never reuse it, and rotate only through a designed re-encryption/rewrapping process |
 | `DOCUMENT_ENCRYPTION_KEY` | Wraps ordinary matter-document file keys | Ordinary stored documents become unreadable | With database plus object storage, an attacker could read ordinary matter documents. Rotate through a designed rewrapping process |
 
 Locally in `apps/api/.env` (git-ignored). In production from the secret manager,
