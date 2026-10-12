@@ -12,11 +12,12 @@ Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance
 gate enforcement, sanctions screening/freezes/licences, and separately encrypted
 nominated-officer restricted reports and SAR/DAML records, plus retention,
 disposal, fixed regulatory exports and the staff-screen capability responses.
-People / HR steps 16a to 16c add the safe directory, self-service and
+People / HR steps 16a to 16d add the safe directory, self-service and
 current-manager projections, protected employment/work-pattern history, exact
 leave records, reason-free sickness, restricted health and separately shaped
 operational adjustments, lifecycle checklists, versioned right-to-work evidence
-and professional-status records.
+and professional-status records, development cycles, required learning,
+objectives and appraisals.
 
 ## Endpoints
 
@@ -71,6 +72,18 @@ and professional-status records.
 | POST | `/hr/people/:personId/right-to-work` | `hr.vetting` and live HR role | Append a serialized right-to-work version linked to the same person's encrypted identity file |
 | POST | `/hr/people/:personId/professional-records` | `hr.competence` and live HR role | Append an encrypted qualification, registration or practising-certificate record |
 | POST | `/hr/professional-records/:recordId/checks` | `hr.competence` and live HR role | Append a dated, encrypted-source professional-status check |
+| GET | `/hr/me/competence` | Active staff with linked personnel record | Own development, required learning, objectives/appraisals and safe AML-training status |
+| GET | `/hr/reports/:personId/competence` | Current effective manager in PostgreSQL | Direct report's competence and review record; AML projection excludes provider/evidence/control content |
+| GET | `/hr/people/:personId/competence` | `hr.competence` and live HR role | Audited full competence record with the same narrow AML-training projection |
+| POST | `/hr/me/development` | Subject account in PostgreSQL | Create an own development cycle |
+| POST | `/hr/reports/:personId/development` | Current effective manager in PostgreSQL | Create a direct report's development cycle |
+| POST | `/hr/people/:personId/development` | `hr.competence` and live HR role | Create a person's development cycle |
+| POST | `/hr/development/:cycleId/events` | Subject, current manager or HR according to event kind | Worker appends reflection/need/plan/activity/evaluation; manager/HR appends review/requirement/status |
+| POST | `/hr/people/:personId/learning-assignments` | `hr.competence` and live HR role | Assign required learning with encrypted detail and due date |
+| POST | `/hr/learning-assignments/:assignmentId/events` | Subject or live HR role in PostgreSQL | Append completion/reopening evidence; manager substitution and future completion are refused |
+| POST | `/hr/reports/:personId/reviews` | Current effective manager in PostgreSQL | Record an immutable objective or appraisal statement for a direct report |
+| POST | `/hr/people/:personId/reviews` | `hr.competence` and live HR role | Record an immutable objective or appraisal statement |
+| POST | `/hr/reviews/:reviewId/worker-events` | Subject account in PostgreSQL | One-time acknowledgement or append-only worker response/disagreement |
 | POST | `/compliance/restricted-reports` | `aml.internal_report`; every active staff role | JSON report or multipart report followed by one protected attachment -> neutral `{receiptId,received}` only |
 | GET | `/compliance/restricted-reports` | Current nominated officer + active Compliance, rechecked in PostgreSQL | 100 safe restricted-queue summaries; `before` continues the keyset page |
 | GET | `/compliance/restricted-reports/:reportId` | Current nominated officer + active Compliance | Decrypted report, attachments, decision, external report and DAML/DATF history; records a protected access event |

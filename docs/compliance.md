@@ -164,7 +164,10 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
 - Training records fix subject, material version, trainer/provider, completion
   date and evidence. Compliance can schedule required training; staff attest
   only their own completion. A dashboard reports missing and expired training
-  without exposing unrelated AML records.
+  without exposing unrelated AML records. People / HR step 16d consumes a
+  Compliance-owned projection containing only material id/title/version and
+  completion/due status; provider, evidence and control content stay in
+  Compliance.
 - Independent review records fix reviewer, scope, period, findings document,
   recommendations, management response and completion. Stass does not call a
   self-review independent merely because a checkbox was selected.

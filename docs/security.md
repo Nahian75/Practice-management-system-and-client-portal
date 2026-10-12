@@ -41,7 +41,7 @@ retention, encrypted legal-hold evidence, transaction-locked object/database
 disposal, content-free tombstones, segregated regulatory exports and a
 restricted-content-free attention count. The Compliance security review is in
 [`reviews/2026-10-11-compliance.md`](reviews/2026-10-11-compliance.md).
-People / HR steps 16a to 16c add an independent HR role and encryption key, protected
+People / HR steps 16a to 16d add an independent HR role and encryption key, protected
 append-only employment history, live self/HR/current-manager database checks,
 bounded manager response schemas and a private `hr/` file namespace. Direct
 application-table reads/writes and owner mutation/truncation are refused. The
@@ -55,7 +55,12 @@ bind evidence to the same person's encrypted identity file and keep checklist,
 right-to-work and professional history owner-immutable. Manager vetting output
 is limited to expiry/action and public status. Leaver checks expose safe blocker
 ids/statuses but give HR no account, role, client, matter, task or AML mutation
-path. The HR module security review remains due after step 16f.
+path. Competence/review tables are likewise protected and immutable; distinct
+encryption contexts cover every narrative and evidence event, and PostgreSQL
+separates worker authorship from manager/HR authorship. HR receives AML training
+only through a Compliance-owned status projection that omits provider, evidence,
+control content and every restricted record. The HR module security review
+remains due after step 16f.
 
 This file lists only the controls that are actually in place.
 

@@ -2,7 +2,7 @@
 
 **Current state (2026-10-12):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16c.
+Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16d.
 
 ## Purpose
 
@@ -92,6 +92,15 @@ engagement ids, checklist kind/date/item count, version, professional kind or
 check status/date. Checklist notes, right-to-work outcomes and private detail,
 professional identifiers/restrictions/source/notes, ciphertext, filenames and
 encryption material never enter the ordinary audit row.
+
+Step 16d adds `hr.development_cycle_created`,
+`hr.development_event_recorded`, `hr.learning_assigned`,
+`hr.learning_completed`, `hr.learning_reopened`, `hr.review_recorded`,
+`hr.review_acknowledged`, `hr.review_response`, `hr.review_disagreement` and
+`hr.competence_viewed`. Mutations and their audit event share one transaction.
+Metadata is limited to person/record ids, event kind/state and relevant dates;
+reflection, needs, plans, activity/evaluation evidence, requirements, learning
+detail/evidence, objective/appraisal text and worker responses never enter it.
 
 Tasks records `task.created` with the task and matter ids, assignee id,
 priority, and whether a due date exists. Detail changes use `task.updated`

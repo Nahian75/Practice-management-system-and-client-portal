@@ -1,11 +1,12 @@
 # People and HR
 
 **Current state (2026-10-12):** First-version design approved. Steps 16a to
-16c are built: separate HR authority, protected employment and lifecycle
+16d are built: separate HR authority, protected employment and lifecycle
 history, encrypted personnel files/data and right-to-work evidence, exact leave
 evidence, reason-free sickness administration, restricted health records,
-bounded manager projections and versioned professional checks. Steps 16d to
-16f and the final HR security review remain.
+bounded manager projections, versioned professional checks, development cycles,
+required learning, objectives and appraisals. Steps 16e and 16f and the final HR
+security review remain.
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -87,7 +88,7 @@ retention rule, privacy information and responsible owner.
 ## Roles and proposed permissions
 
 `hr.directory`, `hr.manage`, `hr.leave`, `hr.health`, `hr.vetting` and
-`hr.competence` are implemented through step 16c. The remaining permission
+`hr.competence` are implemented through step 16d. The remaining permission
 names are reserved design and are added only with their step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
@@ -509,6 +510,40 @@ safe self/manager/HR projections, evidence-person binding, ciphertext/audit
 separation, right-to-work versioning and due dates, professional check history,
 strict inputs, direct-table denial and owner immutability.
 
+### Step 16d: competence and reviews
+
+Built on 12 October 2026 in migration `0062_hr_competence_reviews.sql` and the
+HR API module:
+
+- Development cycles cover a fixed period. The worker appends their reflection,
+  identified need, plan, activity/evidence and evaluation; a current manager or
+  HR appends requirements, reviews and status. Neither side can write as the
+  other, and no event replaces an earlier narrative.
+- HR can assign required learning with a due date and encrypted details. The
+  worker or HR can append completion evidence or reopen the assignment;
+  duplicate completion and future-dated completion are refused. A manager can
+  read the record but cannot attest completion for the worker.
+- A current manager or HR creates an immutable objective with a target date or
+  an immutable appraisal statement for a fixed period. Only the worker can
+  acknowledge it or append a response/disagreement; acknowledgement is
+  one-time and the manager's statement is never rewritten.
+- Every narrative, requirement, learning detail/evidence, objective, appraisal
+  and worker response is AES-256-GCM ciphertext under `HR_ENCRYPTION_KEY` with
+  a distinct row-and-purpose context. Ordinary audit metadata contains only
+  ids, event kinds, dates and states.
+- Self, current-manager and HR reads are rechecked in PostgreSQL. `pms_app`
+  cannot directly access the six tables and owner update/delete/truncate is
+  refused. Losing the reporting line removes manager access on the next call.
+- AML training remains owned by Compliance. A small Compliance-exported service
+  returns only approved material id/title/version and completion/due status to
+  the HR competence response; provider, evidence reference, control content and
+  every other AML record remain outside HR.
+
+Focused integration coverage proves the record rules, worker/manager authorship
+split, assignment state/date rules, fixed review and response history,
+encryption/audit separation, safe AML projection, strict shapes, direct-table
+denial and owner immutability.
+
 - **16a. Foundation and employment records — built.** Separate `hr` role and
   permissions, protected employment/person/manager/work-pattern history, HR
   encryption and private-file boundary, safe directory, self-service and
@@ -519,7 +554,7 @@ strict inputs, direct-table denial and owner immutability.
 - **16c. Joiners, movers, leavers and vetting — built.** Lifecycle checklists,
   right-to-work versions/evidence/follow-ups, qualifications and professional
   status without giving HR account-management authority.
-- **16d. Competence and reviews.** Add reflect/identify/plan/activity/evaluate,
+- **16d. Competence and reviews — built.** Reflect/identify/plan/activity/evaluate,
   firm assignments, objectives, appraisal acknowledgement and worker response.
 - **16e. Confidential cases, retention and exports.** Add explicit case teams,
   investigation/decision/appeal event history, category schedules, holds,
@@ -537,6 +572,6 @@ next step.
 
 ## Approval
 
-The first-version scope is approved and steps 16a to 16c are implemented. A change to
+The first-version scope is approved and steps 16a to 16d are implemented. A change to
 role authority, health/case access, retention, payroll boundary or automated
 decision policy changes the security model and is agreed here before code.

@@ -3,7 +3,7 @@
 **Current state (2026-10-12):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus People / HR steps 16a to 16c. Playwright end-to-end tests cover the staff app,
+plus People / HR steps 16a to 16d. Playwright end-to-end tests cover the staff app,
 Tasks, Notifications,
 Compliance and the client portal.
 
@@ -83,6 +83,17 @@ due queue, strict request shapes, content-free audit metadata, direct-table
 denial and owner immutability. The final clean run passed 105 API files/1,942
 tests; the focused 16c file passed 10/10. API type-check and production build,
 the all-files hidden-character scan and `git diff --check` also passed.
+
+Step 16d integration tests exercise self/current-manager/HR record rules,
+worker-versus-manager development authorship, HR learning assignment,
+completion state/date checks, immutable objectives/appraisals, one-time worker
+acknowledgement and append-only disagreement, ciphertext/audit separation, the
+safe AML-training projection, strict request shapes, direct-table denial and
+owner immutability. The final clean run passed 106 API files/1,950 tests with
+four workers after unbounded local runs exposed existing Mailpit/appointment
+fixture contention; the focused 16d file passed 8/8. API type-check and
+production build, the all-files hidden-character scan and `git diff --check`
+also passed.
 
 In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears

@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-12):** The database foundation through Compliance
-step 15f and People / HR step 16c exists, with separate owner and application
-roles and forward-only migrations through `0061`.
+step 15f and People / HR step 16d exists, with separate owner and application
+roles and forward-only migrations through `0062`.
 
 ## Database
 
@@ -106,6 +106,9 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `hr_lifecycle_checklists`, `hr_lifecycle_items`, `hr_lifecycle_item_events`, `hr_lifecycle_checklist_events` | `0061_hr_lifecycle_vetting.sql` | Engagement-bound joiner/mover/leaver workflows with structured departure category and encrypted append-only evidence. Completion requires all mandatory work, current right-to-work for joiners/movers, and no account/role/ownership blockers for leavers | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
 | `hr_right_to_work_checks` | `0061_hr_lifecycle_vetting.sql` | Advisory-lock serialized versions linked to the same person's encrypted identity file. Guidance/route/date/status/follow-up are permanent; identity-match, restriction and provider detail is authenticated ciphertext. Latest-check projections and due work are derived | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
 | `hr_professional_records`, `hr_professional_check_events` | `0061_hr_lifecycle_vetting.sql` | Immutable qualification/registration/certificate records with encrypted identifier/restriction and append-only status checks whose source/note is separately encrypted; backdating over later evidence is refused | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
+| `hr_development_cycles`, `hr_development_events` | `0062_hr_competence_reviews.sql` | Fixed periods and encrypted append-only reflect/identify/plan/activity/evaluate history. PostgreSQL separates worker-owned narrative from manager/HR requirement, review and status events | [hr.md](hr.md#step-16d-competence-and-reviews) |
+| `hr_learning_assignments`, `hr_learning_events` | `0062_hr_competence_reviews.sql` | HR-only encrypted assignments and due dates; serialized worker/HR completion/reopening evidence. Duplicate and future-dated completion is refused | [hr.md](hr.md#step-16d-competence-and-reviews) |
+| `hr_review_records`, `hr_review_worker_events` | `0062_hr_competence_reviews.sql` | Immutable encrypted manager/HR objective and appraisal statements, one-time worker acknowledgement and append-only response/disagreement. Subject, current-manager and HR access is database-checked | [hr.md](hr.md#step-16d-competence-and-reviews) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

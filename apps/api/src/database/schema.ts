@@ -1303,6 +1303,36 @@ export interface HrProfessionalCheckEventsTable extends HrSealedColumns {
   status: DatabaseSet<'current' | 'expired' | 'restricted' | 'suspended' | 'not_verified'>;
   checked_on: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
 }
+export interface HrDevelopmentCyclesTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; title: DatabaseSet<string>;
+  period_start: DatabaseSet<string>; period_end: DatabaseSet<string>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrDevelopmentEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; cycle_id: DatabaseSet<string>;
+  kind: DatabaseSet<'reflection' | 'need' | 'plan' | 'activity' | 'evaluation' | 'review' | 'requirement' | 'status'>;
+  state: DatabaseSet<'planned' | 'active' | 'completed' | 'closed' | null>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLearningAssignmentsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; title: DatabaseSet<string>;
+  provider: DatabaseSet<string | null>; due_on: DatabaseSet<string>;
+  assigned_by: DatabaseSet<string>; assigned_at: DatabaseSet<Date>;
+}
+export interface HrLearningEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; assignment_id: DatabaseSet<string>; action: DatabaseSet<'completed' | 'reopened'>;
+  completed_on: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrReviewRecordsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; kind: DatabaseSet<'objective' | 'appraisal'>;
+  title: DatabaseSet<string>; period_start: DatabaseSet<string | null>; period_end: DatabaseSet<string | null>;
+  target_on: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrReviewWorkerEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; review_id: DatabaseSet<string>;
+  action: DatabaseSet<'acknowledged' | 'response' | 'disagreement'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
 
 export interface Database {
   account_roles: AccountRolesTable;
@@ -1391,6 +1421,8 @@ export interface Database {
   finance_postings: FinancePostingsTable;
   finance_transactions: FinanceTransactionsTable;
   hr_contact_versions: HrContactVersionsTable;
+  hr_development_cycles: HrDevelopmentCyclesTable;
+  hr_development_events: HrDevelopmentEventsTable;
   hr_adjustment_decisions: HrAdjustmentDecisionsTable;
   hr_adjustment_progress_events: HrAdjustmentProgressEventsTable;
   hr_adjustment_requests: HrAdjustmentRequestsTable;
@@ -1407,6 +1439,8 @@ export interface Database {
   hr_leave_request_days: HrLeaveRequestDaysTable;
   hr_leave_request_events: HrLeaveRequestEventsTable;
   hr_leave_requests: HrLeaveRequestsTable;
+  hr_learning_assignments: HrLearningAssignmentsTable;
+  hr_learning_events: HrLearningEventsTable;
   hr_lifecycle_checklist_events: HrLifecycleChecklistEventsTable;
   hr_lifecycle_checklists: HrLifecycleChecklistsTable;
   hr_lifecycle_item_events: HrLifecycleItemEventsTable;
@@ -1417,6 +1451,8 @@ export interface Database {
   hr_professional_check_events: HrProfessionalCheckEventsTable;
   hr_professional_records: HrProfessionalRecordsTable;
   hr_right_to_work_checks: HrRightToWorkChecksTable;
+  hr_review_records: HrReviewRecordsTable;
+  hr_review_worker_events: HrReviewWorkerEventsTable;
   hr_sickness_absences: HrSicknessAbsencesTable;
   hr_work_patterns: HrWorkPatternsTable;
   invitations: InvitationsTable;
