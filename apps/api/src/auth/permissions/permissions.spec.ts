@@ -46,9 +46,13 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'aml.view_evidence': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: true },
   'aml.approve': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
   'aml.sanctions': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
-  'aml.internal_report': { administrator: true, partner: true, fee_earner: true, accounts: true, compliance: true },
+  'aml.internal_report': { administrator: true, partner: true, fee_earner: true, accounts: true, compliance: true, hr: true },
   'aml.retention': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
   'aml.export': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: true },
+  'hr.directory': { administrator: true, partner: true, fee_earner: true, accounts: true, compliance: true, hr: true },
+  'hr.manage': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.leave': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.health': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
 };
 
 describe('role permissions', () => {
@@ -59,7 +63,7 @@ describe('role permissions', () => {
   it.each(PERMISSIONS.flatMap((permission) => STAFF_ROLES.map((role) => [permission, role] as const)))(
     '%s for %s matches the table',
     (permission, role) => {
-      expect(ROLE_PERMISSIONS[role].includes(permission)).toBe(EXPECTED[permission]?.[role]);
+      expect(ROLE_PERMISSIONS[role].includes(permission)).toBe(EXPECTED[permission]?.[role] ?? false);
     },
   );
 
@@ -68,7 +72,7 @@ describe('role permissions', () => {
   });
 
   it('combines the permissions of every role held', () => {
-    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['aml.approve', 'aml.assess', 'aml.export', 'aml.firm_approve', 'aml.firm_controls', 'aml.internal_report', 'aml.retention', 'aml.sanctions', 'aml.view_evidence', 'audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.reconciliation_sign_off', 'finance.view_all', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
+    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['aml.approve', 'aml.assess', 'aml.export', 'aml.firm_approve', 'aml.firm_controls', 'aml.internal_report', 'aml.retention', 'aml.sanctions', 'aml.view_evidence', 'audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.reconciliation_sign_off', 'finance.view_all', 'hr.directory', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
   });
 
   it('gives no permissions without roles', () => {

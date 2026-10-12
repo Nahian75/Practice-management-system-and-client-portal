@@ -13,13 +13,14 @@ import { TasksModule } from './tasks/tasks.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { FinanceModule } from './finance/finance.module.js';
 import { ComplianceModule } from './compliance/compliance.module.js';
+import { HrModule } from './hr/hr.module.js';
 
 @Module({})
 export class AppModule {
   static forRoot(env: Env): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule],
+      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule, HrModule],
     };
   }
 }

@@ -1,8 +1,10 @@
 # People and HR
 
-**Current state (2026-10-12):** First-version design proposed for project-owner
-approval. Nothing in this document is implemented yet. Step 16a is the first
-planned implementation step.
+**Current state (2026-10-12):** First-version design approved. Steps 16a and
+16b are built: separate HR authority, protected employment history, encrypted
+personnel files/data, exact leave evidence, reason-free sickness administration,
+restricted health records and a bounded operational-adjustment projection.
+Steps 16c to 16f and the final HR security review remain.
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -83,7 +85,9 @@ retention rule, privacy information and responsible owner.
 
 ## Roles and proposed permissions
 
-Permission names are not added to code until their implementation step.
+`hr.directory`, `hr.manage`, `hr.leave` and `hr.health` are implemented through
+step 16b. The remaining permission names are reserved design and are added only
+with their step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
 |---|---:|---:|---:|---:|---:|---:|
@@ -279,10 +283,10 @@ feature exists. AML suspicion continues to use the nominated-officer-only step
   eligible object keys, the service removes them, and finalization rechecks
   retention, holds and case membership before clearing ciphertext and keys.
 
-`HR_ENCRYPTION_KEY` is a new independent 32-byte base64 secret. It is never
-reused as the document, Finance, AML or suspicion key. It will be added to
-environment examples only when step 16a implements the cipher; the local secret
-must be generated then, not committed.
+`HR_ENCRYPTION_KEY` is an implemented independent 32-byte base64 secret. It is
+never reused as the document, Finance, AML, suspicion, mail or TOTP key. The
+environment loader refuses a missing, malformed or reused key. Examples contain
+only a placeholder; each environment supplies its own uncommitted secret.
 
 ## Retention, legal hold and worker access
 
@@ -339,7 +343,7 @@ The exact schemas are fixed in each implementation step. Planned route groups:
 | Directory and self | `/hr/directory`, `/hr/me`, correction request | signed-in staff; own record or safe directory fields |
 | HR workspace | `/hr`, due joiners/leavers, checks, leave, reviews, retention | relevant `hr.*` permission |
 | Personnel | `/hr/people/:accountId`, engagements, terms, manager, work pattern, lifecycle | `hr.manage`; own safe subroutes |
-| Leave | `/hr/me/leave`, `/hr/reports/:accountId/leave`, HR leave queue | own, current manager, or `hr.leave` record rule |
+| Leave | `/hr/me/leave`, `/hr/reports/:personId/leave`, HR leave queue | own, current manager, or `hr.leave` record rule |
 | Health/adjustments | separate evidence and operational-adjustment routes | `hr.health`; manager gets operational projection only |
 | Vetting | right-to-work, professional checks, evidence and follow-up | `hr.vetting`; worker gets safe status |
 | Competence/reviews | development cycles, qualifications, objectives and acknowledgements | own, current manager, or `hr.competence` |
@@ -377,10 +381,96 @@ that manager projections omit pay, medical and case fields.
 
 ## Build order
 
-- **16a. Foundation and employment records.** Add the `hr` role and permissions,
-  protected employment/person/manager/work-pattern history, HR encryption and
-  private file boundary, safe directory, self-service and correction workflow.
-- **16b. Leave, sickness administration and adjustments.** Add exact entitlement
+### Step 16a: foundation and employment records
+
+Built on 12 October 2026 in migration `0059_hr_foundations.sql` and
+`apps/api/src/hr/`:
+
+- The separate `hr` role has only `hr.directory`, `hr.manage` and the
+  all-staff confidential-report submission permission. Administrator, Partner
+  and Compliance do not inherit personnel access. Granting HR triggers the
+  existing sensitive-role notice to active Compliance holders.
+- PostgreSQL owns the access decision. Protected functions lock and recheck a
+  live HR role, the subject account or the effective current reporting line;
+  `pms_app` cannot read or write HR tables directly. History tables reject
+  owner update, delete and truncate.
+- One personnel record links to one staff account. Engagements cover every
+  designed workforce kind and cannot overlap. Terms, weekday-minute work
+  patterns and manager assignments are effective-dated append-only events.
+  Retroactive entries over newer history, inactive managers, self-management
+  and direct/indirect reporting cycles are refused.
+- Contact details, date of birth, engagement-ending reasons, correction text
+  and filenames are AES-256-GCM ciphertext under `HR_ENCRYPTION_KEY`, bound to
+  record id and purpose. Ending an engagement does not disable an account or
+  alter roles.
+- `/hr/directory` returns only work identity and current directory facts.
+  `/hr/me` exposes the subject's safe record and permits only append-only
+  contact changes and correction requests. `/hr/reports/:personId` returns a
+  current manager only the employment summary and current work pattern.
+- HR files use random `hr/<uuid>` object keys, streaming type/active-content
+  inspection, ClamAV and per-file encryption. Only HR uploads; the subject can
+  download only a file whose immutable `worker_visible` flag is true. Downloads
+  are audited and use attachment, `private, no-store`, `nosniff` and sandbox
+  headers.
+- Every successful change, HR view of another person's full record and file
+  download is content-free in the ordinary audit log. Correction requests and
+  decisions are separately encrypted and append-only.
+
+Focused tests cover the role matrix and security notices, key validation and
+separation, cipher context binding, positive and negative HTTP paths, manager
+replacement, cycles/overlaps/retroactivity, direct-table denial, owner
+immutability, strict unsafe input and encrypted file round trips.
+
+### Step 16b: leave, sickness administration and adjustments
+
+Built on 12 October 2026 in migration
+`0060_hr_leave_health_adjustments.sql` and the HR API module:
+
+- Versioned policies retain the leave-year anchor, standard minute entitlement,
+  carry-over limit, booking notice and `manager_or_hr`/`hr_only` annual approval
+  route as evidence. Each request pins the applicable policy version. Policies
+  do not calculate legal entitlement or holiday pay.
+- The signed, append-only entitlement ledger stores exact integer minutes.
+  Annual approval locks the person and leave year, derives each working date
+  from the then-effective pattern, rejects overlap or insufficient balance, and
+  fixes the approved daily expansion permanently. Cancellation appends an event
+  and a matching return; it does not rewrite the decision or consumption.
+- Workers and HR can submit encrypted leave requests. The current effective
+  manager may approve/refuse only ordinary annual leave, never their own. HR can
+  decide every category. Request, decision and ledger-note ciphertexts use
+  separate purpose-and-row contexts.
+- Payroll-supplied holiday-pay evidence records integer pence, period, basis and
+  named component amounts whose pence sum must equal the recorded total, with a
+  database-derived minimum six-year retention date. Stass stores the evidence
+  and does not calculate the lawful rate.
+- Sickness administration contains dates, notification time and the operational
+  `fit`, `not_fit`, `may_be_fit` or `not_assessed` status only. Strict request
+  schemas reject extra medical-reason fields. Detailed sickness, fit-note,
+  occupational-health and adjustment-ground records use the encrypted health
+  boundary and are unavailable to managers.
+- Adjustment requests and accountable decisions remain private to the worker
+  and HR. An agreed decision separately encrypts the operational instruction,
+  effective date and review date shown to the current manager. Implementation,
+  review and closure append permanent events; managers cannot close a record.
+- `/hr/me/leave`, `/hr/reports/:personId/leave` and HR person/queue routes apply
+  self, current-manager and HR rules in PostgreSQL. Manager responses contain no
+  holiday pay or ledger notes. Separate health and adjustment routes audit
+  sensitive reads and return only the appropriate private or operational shape.
+- Direct `pms_app` table access and owner update/delete/truncate remain refused.
+  Change audits contain ids, dates, kinds, minute/pence totals and outcomes, not
+  request reasons, health facts, adjustment text or encryption material.
+
+Focused integration coverage proves role/record separation, encryption at rest,
+exact minute expansion, self-approval and protected-category refusal, balance
+and overlap enforcement, cancellation return, reason-free sickness, health and
+adjustment projections, holiday-pay retention, direct-table denial and immutable
+history.
+
+- **16a. Foundation and employment records — built.** Separate `hr` role and
+  permissions, protected employment/person/manager/work-pattern history, HR
+  encryption and private-file boundary, safe directory, self-service and
+  correction workflow.
+- **16b. Leave, sickness administration and adjustments — built.** Exact entitlement
   ledgers, approval concurrency, six-year holiday/pay evidence, health-separated
   absence and the operational-adjustment projection.
 - **16c. Joiners, movers, leavers and vetting.** Add lifecycle checklists,
@@ -404,7 +494,6 @@ next step.
 
 ## Approval
 
-This is the proposed first-version scope. Approval means implementation starts
-with step 16a in this order. A change to role authority, health/case access,
-retention, payroll boundary or automated decision policy changes the security
-model and is agreed here before code.
+The first-version scope is approved and steps 16a and 16b are implemented. A change to
+role authority, health/case access, retention, payroll boundary or automated
+decision policy changes the security model and is agreed here before code.

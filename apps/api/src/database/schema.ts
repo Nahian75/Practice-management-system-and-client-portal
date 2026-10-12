@@ -162,7 +162,7 @@ export interface PasswordResetsTable {
   close_reason: UpdateOnly<'used' | 'replaced' | null>;
 }
 
-export type StaffRole = 'administrator' | 'partner' | 'fee_earner' | 'accounts' | 'compliance';
+export type StaffRole = 'administrator' | 'partner' | 'fee_earner' | 'accounts' | 'compliance' | 'hr';
 
 export interface AccountRolesTable {
   id: DatabaseSet<string>;
@@ -1136,6 +1136,134 @@ export interface AmlDisposedRecordsTable {
   governing_rule: DatabaseSet<string>; disposed_by: DatabaseSet<string>; disposed_at: DatabaseSet<Date>;
 }
 
+export type HrEngagementKind = 'employee' | 'worker' | 'llp_partner' | 'equity_partner' | 'consultant' | 'apprentice' | 'trainee';
+export type HrCorrectionCategory = 'contact' | 'personal' | 'employment' | 'manager' | 'work_pattern' | 'other';
+export type HrFileCategory = 'contract' | 'terms' | 'identity' | 'personal' | 'other';
+export type HrLeaveKind = 'annual' | 'family' | 'compassionate' | 'unpaid' | 'other';
+export type HrEntitlementKind = 'opening_grant' | 'accrual' | 'adjustment' | 'carry_over' | 'consumption' | 'cancellation_return' | 'leaving_adjustment';
+export type HrFitnessStatus = 'fit' | 'not_fit' | 'may_be_fit' | 'not_assessed';
+
+interface HrSealedColumns {
+  context: DatabaseSet<string>;
+  key_version: DatabaseSet<number>;
+  nonce: DatabaseSet<Buffer>;
+  ciphertext: DatabaseSet<Buffer>;
+  auth_tag: DatabaseSet<Buffer>;
+}
+
+export interface HrPeopleTable {
+  id: DatabaseSet<string>; account_id: DatabaseSet<string>; created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrContactVersionsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrPrivateVersionsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrEngagementsTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; engagement_kind: DatabaseSet<HrEngagementKind>;
+  started_on: DatabaseSet<string>; ended_on: DatabaseSet<string | null>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrEngagementEndingsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; engagement_id: DatabaseSet<string>; ended_on: DatabaseSet<string>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrEmploymentTermsTable {
+  id: DatabaseSet<string>; engagement_id: DatabaseSet<string>; effective_on: DatabaseSet<string>;
+  job_title: DatabaseSet<string>; team: DatabaseSet<string | null>; work_location: DatabaseSet<string | null>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrManagerEventsTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; action: DatabaseSet<'assigned' | 'cleared'>;
+  manager_person_id: DatabaseSet<string | null>; effective_on: DatabaseSet<string>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrWorkPatternsTable {
+  id: DatabaseSet<string>; engagement_id: DatabaseSet<string>; effective_on: DatabaseSet<string>;
+  time_zone: DatabaseSet<string>; monday_minutes: DatabaseSet<number>; tuesday_minutes: DatabaseSet<number>;
+  wednesday_minutes: DatabaseSet<number>; thursday_minutes: DatabaseSet<number>; friday_minutes: DatabaseSet<number>;
+  saturday_minutes: DatabaseSet<number>; sunday_minutes: DatabaseSet<number>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrCorrectionRequestsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; category: DatabaseSet<HrCorrectionCategory>;
+  submitted_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>;
+}
+export interface HrCorrectionEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; outcome: DatabaseSet<'resolved' | 'rejected'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrFilesTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; category: DatabaseSet<HrFileCategory>;
+  worker_visible: DatabaseSet<boolean>; metadata_context: DatabaseSet<string>;
+  metadata_key_version: DatabaseSet<number>; metadata_nonce: DatabaseSet<Buffer>;
+  metadata_ciphertext: DatabaseSet<Buffer>; metadata_auth_tag: DatabaseSet<Buffer>;
+  media_type: DatabaseSet<DocumentMediaType>; size_bytes: DatabaseSet<number>; sha256: DatabaseSet<Buffer>;
+  storage_key: DatabaseSet<string>; file_key_version: DatabaseSet<number>; file_key_nonce: DatabaseSet<Buffer>;
+  wrapped_file_key: DatabaseSet<Buffer>; file_key_tag: DatabaseSet<Buffer>;
+  uploaded_by: DatabaseSet<string>; uploaded_at: DatabaseSet<Date>;
+}
+export interface HrLeavePoliciesTable {
+  id: DatabaseSet<string>; version: DatabaseSet<number>; effective_from: DatabaseSet<string>;
+  leave_year_month: DatabaseSet<number>; leave_year_day: DatabaseSet<number>;
+  standard_entitlement_minutes: DatabaseSet<number>; carry_over_limit_minutes: DatabaseSet<number>;
+  booking_notice_days: DatabaseSet<number>; annual_approval_route: DatabaseSet<'manager_or_hr' | 'hr_only'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLeaveRequestsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; policy_id: DatabaseSet<string>; kind: DatabaseSet<HrLeaveKind>;
+  starts_on: DatabaseSet<string>; ends_on: DatabaseSet<string>; leave_year_start: DatabaseSet<string>;
+  submitted_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>;
+}
+export interface HrLeaveRequestEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; action: DatabaseSet<'approved' | 'refused' | 'cancelled'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLeaveRequestDaysTable {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; person_id: DatabaseSet<string>;
+  leave_on: DatabaseSet<string>; minutes: DatabaseSet<number>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLeaveEntitlementEntriesTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; leave_year_start: DatabaseSet<string>;
+  kind: DatabaseSet<HrEntitlementKind>; minutes: DatabaseSet<number>; leave_request_id: DatabaseSet<string | null>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrHolidayPayRecordsTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; leave_request_id: DatabaseSet<string>;
+  period_starts_on: DatabaseSet<string>; period_ends_on: DatabaseSet<string>; amount_pence: DatabaseSet<string>;
+  basis: DatabaseSet<'normal' | 'basic' | 'rolled_up' | 'other'>;
+  included_elements: DatabaseSet<Array<{ name: string; amountPence: number }>>;
+  retention_until: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrSicknessAbsencesTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; started_on: DatabaseSet<string>;
+  ended_on: DatabaseSet<string | null>; notified_at: DatabaseSet<Date>; fitness_status: DatabaseSet<HrFitnessStatus>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrHealthRecordsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>;
+  kind: DatabaseSet<'sickness_detail' | 'fit_note' | 'occupational_health' | 'adjustment_ground'>;
+  valid_from: DatabaseSet<string | null>; valid_to: DatabaseSet<string | null>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrAdjustmentRequestsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; submitted_by: DatabaseSet<string>; submitted_at: DatabaseSet<Date>;
+}
+export interface HrAdjustmentDecisionsTable {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; outcome: DatabaseSet<'agreed' | 'refused'>;
+  private_context: DatabaseSet<string>; private_key_version: DatabaseSet<number>; private_nonce: DatabaseSet<Buffer>;
+  private_ciphertext: DatabaseSet<Buffer>; private_auth_tag: DatabaseSet<Buffer>;
+  operational_context: DatabaseSet<string | null>; operational_key_version: DatabaseSet<number | null>;
+  operational_nonce: DatabaseSet<Buffer | null>; operational_ciphertext: DatabaseSet<Buffer | null>;
+  operational_auth_tag: DatabaseSet<Buffer | null>; effective_on: DatabaseSet<string | null>;
+  review_on: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrAdjustmentProgressEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; decision_id: DatabaseSet<string>;
+  action: DatabaseSet<'implemented' | 'reviewed' | 'closed'>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+
 export interface Database {
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
@@ -1222,6 +1350,28 @@ export interface Database {
   email_outbox_changes: EmailOutboxChangesTable;
   finance_postings: FinancePostingsTable;
   finance_transactions: FinanceTransactionsTable;
+  hr_contact_versions: HrContactVersionsTable;
+  hr_adjustment_decisions: HrAdjustmentDecisionsTable;
+  hr_adjustment_progress_events: HrAdjustmentProgressEventsTable;
+  hr_adjustment_requests: HrAdjustmentRequestsTable;
+  hr_correction_events: HrCorrectionEventsTable;
+  hr_correction_requests: HrCorrectionRequestsTable;
+  hr_employment_terms: HrEmploymentTermsTable;
+  hr_engagement_endings: HrEngagementEndingsTable;
+  hr_engagements: HrEngagementsTable;
+  hr_files: HrFilesTable;
+  hr_health_records: HrHealthRecordsTable;
+  hr_holiday_pay_records: HrHolidayPayRecordsTable;
+  hr_leave_entitlement_entries: HrLeaveEntitlementEntriesTable;
+  hr_leave_policies: HrLeavePoliciesTable;
+  hr_leave_request_days: HrLeaveRequestDaysTable;
+  hr_leave_request_events: HrLeaveRequestEventsTable;
+  hr_leave_requests: HrLeaveRequestsTable;
+  hr_manager_events: HrManagerEventsTable;
+  hr_people: HrPeopleTable;
+  hr_private_versions: HrPrivateVersionsTable;
+  hr_sickness_absences: HrSicknessAbsencesTable;
+  hr_work_patterns: HrWorkPatternsTable;
   invitations: InvitationsTable;
   issued_bill_lines: IssuedBillLinesTable;
   issued_bills: IssuedBillsTable;

@@ -9,6 +9,7 @@ const MAIL_KEY = Buffer.alloc(32, 8).toString('base64');
 const FINANCE_KEY = Buffer.alloc(32, 10).toString('base64');
 const AML_KEY = Buffer.alloc(32, 12).toString('base64');
 const SUSPICION_KEY = Buffer.alloc(32, 14).toString('base64');
+const HR_KEY = Buffer.alloc(32, 15).toString('base64');
 const MAIL = {
   APP_BASE_URL: 'http://localhost:3000',
   SMTP_URL: 'smtp://127.0.0.1:1025',
@@ -27,6 +28,7 @@ const minimal = {
   NODE_ENV: 'development', DATABASE_URL: LOCAL_DATABASE_URL,
   TOTP_ENCRYPTION_KEY: TOTP_KEY, FINANCE_ENCRYPTION_KEY: FINANCE_KEY, AML_ENCRYPTION_KEY: AML_KEY,
   SUSPICION_ENCRYPTION_KEY: SUSPICION_KEY,
+  HR_ENCRYPTION_KEY: HR_KEY,
   ...MAIL, ...DOCUMENTS,
 };
 
@@ -43,6 +45,7 @@ describe('loadEnv', () => {
       FINANCE_ENCRYPTION_KEY: FINANCE_KEY,
       AML_ENCRYPTION_KEY: AML_KEY,
       SUSPICION_ENCRYPTION_KEY: SUSPICION_KEY,
+      HR_ENCRYPTION_KEY: HR_KEY,
       MAIL_FROM_NAME: 'Practice Portal',
       TRUSTED_PROXIES: [],
       ...DOCUMENTS,
@@ -74,6 +77,7 @@ describe('loadEnv', () => {
     'FINANCE_ENCRYPTION_KEY',
     'AML_ENCRYPTION_KEY',
     'SUSPICION_ENCRYPTION_KEY',
+    'HR_ENCRYPTION_KEY',
     'DOCUMENTS_S3_ENDPOINT',
     'DOCUMENTS_S3_BUCKET',
     'DOCUMENTS_S3_ACCESS_KEY',
@@ -109,6 +113,7 @@ describe('loadEnv', () => {
     ['FINANCE_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
     ['AML_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
     ['SUSPICION_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
+    ['HR_ENCRYPTION_KEY', Buffer.alloc(16).toString('base64')],
     ['TRUSTED_PROXIES', '*'],
     ['TRUSTED_PROXIES', 'true'],
     ['TRUSTED_PROXIES', 'proxy.example.com'],
@@ -150,6 +155,10 @@ describe('loadEnv', () => {
     expect(()=>loadEnv({...minimal,SUSPICION_ENCRYPTION_KEY:AML_KEY})).toThrow(/SUSPICION_ENCRYPTION_KEY: must be separate from AML_ENCRYPTION_KEY/);
   });
 
+  it('requires a distinct HR encryption key',()=>{
+    expect(()=>loadEnv({...minimal,HR_ENCRYPTION_KEY:AML_KEY})).toThrow(/HR_ENCRYPTION_KEY: must be separate from AML_ENCRYPTION_KEY/);
+  });
+
   describe('in production', () => {
     const production = {
       NODE_ENV: 'production',
@@ -157,6 +166,7 @@ describe('loadEnv', () => {
       FINANCE_ENCRYPTION_KEY: FINANCE_KEY,
       AML_ENCRYPTION_KEY: AML_KEY,
       SUSPICION_ENCRYPTION_KEY: SUSPICION_KEY,
+      HR_ENCRYPTION_KEY: HR_KEY,
       ...MAIL,
       APP_BASE_URL: 'https://portal.example.com',
       ...DOCUMENTS,

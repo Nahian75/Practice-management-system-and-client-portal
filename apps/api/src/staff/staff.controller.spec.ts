@@ -347,7 +347,7 @@ describe('Staff management', () => {
       expect(email?.text).toContain('The fee earner role was removed');
     });
 
-    const sensitiveRoles = ['administrator', 'compliance', 'accounts'] as const;
+    const sensitiveRoles = ['administrator', 'compliance', 'accounts', 'hr'] as const;
 
     it.each(sensitiveRoles)('tells every compliance holder when %s is granted', async (role) => {
       const holders = [await staffWith('compliance'), await staffWith('compliance', 'partner')];

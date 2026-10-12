@@ -1,6 +1,6 @@
 # Authorization
 
-**Current state (2026-10-11):** Layers 1 and 2 built, including the
+**Current state (2026-10-12):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
 issued billing records. Finance-wide bank, cash-book and ledger reads are
@@ -21,6 +21,11 @@ a Partner, for high-risk or PEP senior-management approval. Step 15d adds the
 Compliance-only `aml.sanctions`. Step 15e gives every staff role submission-only
 `aml.internal_report`; reading and deciding require both a live Compliance role
 and current nominated-officer appointment in PostgreSQL.
+People / HR steps 16a and 16b add a separate `hr` role. All staff roles receive only
+the safe directory; self-service and manager routes use live record
+relationships, while personnel management, firm-wide leave administration and
+restricted health access require the respective permission plus a live HR role
+rechecked in PostgreSQL.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -49,7 +54,7 @@ without it.
 
 | Topic | Decision | Decided by |
 |---|---|---|
-| Staff roles | Administrator, Partner, Fee earner, Accounts, Compliance. A person may hold several | Project owner |
+| Staff roles | Administrator, Partner, Fee earner, Accounts, Compliance, HR. A person may hold several | Project owner |
 | Who invites staff | Administrator only | Project owner |
 | Four-eyes approval | Client money payments out (built with Finance) | Project owner |
 | Role and permission model | Fixed permissions in code; roles grant sets of permissions; assignments in the database | ADR-009 |
@@ -65,6 +70,7 @@ Clients have no roles. What a client may see is decided by layer 3 only.
 | `fee_earner` | Runs matters day to day |
 | `accounts` | Client and office money, bills, reconciliation |
 | `compliance` | Regulatory oversight: COLP, COFA, MLRO duties, audit log |
+| `hr` | Personnel records and employment lifecycle; no account, client, matter, Finance, audit or Compliance access by default |
 
 ### Permissions in this module
 
@@ -116,6 +122,30 @@ Each module adds its own permissions when it is built. These exist now:
 | `aml.retention` - schedule retention, record legal holds and run controlled disposal | | | | | ✓ |
 | `aml.export` - create and download fixed ordinary AML regulatory bundles | | | | | ✓ |
 
+The HR role is intentionally omitted from the established-role matrix above:
+it receives none of those permissions except `aml.internal_report`, which all
+active staff can use. Step 16a adds this separate matrix:
+
+| Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
+|---|---:|---:|---:|---:|---:|---:|
+| `hr.directory` - safe work directory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `hr.manage` - personnel and employment history | | | | | | ✓ |
+| `hr.leave` - firm-wide entitlement, absence and holiday-pay evidence | | | | | | ✓ |
+| `hr.health` - health facts, adjustment grounds and private decisions | | | | | | ✓ |
+
+Self-service does not grant `hr.manage`. The database binds `/hr/me` to the
+caller's account and `/hr/reports/:personId` to the current effective reporting
+line. A former manager loses access on the next request. Administrator and
+Partner roles do not imply personnel access.
+
+Leave and adjustment routes add record rules after the HTTP permission check.
+A worker can request and cancel their own leave and adjustment request. The
+current effective manager can read a bounded leave/sickness projection, decide
+only ordinary annual leave, and record operational adjustment progress, but
+cannot self-approve, see holiday pay or entitlement notes, read health facts or
+see adjustment grounds/private decisions. HR can administer all categories.
+Every protected function rechecks the live relationship or HR role.
+
 Restricted-report reads and decisions deliberately have no role permission that
 an administrator can grant. Each protected database function locks and rechecks
 the active account, active `compliance` role and current nominated-officer
@@ -146,7 +176,7 @@ accounts should not be the only ones checking what changed.
   so the database shows who held which role and when.
 - **Safeguards on account management:**
   - Nobody can change their own roles, grant or revoke. Otherwise an
-    administrator could grant themselves `compliance` and read the audit log.
+    administrator could grant themselves a sensitive role and read protected data.
   - Nobody can disable their own account.
   - The last active administrator, and the last active `compliance` holder,
     cannot be removed or disabled.
@@ -158,7 +188,7 @@ accounts should not be the only ones checking what changed.
   change without its record cannot happen.
 - **Role changes are emailed.** The person is told whenever a role is granted
   or revoked, and every active compliance holder is told when `administrator`,
-  `compliance` or `accounts` is granted, so a misused administrator account
+  `compliance`, `accounts` or `hr` is granted, so a misused administrator account
   cannot hand out access quietly. See the notice table in
   [authentication.md](authentication.md#security-notice-emails).
 - **Refusals are audited too.** Trying to change your own account, or to remove

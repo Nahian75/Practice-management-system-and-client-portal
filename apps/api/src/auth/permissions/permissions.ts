@@ -48,11 +48,15 @@ export const PERMISSIONS = [
   'aml.internal_report',
   'aml.retention',
   'aml.export',
+  'hr.directory',
+  'hr.manage',
+  'hr.leave',
+  'hr.health',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const STAFF_ROLES = ['administrator', 'partner', 'fee_earner', 'accounts', 'compliance'] as const satisfies readonly StaffRole[];
+export const STAFF_ROLES = ['administrator', 'partner', 'fee_earner', 'accounts', 'compliance', 'hr'] as const satisfies readonly StaffRole[];
 
 /**
  * Roles whose last active holder cannot be removed: without an administrator
@@ -64,14 +68,14 @@ export type ProtectedRole = (typeof PROTECTED_ROLES)[number];
 
 /**
  * Roles whose grant is emailed to every compliance holder: they reach staff
- * management, the audit log and client money, so a grant made through a
- * misused administrator account must not go unnoticed.
+ * management, the audit log, client money and personnel records, so a grant
+ * made through a misused administrator account must not go unnoticed.
  */
-export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'compliance', 'accounts'];
+export const SENSITIVE_ROLES: readonly StaffRole[] = ['administrator', 'compliance', 'accounts', 'hr'];
 
 /** What each role allows. Matches the table in docs/authorization.md. */
 export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>> = {
-  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'aml.officers.manage', 'aml.internal_report'],
+  administrator: ['staff.view', 'staff.invite', 'staff.roles.manage', 'staff.disable', 'aml.officers.manage', 'aml.internal_report', 'hr.directory'],
   partner: [
     'staff.view',
     'clients.create',
@@ -97,6 +101,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.assess',
     'aml.view_evidence',
     'aml.internal_report',
+    'hr.directory',
   ],
   fee_earner: [
     'clients.create',
@@ -119,12 +124,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.assess',
     'aml.view_evidence',
     'aml.internal_report',
+    'hr.directory',
   ],
   accounts: [
     'finance.matter.view', 'finance.view_all', 'rates.manage', 'bills.manage',
     'client_money.record', 'client_money.request', 'client_money.approve',
     'finance.reconcile',
     'aml.internal_report',
+    'hr.directory',
   ],
   compliance: [
     'staff.view', 'audit.view', 'matters.access_with_reason', 'finance.matter.view',
@@ -137,7 +144,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.internal_report',
     'aml.retention',
     'aml.export',
+    'hr.directory',
   ],
+  hr: ['aml.internal_report', 'hr.directory', 'hr.manage', 'hr.leave', 'hr.health'],
 };
 
 export function permissionsFor(roles: Iterable<StaffRole>): ReadonlySet<Permission> {

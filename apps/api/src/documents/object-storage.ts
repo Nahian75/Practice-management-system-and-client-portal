@@ -6,7 +6,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const STORAGE_KEY = new RegExp(`^(?:${UUID}|compliance/${UUID}|compliance/restricted/${UUID})$`);
+const STORAGE_KEY = new RegExp(`^(?:${UUID}|compliance/${UUID}|compliance/restricted/${UUID}|hr/${UUID})$`);
 
 export class ObjectNotFoundError extends Error {
   override readonly name = 'ObjectNotFoundError';

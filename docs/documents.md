@@ -99,6 +99,11 @@ see there.
   `compliance/restricted/<uuid>` namespace, no direct application-table reads,
   and nominated-officer-only metadata/download functions. They never enter
   ordinary CDD exports, matter history, notifications or the client portal.
+- HR files are a fourth boundary. They reuse bounded streaming inspection and
+  malware scanning, but use the independent `HR_ENCRYPTION_KEY`, random
+  `hr/<uuid>` objects and HR-specific tables/functions. Only live HR can upload;
+  download requires live HR or the subject plus the fixed worker-visible flag.
+  HR files never enter matter documents, sharing, search or the client portal.
 
 ## How a file's type is checked
 

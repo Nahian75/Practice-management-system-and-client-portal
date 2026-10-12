@@ -84,6 +84,8 @@ const envSchema = z
     AML_ENCRYPTION_KEY: encryptionKeySchema,
     /** Seals internal disclosures, SAR/DAML decisions and their file keys. */
     SUSPICION_ENCRYPTION_KEY: encryptionKeySchema,
+    /** Seals personnel data and each private HR file key. */
+    HR_ENCRYPTION_KEY: encryptionKeySchema,
     /** The official UK Sanctions List CSV, checked every six hours. Unset: lists are only uploaded by hand. */
     SANCTIONS_LIST_URL: z.url({ protocol: /^https$/ }).optional(),
     TRUSTED_PROXIES: trustedProxiesSchema,
@@ -109,6 +111,11 @@ const envSchema = z
     for (const key of ['TOTP_ENCRYPTION_KEY','MAIL_ENCRYPTION_KEY','FINANCE_ENCRYPTION_KEY','DOCUMENT_ENCRYPTION_KEY','AML_ENCRYPTION_KEY'] as const) {
       if (env.SUSPICION_ENCRYPTION_KEY === env[key]) {
         ctx.addIssue({ code:'custom', path:['SUSPICION_ENCRYPTION_KEY'], message:`must be separate from ${key}` });
+      }
+    }
+    for (const key of ['TOTP_ENCRYPTION_KEY','MAIL_ENCRYPTION_KEY','FINANCE_ENCRYPTION_KEY','DOCUMENT_ENCRYPTION_KEY','AML_ENCRYPTION_KEY','SUSPICION_ENCRYPTION_KEY'] as const) {
+      if (env.HR_ENCRYPTION_KEY === env[key]) {
+        ctx.addIssue({ code:'custom', path:['HR_ENCRYPTION_KEY'], message:`must be separate from ${key}` });
       }
     }
     for (const key of ['APP_BASE_URL', 'DOCUMENTS_S3_ENDPOINT'] as const) {

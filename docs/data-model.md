@@ -1,8 +1,8 @@
 # Data Model
 
-**Current state (2026-10-11):** The database foundation through Compliance
-step 15f exists, with separate owner and application roles and forward-only
-migrations through `0058`.
+**Current state (2026-10-12):** The database foundation through Compliance
+step 15f and People / HR step 16b exists, with separate owner and application
+roles and forward-only migrations through `0060`.
 
 ## Database
 
@@ -96,6 +96,13 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `aml_retention_schedules`, `aml_legal_hold_events` | `0058_compliance_retention_exports.sql` | One evidenced relationship-end schedule per client, with the database-derived five-year regulation 40 disposal date. Longer retention uses an encrypted permanent legal-hold event ordered by trusted time. Protected functions require active Compliance; direct app access and owner mutation are refused | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
 | `aml_exports`, `aml_restricted_exports` | `0058_compliance_retention_exports.sql` | Fixed AES-GCM JSON bundles with byte count and SHA-256 integrity. Ordinary CDD exports use the AML key; restricted-report exports use the separate suspicion key and nominated-officer read path. Neither table is directly readable or writable by the app | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
 | `aml_disposal_runs`, `aml_disposed_records` | `0058_compliance_retention_exports.sql` | Resumable prepare/delete/finalize disposal. Preparation fixes private-object keys; finalization rechecks every gate, removes AML content through the sole deletion mode, clears keys and retains only content-free ids/kinds/rule/time/actor tombstones | [compliance.md](compliance.md#step-15f-retention-exports-and-screens) |
+| `hr_people`, `hr_contact_versions`, `hr_private_versions` | `0059_hr_foundations.sql` | One personnel identity per staff account. Contact and private values are append-only AES-GCM ciphertext bound to purpose and history id. Protected functions permit HR or the subject as appropriate; app direct table access and owner mutation/truncation are refused | [hr.md](hr.md#step-16a-foundation-and-employment-records) |
+| `hr_engagements`, `hr_engagement_endings`, `hr_employment_terms`, `hr_work_patterns`, `hr_manager_events` | `0059_hr_foundations.sql` | Protected effective-dated employment history. PostgreSQL serializes changes, refuses overlapping engagements, retroactive history, inactive managers and reporting cycles, and exposes managers only while their relationship is current | [hr.md](hr.md#step-16a-foundation-and-employment-records) |
+| `hr_correction_requests`, `hr_correction_events` | `0059_hr_foundations.sql` | Encrypted append-only worker requests and one permanent HR resolution/rejection event. Request and response text never enters audit metadata | [hr.md](hr.md#step-16a-foundation-and-employment-records) |
+| `hr_files` | `0059_hr_foundations.sql` | Encrypted metadata plus a wrapped random file key for a random `hr/<uuid>` object. Protected reads require live HR or the subject plus `worker_visible`; application direct access and owner mutation are refused | [hr.md](hr.md#step-16a-foundation-and-employment-records) |
+| `hr_leave_policies`, `hr_leave_requests`, `hr_leave_request_events`, `hr_leave_request_days`, `hr_leave_entitlement_entries` | `0060_hr_leave_health_adjustments.sql` | Versioned policy evidence including annual approval route, pinned by each request; encrypted requests/decisions; immutable approved local-date minute expansion; append-only signed entitlement ledger. Person/year advisory locks serialize balance and overlap checks; cancellation appends a return entry | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
+| `hr_holiday_pay_records`, `hr_sickness_absences`, `hr_health_records` | `0060_hr_leave_health_adjustments.sql` | Immutable payroll-supplied total pence, basis and named component pence that must arithmetically reconcile, with a six-year minimum retention date; reason-free sickness dates/notification/fitness; separately encrypted health evidence unavailable to managers | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
+| `hr_adjustment_requests`, `hr_adjustment_decisions`, `hr_adjustment_progress_events` | `0060_hr_leave_health_adjustments.sql` | Encrypted private request/decision history separated from the encrypted operational instruction managers need. Agreed/refused shape and permanent implementation/review/closure events are database-enforced | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

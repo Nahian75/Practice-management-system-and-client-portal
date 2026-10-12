@@ -11,7 +11,7 @@ Requirements: Node.js 24 LTS, Docker Desktop, gitleaks.
 cp .env.example .env              # then fill every value with a random password
 docker compose up -d              # PostgreSQL 18 on 127.0.0.1:5432, Mailpit on 127.0.0.1:1025 / :8025,
                                   # SeaweedFS (documents) on :8333, ClamAV on :3310 (first start: a few minutes)
-cp apps/api/.env.example apps/api/.env    # then fill the database URLs and the distinct TOTP, MAIL, FINANCE, AML, SUSPICION and DOCUMENT encryption keys
+cp apps/api/.env.example apps/api/.env    # then fill the database URLs and the distinct TOTP, MAIL, FINANCE, AML, SUSPICION, HR and DOCUMENT encryption keys
                                           # and the storage key pair from .env; mail and scanner settings work as given
 npm ci
 npm run build -w @practice/api
@@ -58,9 +58,10 @@ locally. The reverse proxy must:
   of every request it passes on, before it can refuse it (review D2). The
   pass-through remains for development and the end-to-end tests.
 - **Limit request bodies before reading them:** 52 MB on document, CDD-evidence
-  and restricted-report multipart upload routes
+  restricted-report and HR-file multipart upload routes
   (`POST /api/matters/{id}/documents`, `POST /api/documents/{id}/versions`,
-  `POST /api/clients/{id}/cdd/{id}/evidence`, `POST /api/compliance/restricted-reports`),
+  `POST /api/clients/{id}/cdd/{id}/evidence`, `POST /api/compliance/restricted-reports`,
+  `POST /api/hr/people/{id}/files`),
   1 MB on every other address; and limit connections per client.
 - **Pass the browser's address last in `X-Forwarded-For`.** The API
   (`TRUSTED_PROXIES=loopback`) takes the last address that is not loopback;
@@ -82,7 +83,7 @@ server {
   proxy_set_header X-Forwarded-Proto https;
 
   # Document uploads: up to 52 MB, streamed on as they arrive.
-  location ~ ^/api/(matters/[^/]+/documents|documents/[^/]+/versions|clients/[^/]+/cdd/[^/]+/evidence|compliance/restricted-reports)$ {
+  location ~ ^/api/(matters/[^/]+/documents|documents/[^/]+/versions|clients/[^/]+/cdd/[^/]+/evidence|compliance/restricted-reports|hr/people/[^/]+/files)$ {
     client_max_body_size 52m;
     proxy_request_buffering off;
     rewrite ^/api/(.*)$ /$1 break;

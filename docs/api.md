@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-11):** Health, authentication, staff management,
+**Current state (2026-10-12):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
 are built. Tasks and Notifications are built. Finance steps 14a to 14f add
 rates, time and billing plus the encrypted bank register, receipts, allocation
@@ -12,11 +12,51 @@ Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance
 gate enforcement, sanctions screening/freezes/licences, and separately encrypted
 nominated-officer restricted reports and SAR/DAML records, plus retention,
 disposal, fixed regulatory exports and the staff-screen capability responses.
+People / HR steps 16a and 16b add the safe directory, self-service and
+current-manager projections, protected employment/work-pattern history, exact
+leave records, reason-free sickness, restricted health and separately shaped
+operational adjustments.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| GET | `/hr/directory` | `hr.directory`; every active staff role | Safe staff directory: work identity, current job title, team and location only |
+| GET | `/hr/me` | Active staff with a linked personnel record | Own filtered personnel record, history, correction requests and worker-visible files |
+| PUT | `/hr/me/contact` | Active staff; own record in PostgreSQL | Append a new encrypted personal/contact version; never edits history |
+| POST | `/hr/me/corrections` | Active staff; own record in PostgreSQL | Append an encrypted correction request for HR review |
+| GET | `/hr/reports/:personId` | Active staff; current effective manager in PostgreSQL | Bounded direct-report employment/work-pattern projection; no contact, private data, corrections or files |
+| GET | `/hr/people` | `hr.manage` and live HR role | Safe HR personnel list |
+| POST | `/hr/people` | `hr.manage` and live HR role | Link one personnel record to a staff account, optionally with encrypted contact/private details |
+| GET | `/hr/people/:personId` | `hr.manage` and live HR role | Full HR-managed record; sensitive reads are audited |
+| PUT | `/hr/people/:personId/contact` | `hr.manage` and live HR role | Append encrypted contact details |
+| PUT | `/hr/people/:personId/private` | `hr.manage` and live HR role | Append encrypted private details |
+| POST | `/hr/people/:personId/engagements` | `hr.manage` and live HR role | Create a non-overlapping engagement plus its first terms and minute-based work pattern |
+| POST | `/hr/people/:personId/terms` | `hr.manage` and live HR role | Append effective-dated job title, team and work-location terms |
+| POST | `/hr/people/:personId/work-patterns` | `hr.manage` and live HR role | Append an effective-dated IANA-time-zone and weekday-minute pattern |
+| POST | `/hr/people/:personId/manager` | `hr.manage` and live HR role | Append an effective-dated assignment or clearing; cycles and inactive managers are refused |
+| POST | `/hr/people/:personId/end-engagement` | `hr.manage` and live HR role | End an engagement once and encrypt the reason; does not disable the account or change roles |
+| GET | `/hr/corrections` | `hr.manage` and live HR role | HR correction queue with decrypted request/decision text |
+| POST | `/hr/people/:personId/corrections/:requestId/decision` | `hr.manage` and live HR role | Append the sole encrypted resolved/rejected decision |
+| POST | `/hr/people/:personId/files` | `hr.manage` and live HR role | Inspect, malware-scan and encrypt one private HR file in the `hr/` namespace |
+| GET | `/hr/people/:personId/files/:fileId/content` | Live HR role, or the subject when worker-visible | Audited streaming download with attachment, no-store, nosniff and sandbox headers |
+| GET / POST | `/hr/leave/policies` | `hr.leave` and live HR role | Read versioned policy evidence or append the next effective policy |
+| GET | `/hr/leave/requests` | `hr.leave` and live HR role | Pending firm-wide leave queue with encrypted reasons decrypted only in the HR response |
+| POST | `/hr/leave/requests/:requestId/decision` | Active staff; PostgreSQL requires current manager for ordinary annual leave or HR for any category | Append approved/refused decision; self-approval, repeat decisions, overlap and insufficient balance are refused |
+| POST | `/hr/leave/requests/:requestId/cancel` | Subject or live HR role in PostgreSQL | Append cancellation and, for consumed annual leave, an exact entitlement return |
+| GET / POST | `/hr/me/leave` | Active staff with linked personnel record | Own requests, derived balance, ledger, holiday-pay evidence and reason-free sickness; submit own request |
+| GET | `/hr/reports/:personId/leave` | Current effective manager in PostgreSQL | Direct-report requests, derived balance and reason-free sickness; no ledger notes or holiday pay |
+| GET / POST | `/hr/people/:personId/leave` | `hr.leave` and live HR role | Full leave record or HR-submitted request for the person |
+| POST | `/hr/people/:personId/leave/entitlement` | `hr.leave` and live HR role | Append a signed integer-minute grant, accrual, adjustment, carry-over or leaving adjustment |
+| POST | `/hr/people/:personId/leave/holiday-pay` | `hr.leave` and live HR role | Store immutable payroll-supplied total/component pence, period and basis; components must reconcile, but Stass never calculates the lawful rate |
+| POST | `/hr/people/:personId/sickness` | Active staff; current manager or HR in PostgreSQL | Record dates, notification and operational fitness only; strict input has no medical-reason field |
+| GET | `/hr/me/health` | Subject account in PostgreSQL | Own separately encrypted health evidence |
+| GET / POST | `/hr/people/:personId/health` | `hr.health` and live HR role | Audited restricted health read or append-only health evidence |
+| GET / POST | `/hr/me/adjustments` | Subject account in PostgreSQL | Own private request/decision/progress history or submit a private request |
+| GET | `/hr/reports/:personId/adjustments` | Current effective manager in PostgreSQL | Operational instruction and progress only; request grounds/private decision are null |
+| GET | `/hr/people/:personId/adjustments` | `hr.health` and live HR role | Audited full private and operational adjustment history |
+| POST | `/hr/adjustments/:requestId/decision` | `hr.health` and live HR role | Append an accountable agreed/refused decision; agreed records require a separate operational instruction |
+| POST | `/hr/adjustments/decisions/:decisionId/progress` | Current manager or live HR in PostgreSQL | Append implementation/review; only HR may close |
 | POST | `/compliance/restricted-reports` | `aml.internal_report`; every active staff role | JSON report or multipart report followed by one protected attachment -> neutral `{receiptId,received}` only |
 | GET | `/compliance/restricted-reports` | Current nominated officer + active Compliance, rechecked in PostgreSQL | 100 safe restricted-queue summaries; `before` continues the keyset page |
 | GET | `/compliance/restricted-reports/:reportId` | Current nominated officer + active Compliance | Decrypted report, attachments, decision, external report and DAML/DATF history; records a protected access event |

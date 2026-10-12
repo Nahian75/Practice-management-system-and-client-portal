@@ -1,8 +1,8 @@
 # Audit
 
-**Current state (2026-10-09):** The protected audit table and `AuditService`
+**Current state (2026-10-12):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications and Finance steps 14a to 14e.
+Tasks, Notifications, Finance, Compliance and People / HR steps 16a and 16b.
 
 ## Purpose
 
@@ -60,6 +60,28 @@ before production.
   bodies in `metadata`. Record IDs and outcomes.
 - Record denied attempts as well as successes: they show attacks.
 - For an action that changes data, record inside the same transaction.
+
+People / HR step 16a records `hr.person_created`, `hr.contact_updated`,
+`hr.private_details_updated`, `hr.engagement_created`, `hr.terms_recorded`,
+`hr.work_pattern_recorded`, `hr.manager_recorded`, `hr.engagement_ended`,
+`hr.correction_requested`, `hr.correction_decided`, `hr.file_uploaded`,
+`hr.file_downloaded` and HR viewing another person's full record as
+`hr.record_viewed`. Change events share the protected database transaction.
+Metadata is limited to ids, dates, engagement/category/state facts and file
+type/size/visibility. It never copies personal contact data, date of birth,
+ending or correction text, filename, file content or encryption material.
+
+Step 16b adds `hr.leave_policy_created`, `hr.leave_entitlement_recorded`,
+`hr.leave_requested`, `hr.leave_approved`, `hr.leave_refused`,
+`hr.leave_cancelled`, `hr.holiday_pay_recorded`, `hr.sickness_recorded`,
+`hr.health_recorded`, `hr.health_viewed`, `hr.adjustment_requested`,
+`hr.adjustment_decided`, `hr.adjustment_progress_recorded` and
+`hr.adjustments_viewed`. Mutations are recorded in the same transaction. Safe
+metadata can include person/request ids, leave kind, dates, minute or pence
+totals, fitness status, adjustment outcome/action and retention facts. Leave or
+decision reasons, entitlement notes, medical facts, adjustment grounds and
+instructions, included narrative, ciphertext and key material never enter the
+ordinary audit row.
 
 Tasks records `task.created` with the task and matter ids, assignee id,
 priority, and whether a due date exists. Detail changes use `task.updated`

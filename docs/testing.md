@@ -3,7 +3,8 @@
 **Current state (2026-10-12):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus Playwright end-to-end tests for the staff app, Tasks, Notifications,
+plus People / HR steps 16a and 16b. Playwright end-to-end tests cover the staff app,
+Tasks, Notifications,
 Compliance and the client portal.
 
 ## Tools
@@ -53,6 +54,26 @@ supersede each other's framework. Tests that deliberately supersede one run as
 gated work can proceed; it clears through the same functions a firm would use.
 The AML and separate suspicion-report test keys are fixed, like the mail key, because firm-wide Compliance
 lists decrypt rows that other workers and earlier runs created.
+
+## People / HR fixtures
+
+Step 16a integration tests create personnel records only through the protected
+API/functions and use a dedicated deterministic test `HR_ENCRYPTION_KEY`.
+Coverage proves role separation and safe directory output, self-service,
+current-manager-only projections and immediate former-manager denial,
+effective-date/overlap/cycle constraints, encrypted append-only corrections,
+private-file authorization and storage namespace, direct `pms_app` denial,
+owner immutability, person/path binding, concurrent role loss and strict unsafe
+input rejection. Cipher unit tests prove purpose/person binding and separation
+from the AML key.
+
+Step 16b integration tests exercise HR-only policy/entitlement authority,
+encrypted self-service requests and the pending queue, exact work-pattern
+expansion, self-approval/category restrictions, overlap and insufficient-balance
+conflicts, cancellation returns, reason-free sickness, health separation,
+manager-safe adjustment projection/progress, six-year holiday-pay evidence,
+direct-table denial and owner immutability. Migration reset, API type-check/build,
+focused/full API suites and hidden-character checks are run before handoff.
 
 In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears
