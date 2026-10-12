@@ -1,13 +1,13 @@
 # People and HR
 
 **Current state (2026-10-13):** First-version design approved. Steps 16a to
-16e are built: separate HR authority, protected employment and lifecycle
+16f are built: separate HR authority, protected employment and lifecycle
 history, encrypted personnel files/data and right-to-work evidence, exact leave
 evidence, reason-free sickness administration, restricted health records,
 bounded manager projections, versioned professional checks, development cycles,
 required learning, objectives and appraisals, membership-scoped confidential
-cases, category retention/disposal and reviewed fixed exports. Step 16f and the
-final HR security review remain.
+cases, category retention/disposal, reviewed fixed exports, and least-privilege
+staff, manager and HR screens. The final HR security review remains.
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -89,8 +89,8 @@ retention rule, privacy information and responsible owner.
 ## Roles and proposed permissions
 
 `hr.directory`, `hr.manage`, `hr.leave`, `hr.health`, `hr.vetting` and
-`hr.competence`, `hr.cases`, `hr.retention` and `hr.export` are implemented
-through step 16e. No reserved HR permission remains.
+`hr.competence`, `hr.cases`, `hr.retention` and `hr.export` are implemented.
+No reserved HR permission remains.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
 |---|---:|---:|---:|---:|---:|---:|
@@ -337,9 +337,9 @@ case, pay, leave reason or right-to-work outcome is sent through the ordinary
 email outbox. Reminder deduplication and final recipient-role/relationship checks
 follow the Notifications module's existing pattern.
 
-## Proposed API and screens
+## API and screens
 
-The exact schemas are fixed in each implementation step. Planned route groups:
+The schemas are fixed in the implementation. Built route groups:
 
 | Area | Routes / screens | Principal authorization |
 |---|---|---|
@@ -597,6 +597,50 @@ holds, content-free disposal, two-person export release, strict shapes, direct
 table denial, owner immutability and races between reads/revocation, holds/
 disposal and events/disposal.
 
+### Step 16f: staff, manager and HR screens
+
+Built on 13 October 2026 in migration `0064_hr_screens.sql` and the Next.js
+staff app:
+
+- Every active staff member sees `/people`, the safe directory and, when linked,
+  `/people/me`. Self-service shows the filtered employment, leave, health,
+  lifecycle, vetting and competence record and supports contact versions,
+  correction and adjustment requests, leave, development, learning completion
+  and responses to fixed objectives or appraisals.
+- `/people/team` is populated only by `app.list_hr_reports`. PostgreSQL rechecks
+  the active manager and worker engagements and latest effective reporting line
+  for every row. Direct-report detail continues to use the bounded manager APIs,
+  so private contact, pay, diagnoses, restricted evidence and casework never
+  enter the response; reassignment removes the page on the next request.
+- `/people/cases` is available to explicitly assigned case-team members without
+  granting broader HR access. Detail shows encrypted history only after the API
+  rechecks membership, exposes role-appropriate permanent events, and limits
+  membership and access-log work to a current live HR case member.
+- `/hr/access` supplies presentation-only capability flags. It controls whether
+  the HR navigation and each dashboard area are shown, but every request still
+  passes the route permission, live HR-role check and PostgreSQL record rule.
+- `/hr` provides personnel, correction, leave, right-to-work, assigned-case,
+  retention and export work. Personnel detail exposes only actions covered by
+  the holder's live capability, including complete employment, leave/pay,
+  health/adjustment, lifecycle, vetting and competence workflows. Multi-item
+  lifecycle checklists and multi-component payroll evidence preserve the API's
+  structured records rather than collapsing them into free text.
+- `/hr/retention` shows schedules, hold history and disposal runs. A due,
+  unheld schedule requires the operator to type `DISPOSE` before the protected
+  irreversible action. `/hr/exports` presents the fixed bundle to an eligible
+  second HR holder for approval/rejection and exposes download only after
+  approval; the preparer cannot review their own bundle.
+- Server components fetch filtered API responses with the session cookie.
+  Client forms contain no authorization or employment decision rules. Private
+  downloads are ordinary links to the same-origin API so they are initiated
+  only by the user and are not prefetched.
+
+Focused API coverage proves the capability response and the current-direct-
+report projection, including immediate reassignment removal. Playwright covers
+the universal safe People area, conditional HR navigation, a personnel/
+engagement/confidential-case journey, bounded manager access with reassignment,
+private self-service, 390-pixel layout and axe checks.
+
 - **16a. Foundation and employment records — built.** Separate `hr` role and
   permissions, protected employment/person/manager/work-pattern history, HR
   encryption and private-file boundary, safe directory, self-service and
@@ -612,7 +656,7 @@ disposal and events/disposal.
 - **16e. Confidential cases, retention and exports — built.** Explicit case teams,
   investigation/decision/appeal event history, category schedules, holds,
   controlled disposal and reviewable fixed exports.
-- **16f. Staff, manager and HR screens.** Add the complete People/self-service,
+- **16f. Staff, manager and HR screens — built.** Complete People/self-service,
   My team and least-privilege HR workspaces with browser coverage.
 - **Security review.** Recheck the current law/guidance; threat-model insider and
   former-manager access, health/case inference, ids, exports, files, concurrency,
@@ -625,6 +669,6 @@ next step.
 
 ## Approval
 
-The first-version scope is approved and steps 16a to 16e are implemented. A change to
+The first-version scope is approved and steps 16a to 16f are implemented. A change to
 role authority, health/case access, retention, payroll boundary or automated
 decision policy changes the security model and is agreed here before code.

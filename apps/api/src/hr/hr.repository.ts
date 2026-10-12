@@ -69,6 +69,15 @@ export class HrRepository {
       team: row.team, workLocation: row.work_location }));
   }
 
+  async reports(actorId: string): Promise<HrDirectoryMember[]> {
+    const rows = (await sql<{ account_id: string; person_id: string; display_name: string;
+      work_email: string; job_title: string | null; team: string | null; work_location: string | null }>`
+      select * from app.list_hr_reports(${actorId}::uuid)`.execute(this.db)).rows;
+    return rows.map((row) => ({ accountId: row.account_id, personId: row.person_id,
+      displayName: row.display_name, workEmail: row.work_email, jobTitle: row.job_title,
+      team: row.team, workLocation: row.work_location }));
+  }
+
   async people(actorId: string) {
     return (await sql<{ person_id: string; account_id: string; display_name: string; work_email: string;
       account_status: 'invited' | 'active' | 'disabled'; engagement_id: string | null;

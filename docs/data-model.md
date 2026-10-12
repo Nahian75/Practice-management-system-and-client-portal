@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-13):** The database foundation through Compliance
-step 15f and People / HR step 16e exists, with separate owner and application
-roles and forward-only migrations through `0063`.
+step 15f and People / HR step 16f exists, with separate owner and application
+roles and forward-only migrations through `0064`.
 
 ## Database
 
@@ -114,6 +114,12 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `hr_disposal_runs`, `hr_disposed_records` | `0063_hr_cases_retention_exports.sql` | Prepare/finalize disposal fixes affected objects, rechecks the due basis and latest hold, removes eligible protected content and duplicating exports, then retains only a content-free tombstone | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
 | `hr_exports`, `hr_export_decisions`, `hr_export_access_log` | `0063_hr_cases_retention_exports.sql` | Fixed authenticated-encrypted JSON bundles with explicit scopes and included cases. A different live HR holder must review; case membership is rechecked for both people; only approved integrity-checked content is downloadable | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
+
+Migration `0064_hr_screens.sql` adds no table. It exposes only the protected
+`app.list_hr_reports(actor_id)` projection used by the manager screen. The
+function rechecks the active actor, both current engagements and the latest
+effective manager event, returns safe directory fields only, caps the result at
+500 and is executable by `pms_app` without granting direct HR-table access.
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.
 Columns the app may not write are typed `never` for insert and update, so the

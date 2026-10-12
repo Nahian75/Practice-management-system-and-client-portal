@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, Controller, Get, HttpException,
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
+import { PermissionsService } from '../auth/permissions/permissions.service.js';
 import { StaffOnly } from '../auth/sessions/access.decorators.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
@@ -54,6 +55,10 @@ const decisionBody = z.strictObject({ outcome: z.enum(['resolved', 'rejected']),
 const directoryMember = z.object({ accountId: id, personId: id.nullable(), displayName: z.string(), workEmail: z.string(),
   jobTitle: z.string().nullable(), team: z.string().nullable(), workLocation: z.string().nullable() });
 const directorySchema = z.object({ people: z.array(directoryMember) });
+const accessSchema = z.object({ personId: id.nullable(), reportCount: z.number().int().min(0).max(500),
+  canManagePeople: z.boolean(), canManageLeave: z.boolean(), canManageHealth: z.boolean(),
+  canManageVetting: z.boolean(), canManageCompetence: z.boolean(), canManageCases: z.boolean(),
+  canManageRetention: z.boolean(), canManageExports: z.boolean() });
 const summarySchema = directoryMember.extend({ accountStatus: z.enum(['invited', 'active', 'disabled']),
   accessKind: z.enum(['self', 'hr', 'manager']), engagementId: id.nullable(),
   engagementKind: z.enum(['employee', 'worker', 'llp_partner', 'equity_partner', 'consultant', 'apprentice', 'trainee']).nullable(),
@@ -94,11 +99,29 @@ const correctionsSchema = z.object({ corrections: z.array(z.object({ id, personI
 
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hr: HrService) {}
+  constructor(private readonly hr: HrService, private readonly permissions: PermissionsService) {}
+
+  @Get('access') @RequirePermission('hr.directory') @ResponseSchema(accessSchema)
+  async access(@CurrentSession() session: ResolvedSession) {
+    const has = (permission: Parameters<PermissionsService['has']>[1]) =>
+      this.permissions.has(session.account.id, permission);
+    const [personId, reports, canManagePeople, canManageLeave, canManageHealth, canManageVetting,
+      canManageCompetence, canManageCases, canManageRetention, canManageExports] = await Promise.all([
+      this.hr.ownPersonId(session.account.id), this.hr.reports(session.account.id), has('hr.manage'), has('hr.leave'),
+      has('hr.health'), has('hr.vetting'), has('hr.competence'), has('hr.cases'), has('hr.retention'), has('hr.export'),
+    ]);
+    return { personId: personId ?? null, reportCount: reports.length, canManagePeople, canManageLeave,
+      canManageHealth, canManageVetting, canManageCompetence, canManageCases, canManageRetention, canManageExports };
+  }
 
   @Get('directory') @RequirePermission('hr.directory') @ResponseSchema(directorySchema)
   async directory(@CurrentSession() session: ResolvedSession) {
     return { people: await this.hr.directory(session.account.id) };
+  }
+
+  @Get('reports') @StaffOnly() @ResponseSchema(directorySchema)
+  async reports(@CurrentSession() session: ResolvedSession) {
+    return { people: await this.hr.reports(session.account.id) };
   }
 
   @Get('me') @StaffOnly() @ResponseSchema(recordSchema)

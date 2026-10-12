@@ -45,6 +45,8 @@ export class HrService {
 
   directory(actorId: string) { return this.records.directory(actorId); }
 
+  reports(actorId: string) { return this.records.reports(actorId); }
+
   async listPeople(actorId: string) {
     return (await this.records.people(actorId)).map((row) => ({
       personId: row.person_id, accountId: row.account_id, displayName: row.display_name,

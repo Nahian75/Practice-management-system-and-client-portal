@@ -41,7 +41,7 @@ retention, encrypted legal-hold evidence, transaction-locked object/database
 disposal, content-free tombstones, segregated regulatory exports and a
 restricted-content-free attention count. The Compliance security review is in
 [`reviews/2026-10-11-compliance.md`](reviews/2026-10-11-compliance.md).
-People / HR steps 16a to 16e add an independent HR role and encryption key, protected
+People / HR steps 16a to 16f add an independent HR role and encryption key, protected
 append-only employment history, live self/HR/current-manager database checks,
 bounded manager response schemas and a private `hr/` file namespace. Direct
 application-table reads/writes and owner mutation/truncation are refused. The
@@ -67,8 +67,11 @@ serialized holds and disposal with content-free tombstones. Fixed encrypted
 exports require a different live HR reviewer, recheck included-case membership,
 are integrity-checked on download and are removed when they could preserve
 disposed content. Direct application table access and owner history changes are
-refused outside the narrow protected disposal path. The HR module security review
-remains due after step 16f.
+refused outside the narrow protected disposal path. Step 16f keeps screens on
+filtered server-rendered responses, treats capability flags as presentation
+only, derives the manager list in PostgreSQL, requires typed disposal
+confirmation and prevents automatic prefetch of protected downloads. The HR
+module security review remains due.
 
 This file lists only the controls that are actually in place.
 

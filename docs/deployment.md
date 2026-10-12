@@ -135,8 +135,8 @@ Compliance screen after typed confirmation.
 HR disposal likewise removes eligible protected database content, exact `hr/`
 object keys and fixed HR exports that could preserve disposed material, leaving
 only content-free tombstones. The same finite backup expiry and restoration
-replay requirement applies. Step 16e exposes only the explicit protected API
-action; step 16f adds the HR screen and typed-confirmation browser workflow.
+replay requirement applies. The HR screen exposes only the explicit protected
+action and requires typed confirmation before the browser submits it.
 
 ## Hosted environments
 

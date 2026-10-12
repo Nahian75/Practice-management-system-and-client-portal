@@ -110,6 +110,13 @@ describe('People / HR foundation API', () => {
       personId, displayName: directoryName, jobTitle: 'Solicitor', team: 'Disputes' }));
     expect(JSON.stringify(directory.body)).not.toContain('personalEmail');
     expect((await api(workerToken).get('/hr/people')).status).toBe(403);
+    expect(await api(adminToken).get('/hr/access').then((response) => response.body)).toMatchObject({
+      personId: null, reportCount: 0, canManagePeople: false, canManageCases: false,
+    });
+    expect(await api(hrToken).get('/hr/access').then((response) => response.body)).toMatchObject({
+      canManagePeople: true, canManageLeave: true, canManageHealth: true, canManageVetting: true,
+      canManageCompetence: true, canManageCases: true, canManageRetention: true, canManageExports: true,
+    });
   });
 
   it('encrypts personal details and allows self-service contact changes but not HR authority', async () => {
@@ -160,11 +167,16 @@ describe('People / HR foundation API', () => {
     expect(first.body).not.toHaveProperty('contact');
     expect(first.body).not.toHaveProperty('privateDetails');
     expect(first.body).not.toHaveProperty('files');
+    expect(await api(managerToken).get('/hr/reports').then((response) => response.body.people)).toContainEqual(
+      expect.objectContaining({ personId: workerId, accountId: worker.id }),
+    );
+    expect(await api(managerToken).get('/hr/access').then((response) => response.body.reportCount)).toBe(1);
 
     expect((await api(hrToken).post(`/hr/people/${workerId}/manager`, {
       managerPersonId: replacementId, effectiveOn: today,
     })).status).toBe(201);
     expect((await api(managerToken).get(`/hr/reports/${workerId}`)).status).toBe(404);
+    expect(await api(managerToken).get('/hr/reports').then((response) => response.body.people)).toHaveLength(0);
     expect((await api(replacementToken).get(`/hr/reports/${workerId}`)).status).toBe(200);
   });
 

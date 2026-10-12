@@ -1,7 +1,7 @@
 # Web app
 
-**Current state (2026-10-12):** The staff app screens through Finance step
-14f and Compliance step 15f, and portal administration are built. Portal step 11d adds the
+**Current state (2026-10-13):** The staff app screens through Finance step
+14f, Compliance step 15f and People / HR step 16f, and portal administration are built. Portal step 11d adds the
 read-only client screens, using the same secure pass-through and a separate
 client layout. The staff and client sides are security-reviewed through the
 portal work; the task and Finance screens were checked again with their module reviews.
@@ -64,6 +64,32 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
   the ordinary client-detail route. No Compliance route exists in the portal.
 - Playwright covers the three confidentiality boundaries, a complete protected
   CDD workflow, desktop and 390 px layout, and axe on each completed workflow.
+
+## Built in People / HR step 16f
+
+- Every active staff account sees `/people`: a safe directory plus links to its
+  own linked record, current direct reports and explicitly assigned confidential
+  cases. The HR workspace link appears only when `/hr/access` reports a live HR
+  capability; that response is presentation only and grants no API access.
+- `/people/me` combines the filtered self-service projections and supports
+  contact versions, corrections, leave and adjustment requests, development,
+  learning completion and responses to objectives/appraisals. Restricted data
+  never passes through the directory.
+- `/people/team` is a live PostgreSQL-derived direct-report list. Detail contains
+  only the existing manager projections and actions; a superseded reporting
+  line becomes a not-found response on reload. `/people/cases` uses the separate
+  explicit membership boundary, so a designated case participant needs no
+  general HR role.
+- `/hr` reveals only sections covered by the holder's capabilities. Personnel
+  detail provides employment, private-file, correction, leave/pay, health,
+  adjustment, lifecycle, vetting, competence and review workflows. Dedicated
+  retention and export screens preserve typed permanent-disposal confirmation,
+  legal-hold history, two-person review and user-initiated private downloads.
+- Server components request already-filtered API shapes with the session cookie.
+  Client forms submit to same-origin `/api` routes and contain no authorization,
+  payroll, legal or employment-decision rules.
+- Playwright proves the ordinary-staff, HR, current/former-manager and self-
+  service boundaries, including the principal workflow at 390 px and axe checks.
 
 ## Built in 9a
 
@@ -346,6 +372,7 @@ Browser ──► Next.js (apps/web) ──► NestJS API (apps/api)
 | **13d** | Notifications: staff header unread count, inbox, mark read, task links and older pages |
 | **14f** | Matter time/finance; Accounts billing, receipts, payment and reconciliation workspaces; Compliance read-only ledgers and sign-off; audited CSV exports |
 | **15f** | Confidential staff concern; Compliance dashboard and operational actions; client CDD and matter assessment work; retention/legal holds/disposal; ordinary exports; separately revealed nominated-officer records and restricted exports |
+| **16f** | People directory and self-service; current-manager team records; membership-scoped confidential cases; least-privilege HR personnel, leave, health, lifecycle, vetting, competence, retention and export workspaces |
 | | Security review of the web app |
 
 ## Testing

@@ -5,6 +5,7 @@ import { appName } from '@/config';
 import { apiGet, currentAccount } from '@/lib/api';
 import type { NotificationPage } from '@/lib/notifications';
 import type { ComplianceAccess } from '@/lib/compliance';
+import { hasHrWorkspace, type HrAccess } from '@/lib/hr';
 import { NavLinks } from '@/components/nav-links';
 import { SignOutButton } from '@/components/sign-out-button';
 
@@ -20,8 +21,9 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   if (account.kind !== 'staff') {
     redirect('/portal');
   }
-  const [{ body: notifications }, finance, compliance] = await Promise.all([
+  const [{ body: notifications }, finance, compliance, hr] = await Promise.all([
     apiGet<NotificationPage>('/notifications'), apiGet('/finance/access'), apiGet<ComplianceAccess>('/compliance/access'),
+    apiGet<HrAccess>('/hr/access'),
   ]);
 
   return (
@@ -32,7 +34,8 @@ export default async function StaffLayout({ children }: { children: ReactNode })
             {appName()}
           </Link>
           <NavLinks unreadCount={notifications?.unreadCount ?? 0} canViewFinance={finance.status === 200}
-            canViewCompliance={compliance.status === 200} complianceAttention={compliance.body?.attentionCount ?? 0} />
+            canViewCompliance={compliance.status === 200} complianceAttention={compliance.body?.attentionCount ?? 0}
+            canViewHr={!!hr.body && hasHrWorkspace(hr.body)} />
           <span>{account.displayName}</span>
           <SignOutButton />
         </div>

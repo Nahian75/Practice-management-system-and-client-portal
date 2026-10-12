@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { APIRequestContext } from '@playwright/test';
 import { E2E_AML_ENCRYPTION_KEY, E2E_FINANCE_ENCRYPTION_KEY, E2E_MAIL_ENCRYPTION_KEY,
-  E2E_SUSPICION_ENCRYPTION_KEY, E2E_WEB_URL } from '../../playwright.config';
+  E2E_HR_ENCRYPTION_KEY, E2E_SUSPICION_ENCRYPTION_KEY, E2E_WEB_URL } from '../../playwright.config';
 import { e2eDatabaseUrl } from './database.mjs';
 
 export interface TestStaff {
@@ -52,6 +52,7 @@ export async function inviteStaff(roles: string[] = ['fee_earner']): Promise<{ e
         FINANCE_ENCRYPTION_KEY: E2E_FINANCE_ENCRYPTION_KEY,
         AML_ENCRYPTION_KEY: E2E_AML_ENCRYPTION_KEY,
         SUSPICION_ENCRYPTION_KEY: E2E_SUSPICION_ENCRYPTION_KEY,
+        HR_ENCRYPTION_KEY: E2E_HR_ENCRYPTION_KEY,
         LOG_LEVEL: 'error',
       },
       encoding: 'utf8',

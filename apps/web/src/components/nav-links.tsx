@@ -7,6 +7,8 @@ const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/clients', label: 'Clients' },
   { href: '/matters', label: 'Matters' },
+  { href: '/people', label: 'People' },
+  { href: '/hr', label: 'HR workspace' },
   { href: '/finance', label: 'Finance' },
   { href: '/compliance', label: 'Compliance' },
   { href: '/report-concern', label: 'Report a concern' },
@@ -15,15 +17,16 @@ const LINKS = [
 ] as const;
 
 /** The main sections. The current one is marked for screen readers as well as by sight. */
-export function NavLinks({ unreadCount, canViewFinance, canViewCompliance, complianceAttention }:
-  { unreadCount: number; canViewFinance: boolean; canViewCompliance: boolean; complianceAttention: number }) {
+export function NavLinks({ unreadCount, canViewFinance, canViewCompliance, complianceAttention, canViewHr }:
+  { unreadCount: number; canViewFinance: boolean; canViewCompliance: boolean; complianceAttention: number;
+    canViewHr: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Main" className="nav">
       <ul>
         {LINKS.filter(({ href }) => (href !== '/finance' || canViewFinance) &&
-          (href !== '/compliance' || canViewCompliance)).map(({ href, label }) => {
+          (href !== '/compliance' || canViewCompliance) && (href !== '/hr' || canViewHr)).map(({ href, label }) => {
           const current = href === '/' ? pathname === '/' : pathname.startsWith(href);
           const notifications = href === '/notifications';
           const compliance = href === '/compliance';

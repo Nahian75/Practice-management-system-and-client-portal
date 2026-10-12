@@ -12,19 +12,22 @@ Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance
 gate enforcement, sanctions screening/freezes/licences, and separately encrypted
 nominated-officer restricted reports and SAR/DAML records, plus retention,
 disposal, fixed regulatory exports and the staff-screen capability responses.
-People / HR steps 16a to 16e add the safe directory, self-service and
+People / HR steps 16a to 16f add the safe directory, self-service and
 current-manager projections, protected employment/work-pattern history, exact
 leave records, reason-free sickness, restricted health and separately shaped
 operational adjustments, lifecycle checklists, versioned right-to-work evidence
 and professional-status records, development cycles, required learning,
 objectives and appraisals, membership-scoped confidential cases, category
-retention/disposal and reviewed fixed exports.
+retention/disposal, reviewed fixed exports, and the live capability and direct-
+report lists used by the staff screens.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| GET | `/hr/access` | `hr.directory`; every active staff role | Presentation-only HR capabilities, linked person id and current direct-report count; route/database checks remain authoritative |
 | GET | `/hr/directory` | `hr.directory`; every active staff role | Safe staff directory: work identity, current job title, team and location only |
+| GET | `/hr/reports` | Active staff; current effective reporting lines in PostgreSQL | At most 500 safe direct-report directory rows; inactive engagements and superseded assignments disappear immediately |
 | GET | `/hr/me` | Active staff with a linked personnel record | Own filtered personnel record, history, correction requests and worker-visible files |
 | PUT | `/hr/me/contact` | Active staff; own record in PostgreSQL | Append a new encrypted personal/contact version; never edits history |
 | POST | `/hr/me/corrections` | Active staff; own record in PostgreSQL | Append an encrypted correction request for HR review |

@@ -21,7 +21,7 @@ a Partner, for high-risk or PEP senior-management approval. Step 15d adds the
 Compliance-only `aml.sanctions`. Step 15e gives every staff role submission-only
 `aml.internal_report`; reading and deciding require both a live Compliance role
 and current nominated-officer appointment in PostgreSQL.
-People / HR steps 16a to 16e add a separate `hr` role. All staff roles receive only
+People / HR steps 16a to 16f add a separate `hr` role. All staff roles receive only
 the safe directory; self-service and manager routes use live record
 relationships, while personnel management, firm-wide leave administration and
 restricted health access require the respective permission plus a live HR role
@@ -29,6 +29,13 @@ rechecked in PostgreSQL. Lifecycle administration uses `hr.manage`; full
 right-to-work history/due work uses `hr.vetting`; professional writes use
 `hr.competence`. Confidential cases require current explicit case membership;
 retention and fixed exports require live HR authority.
+
+Step 16f exposes `/hr/access` so the staff layout can show only HR areas the
+account can use. Those booleans are presentation only. Every action is
+authorised again by its controller permission, live role/relationship check and
+protected PostgreSQL function. `/hr/reports` is likewise a database-derived
+list, not a cached manager grant; superseding the reporting line removes the
+person from both the list and detail routes on the next request.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.

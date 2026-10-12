@@ -2,7 +2,7 @@
 
 **Current state (2026-10-13):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16e.
+Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16f.
 
 ## Purpose
 

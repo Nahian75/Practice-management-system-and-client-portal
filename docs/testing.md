@@ -3,7 +3,7 @@
 **Current state (2026-10-13):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus People / HR steps 16a to 16e. Playwright end-to-end tests cover the staff app,
+plus People / HR steps 16a to 16f. Playwright end-to-end tests cover the staff app,
 Tasks, Notifications,
 Compliance and the client portal.
 
@@ -106,6 +106,21 @@ event versus disposal. The final clean run passed 108 API files/1,980 tests
 with four workers; the focused 16e files passed 12/12. API type-check and
 production build, the all-files hidden-character scan and `git diff --check`
 also passed.
+
+Step 16f adds controller coverage for the live capability response and the
+protected current-direct-report list, including immediate removal after an
+effective reassignment. Browser tests cover the universal safe People area and
+conditional HR navigation; personnel and engagement creation; an encrypted,
+assigned confidential-case event; bounded manager access and former-manager
+denial; private self-service; 390-pixel layout; and axe checks. The deterministic
+browser environment supplies its own valid `HR_ENCRYPTION_KEY`; no production
+key is embedded in the web bundle. The final clean run passed 108 API files/
+1,980 tests and 87/87 Playwright tests, including the web production build.
+Both strict type-checks, the API production build, the all-files hidden-
+character scan and `git diff --check` also passed. The final suites ran with one
+worker because an earlier four-worker run reproduced existing shared nominated-
+officer, Finance-lock and Mailpit fixture contention; each collided test passed
+alone before the clean serial runs.
 
 In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears

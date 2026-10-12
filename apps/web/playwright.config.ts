@@ -23,6 +23,7 @@ export const E2E_MAIL_ENCRYPTION_KEY = Buffer.alloc(32, 12).toString('base64');
 export const E2E_FINANCE_ENCRYPTION_KEY = Buffer.alloc(32, 13).toString('base64');
 export const E2E_AML_ENCRYPTION_KEY = Buffer.alloc(32, 14).toString('base64');
 export const E2E_SUSPICION_ENCRYPTION_KEY = Buffer.alloc(32, 15).toString('base64');
+export const E2E_HR_ENCRYPTION_KEY = Buffer.alloc(32, 16).toString('base64');
 
 export default defineConfig({
   testDir: './e2e',
@@ -63,6 +64,7 @@ export default defineConfig({
         FINANCE_ENCRYPTION_KEY: E2E_FINANCE_ENCRYPTION_KEY,
         AML_ENCRYPTION_KEY: E2E_AML_ENCRYPTION_KEY,
         SUSPICION_ENCRYPTION_KEY: E2E_SUSPICION_ENCRYPTION_KEY,
+        HR_ENCRYPTION_KEY: E2E_HR_ENCRYPTION_KEY,
         MAIL_FROM_ADDRESS: required('MAIL_FROM_ADDRESS'),
         MAIL_FROM_NAME: required('MAIL_FROM_NAME'),
         TRUSTED_PROXIES: 'loopback',
