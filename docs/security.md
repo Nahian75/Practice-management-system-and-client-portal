@@ -1,6 +1,6 @@
 # Security
 
-**Current state (2026-10-12):** Core API, staff-web, client-portal, task and
+**Current state (2026-10-13):** Core API, staff-web, client-portal, task and
 notification controls are built and reviewed. Notifications steps 13a to 13d add the
 persistent encrypted email outbox, insert-only staff task notifications,
 database-controlled one-way reads, live matter-access checks, staff-only
@@ -41,7 +41,7 @@ retention, encrypted legal-hold evidence, transaction-locked object/database
 disposal, content-free tombstones, segregated regulatory exports and a
 restricted-content-free attention count. The Compliance security review is in
 [`reviews/2026-10-11-compliance.md`](reviews/2026-10-11-compliance.md).
-People / HR steps 16a to 16d add an independent HR role and encryption key, protected
+People / HR steps 16a to 16e add an independent HR role and encryption key, protected
 append-only employment history, live self/HR/current-manager database checks,
 bounded manager response schemas and a private `hr/` file namespace. Direct
 application-table reads/writes and owner mutation/truncation are refused. The
@@ -59,7 +59,15 @@ path. Competence/review tables are likewise protected and immutable; distinct
 encryption contexts cover every narrative and evidence event, and PostgreSQL
 separates worker authorship from manager/HR authorship. HR receives AML training
 only through a Compliance-owned status projection that omits provider, evidence,
-control content and every restricted record. The HR module security review
+control content and every restricted record. Step 16e keeps confidential cases
+behind current explicit membership, enforces investigator/decision/appeal role
+separation, rechecks live HR status for HR members and records each sensitive
+view separately. Category retention uses database-derived source dates,
+serialized holds and disposal with content-free tombstones. Fixed encrypted
+exports require a different live HR reviewer, recheck included-case membership,
+are integrity-checked on download and are removed when they could preserve
+disposed content. Direct application table access and owner history changes are
+refused outside the narrow protected disposal path. The HR module security review
 remains due after step 16f.
 
 This file lists only the controls that are actually in place.

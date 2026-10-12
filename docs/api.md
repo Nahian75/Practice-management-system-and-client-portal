@@ -1,6 +1,6 @@
 # API
 
-**Current state (2026-10-12):** Health, authentication, staff management,
+**Current state (2026-10-13):** Health, authentication, staff management,
 clients, matters, documents, portal access and the read-only client portal API
 are built. Tasks and Notifications are built. Finance steps 14a to 14f add
 rates, time and billing plus the encrypted bank register, receipts, allocation
@@ -12,12 +12,13 @@ Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance
 gate enforcement, sanctions screening/freezes/licences, and separately encrypted
 nominated-officer restricted reports and SAR/DAML records, plus retention,
 disposal, fixed regulatory exports and the staff-screen capability responses.
-People / HR steps 16a to 16d add the safe directory, self-service and
+People / HR steps 16a to 16e add the safe directory, self-service and
 current-manager projections, protected employment/work-pattern history, exact
 leave records, reason-free sickness, restricted health and separately shaped
 operational adjustments, lifecycle checklists, versioned right-to-work evidence
 and professional-status records, development cycles, required learning,
-objectives and appraisals.
+objectives and appraisals, membership-scoped confidential cases, category
+retention/disposal and reviewed fixed exports.
 
 ## Endpoints
 
@@ -84,6 +85,23 @@ objectives and appraisals.
 | POST | `/hr/reports/:personId/reviews` | Current effective manager in PostgreSQL | Record an immutable objective or appraisal statement for a direct report |
 | POST | `/hr/people/:personId/reviews` | `hr.competence` and live HR role | Record an immutable objective or appraisal statement |
 | POST | `/hr/reviews/:reviewId/worker-events` | Subject account in PostgreSQL | One-time acknowledgement or append-only worker response/disagreement |
+| GET | `/hr/cases` | Active staff; current case membership in PostgreSQL | At most 500 neutral assigned-case summaries; HR role alone discloses nothing |
+| POST | `/hr/cases` | `hr.cases` and live HR role | Open an encrypted grievance, disciplinary or capability case and become its first HR case member |
+| GET | `/hr/cases/:caseId` | Active staff; current explicit case membership | Audited encrypted issue, membership and append-only event history; hidden ids answer 404 |
+| POST | `/hr/cases/:caseId/members` | Current live HR case member | Assign an active investigator, decision-maker, appeal officer or HR member; incompatible roles require encrypted justification |
+| POST | `/hr/case-memberships/:membershipId/end` | Current live HR case member | End membership once; the final live HR case owner cannot be removed |
+| POST | `/hr/cases/:caseId/events` | Current case member; event-specific database role | Append encrypted evidence/meeting/response/notice/action/correction, decision-maker outcome, appeal-officer appeal or HR status |
+| GET | `/hr/cases/:caseId/accesses` | Current live HR case member | Latest 1,000 protected view/export access records without case content |
+| GET / POST | `/hr/retention/rules` | `hr.retention` and live HR role | Read versioned category rules or append the next version; leave is at least 72 months and right-to-work at least 24 |
+| GET / POST | `/hr/retention/schedules` | `hr.retention` and live HR role | List schedules or record encrypted evidence against the database-derived latest source date |
+| GET | `/hr/retention/schedules/:scheduleId` | `hr.retention` and live HR role | Decrypted schedule evidence and permanent legal-hold history |
+| POST | `/hr/retention/schedules/:scheduleId/legal-holds` | `hr.retention` and live HR role | Append imposed/reviewed/released with encrypted authority/reason and the required review date |
+| POST | `/hr/retention/schedules/:scheduleId/dispose` | `hr.retention` and live HR role | Recheck due/source/engagement/hold state under locks, remove eligible HR content/objects/exports and retain content-free tombstones |
+| GET | `/hr/retention/disposals` | `hr.retention` and live HR role | Safe prepared/completed disposal history with category, rule version and count |
+| GET / POST | `/hr/exports` | `hr.export` and live HR role | List visible fixed bundles or prepare one for worker access, litigation or a regulator from explicit scopes |
+| GET | `/hr/exports/:exportId/review` | `hr.export`; active HR and every included case membership | Integrity-checked review view of the fixed encrypted bundle before decision |
+| POST | `/hr/exports/:exportId/decision` | `hr.export`; different active HR reviewer and included case memberships | Permanently approve or reject release with an encrypted review note |
+| GET | `/hr/exports/:exportId/content` | Same live review boundary; approved only | Audited SHA-256-checked JSON attachment with private/no-store, nosniff and sandbox headers |
 | POST | `/compliance/restricted-reports` | `aml.internal_report`; every active staff role | JSON report or multipart report followed by one protected attachment -> neutral `{receiptId,received}` only |
 | GET | `/compliance/restricted-reports` | Current nominated officer + active Compliance, rechecked in PostgreSQL | 100 safe restricted-queue summaries; `before` continues the keyset page |
 | GET | `/compliance/restricted-reports/:reportId` | Current nominated officer + active Compliance | Decrypted report, attachments, decision, external report and DAML/DATF history; records a protected access event |

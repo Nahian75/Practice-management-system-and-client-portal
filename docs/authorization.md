@@ -1,6 +1,6 @@
 # Authorization
 
-**Current state (2026-10-12):** Layers 1 and 2 built, including the
+**Current state (2026-10-13):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and
 issued billing records. Finance-wide bank, cash-book and ledger reads are
@@ -21,13 +21,14 @@ a Partner, for high-risk or PEP senior-management approval. Step 15d adds the
 Compliance-only `aml.sanctions`. Step 15e gives every staff role submission-only
 `aml.internal_report`; reading and deciding require both a live Compliance role
 and current nominated-officer appointment in PostgreSQL.
-People / HR steps 16a to 16d add a separate `hr` role. All staff roles receive only
+People / HR steps 16a to 16e add a separate `hr` role. All staff roles receive only
 the safe directory; self-service and manager routes use live record
 relationships, while personnel management, firm-wide leave administration and
 restricted health access require the respective permission plus a live HR role
 rechecked in PostgreSQL. Lifecycle administration uses `hr.manage`; full
 right-to-work history/due work uses `hr.vetting`; professional writes use
-`hr.competence`.
+`hr.competence`. Confidential cases require current explicit case membership;
+retention and fixed exports require live HR authority.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -136,6 +137,9 @@ active staff can use. Step 16a adds this separate matrix:
 | `hr.health` - health facts, adjustment grounds and private decisions | | | | | | ✓ |
 | `hr.vetting` - right-to-work and professional-check evidence | | | | | | ✓ |
 | `hr.competence` - qualifications, development and reviews | | | | | | ✓ |
+| `hr.cases` - open and participate in explicitly assigned confidential cases | | | | | | ✓ |
+| `hr.retention` - define rules, schedule records, manage holds and run disposal | | | | | | ✓ |
+| `hr.export` - prepare, review and download fixed HR bundles | | | | | | ✓ |
 
 Self-service does not grant `hr.manage`. The database binds `/hr/me` to the
 caller's account and `/hr/reports/:personId` to the current effective reporting
@@ -163,6 +167,22 @@ plans, activities, evaluations and review responses; manager/HR alone add
 requirements, reviews, status, objectives and appraisals. Only HR assigns firm
 learning, and only the worker or HR records completion. The AML-training view
 is a separate Compliance-owned projection containing status fields only.
+
+Confidential-case routes require staff authentication and current explicit case
+membership in PostgreSQL; the `hr.cases` route permission alone never reveals a
+case. The opening HR holder is the first HR member. A live HR case member may
+manage membership, while an assigned investigator, decision-maker or appeal
+officer may act only within that role. A designated Partner or other active
+staff member can therefore participate without broad HR access. Membership as
+an HR member additionally requires the account to retain its live HR role, so
+revocation takes effect on the next request and serializes with an in-flight
+read. Both preparer and reviewer must retain membership in every included case.
+
+Retention and export routes require `hr.retention` or `hr.export` plus a live HR
+role rechecked by the protected database function. Export approval requires a
+different active HR holder from the preparer; only an approved fixed bundle may
+be downloaded. Small-firm procedural-role overlap is exceptional and requires
+an encrypted reason, while the last live HR case owner cannot be removed.
 
 Restricted-report reads and decisions deliberately have no role permission that
 an administrator can grant. Each protected database function locks and rechecks

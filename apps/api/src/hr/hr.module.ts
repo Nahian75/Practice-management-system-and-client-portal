@@ -7,6 +7,9 @@ import { ComplianceTrainingStatusModule } from '../compliance/compliance-trainin
 import { HrCompetenceController } from './hr-competence.controller.js';
 import { HrCompetenceRepository } from './hr-competence.repository.js';
 import { HrCompetenceService } from './hr-competence.service.js';
+import { HrCasesRetentionController } from './hr-cases-retention.controller.js';
+import { HrCasesRetentionRepository } from './hr-cases-retention.repository.js';
+import { HrCasesRetentionService } from './hr-cases-retention.service.js';
 import { HrController } from './hr.controller.js';
 import { HrDataCipher } from './hr-data-cipher.js';
 import { HrFileVault } from './hr-file-vault.js';
@@ -21,8 +24,9 @@ import { HrVettingService } from './hr-vetting.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule, ComplianceTrainingStatusModule],
-  controllers: [HrController, HrLeaveController, HrVettingController, HrCompetenceController],
+  controllers: [HrController, HrLeaveController, HrVettingController, HrCompetenceController, HrCasesRetentionController],
   providers: [HrRepository, HrService, HrDataCipher, HrFileVault, HrLeaveRepository, HrLeaveService,
-    HrVettingRepository, HrVettingService, HrCompetenceRepository, HrCompetenceService],
+    HrVettingRepository, HrVettingService, HrCompetenceRepository, HrCompetenceService,
+    HrCasesRetentionRepository, HrCasesRetentionService],
 })
 export class HrModule {}

@@ -1,8 +1,8 @@
 # Data Model
 
-**Current state (2026-10-12):** The database foundation through Compliance
-step 15f and People / HR step 16d exists, with separate owner and application
-roles and forward-only migrations through `0062`.
+**Current state (2026-10-13):** The database foundation through Compliance
+step 15f and People / HR step 16e exists, with separate owner and application
+roles and forward-only migrations through `0063`.
 
 ## Database
 
@@ -109,6 +109,10 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `hr_development_cycles`, `hr_development_events` | `0062_hr_competence_reviews.sql` | Fixed periods and encrypted append-only reflect/identify/plan/activity/evaluate history. PostgreSQL separates worker-owned narrative from manager/HR requirement, review and status events | [hr.md](hr.md#step-16d-competence-and-reviews) |
 | `hr_learning_assignments`, `hr_learning_events` | `0062_hr_competence_reviews.sql` | HR-only encrypted assignments and due dates; serialized worker/HR completion/reopening evidence. Duplicate and future-dated completion is refused | [hr.md](hr.md#step-16d-competence-and-reviews) |
 | `hr_review_records`, `hr_review_worker_events` | `0062_hr_competence_reviews.sql` | Immutable encrypted manager/HR objective and appraisal statements, one-time worker acknowledgement and append-only response/disagreement. Subject, current-manager and HR access is database-checked | [hr.md](hr.md#step-16d-competence-and-reviews) |
+| `hr_cases`, `hr_case_memberships`, `hr_case_membership_endings`, `hr_case_events`, `hr_case_access_log` | `0063_hr_cases_retention_exports.sql` | Encrypted confidential-case history behind current explicit membership. Protected functions enforce live HR ownership, assigned procedural roles, separation or an encrypted override, append-only corrections and content-free view/export access records | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
+| `hr_retention_rules`, `hr_retention_schedules`, `hr_legal_hold_events` | `0063_hr_cases_retention_exports.sql` | Versioned category rules with minimum leave/right-to-work periods; schedules use a PostgreSQL-derived latest-record basis. Permanent encrypted hold events and disposal both lock and recheck source state | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
+| `hr_disposal_runs`, `hr_disposed_records` | `0063_hr_cases_retention_exports.sql` | Prepare/finalize disposal fixes affected objects, rechecks the due basis and latest hold, removes eligible protected content and duplicating exports, then retains only a content-free tombstone | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
+| `hr_exports`, `hr_export_decisions`, `hr_export_access_log` | `0063_hr_cases_retention_exports.sql` | Fixed authenticated-encrypted JSON bundles with explicit scopes and included cases. A different live HR holder must review; case membership is rechecked for both people; only approved integrity-checked content is downloadable | [hr.md](hr.md#step-16e-confidential-cases-retention-and-exports) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

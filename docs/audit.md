@@ -1,8 +1,8 @@
 # Audit
 
-**Current state (2026-10-12):** The protected audit table and `AuditService`
+**Current state (2026-10-13):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16d.
+Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16e.
 
 ## Purpose
 
@@ -101,6 +101,18 @@ Step 16d adds `hr.development_cycle_created`,
 Metadata is limited to person/record ids, event kind/state and relevant dates;
 reflection, needs, plans, activity/evaluation evidence, requirements, learning
 detail/evidence, objective/appraisal text and worker responses never enter it.
+
+Step 16e adds `hr.case_opened`, `hr.case_member_added`,
+`hr.case_member_ended`, `hr.case_event_recorded`, `hr.case_viewed`,
+`hr.retention_rule_created`, `hr.retention_scheduled`,
+`hr.legal_hold_imposed`, `hr.legal_hold_reviewed`, `hr.legal_hold_released`,
+`hr.record_disposed`, `hr.export_prepared`, `hr.export_reviewed`,
+`hr.export_approved`, `hr.export_rejected` and `hr.export_downloaded`.
+Metadata is limited to record, person, case, membership, rule, schedule, run
+and export ids plus kinds, states, scopes, versions, dates and counts. It never
+copies the issue, evidence, meeting or decision narrative, separation override,
+membership-ending reason, retention rationale, schedule evidence, legal-hold
+reason, export purpose/content, review note, ciphertext or key material.
 
 Tasks records `task.created` with the task and matter ids, assignee id,
 priority, and whether a due date exists. Detail changes use `task.updated`

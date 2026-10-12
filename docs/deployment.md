@@ -1,6 +1,6 @@
 # Deployment
 
-**Current state (2026-10-12):** Local development only: the API, the web app,
+**Current state (2026-10-13):** Local development only: the API, the web app,
 and the document storage and scanner containers. No hosted environments.
 
 ## Local development
@@ -121,7 +121,7 @@ internal address (review W3) does not appear there either.
 
 Local data is synthetic only. Never load production data into a local database.
 
-### Compliance disposal and backups
+### Compliance and HR disposal and backups
 
 Retention disposal removes live AML database content and the exact ordinary
 and restricted object keys in one locked operation, leaving content-free
@@ -131,6 +131,12 @@ backup restore. A backup is not a route to resume ordinary use of disposed
 personal data. Test the procedure and record the result before enabling a live
 disposal job; the current first version runs disposal only from an explicit
 Compliance screen after typed confirmation.
+
+HR disposal likewise removes eligible protected database content, exact `hr/`
+object keys and fixed HR exports that could preserve disposed material, leaving
+only content-free tombstones. The same finite backup expiry and restoration
+replay requirement applies. Step 16e exposes only the explicit protected API
+action; step 16f adds the HR screen and typed-confirmation browser workflow.
 
 ## Hosted environments
 

@@ -1,6 +1,6 @@
 # Architecture
 
-**Current state (2026-10-12):** The API foundation and the Clients, Matters,
+**Current state (2026-10-13):** The API foundation and the Clients, Matters,
 Documents and client portal modules are built, with separate staff and client
 screens. The client portal, Tasks and Notifications modules are
 security-reviewed. Tasks steps
@@ -30,7 +30,9 @@ sickness administration, restricted health records and operational adjustment
 projections; step 16c adds protected lifecycle checklists, right-to-work
 versioning/follow-ups and professional-status history without giving HR account
 or owning-module authority; step 16d adds encrypted competence/review history
-and a narrow Compliance-owned AML-training status projection.
+and a narrow Compliance-owned AML-training status projection; step 16e adds
+membership-scoped confidential cases, category retention/disposal and
+two-person reviewed fixed exports.
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -77,6 +79,6 @@ authorization decisions.
 | Notifications | Steps 13a to 13d built and security-reviewed: persistent encrypted email outbox, leased worker and retries; insert-only staff task notifications, transactional audit and list/read API; generic assignment email and 09:00 Europe/London due reminders with database-bounded catch-up and final live-state/address checks; staff header count and inbox ([notifications.md](notifications.md), [review](reviews/2026-10-08-notifications.md)) |
 | Finance | Steps 14a to 14f built and security-reviewed: exact GBP strings, permissions, immutable rates/time corrections, billing snapshots, encrypted bank/payee details, balanced postings, receipts, allocations, running ledgers/cash books, client-payment reservations, four-eyes approval, bank outcomes, safe CSV statements, immutable matching/reversals, fixed client reconciliation with liability balances, Compliance sign-off, five-week status, numeric VAT documents, audited exports and role-sensitive staff screens (`apps/api/src/finance/`, `apps/web/src/app/(staff)/finance/`, [finance.md](finance.md), [review](reviews/2026-10-10-finance.md)) |
 | Compliance / AML | Steps 15a to 15f built and security-reviewed: firm controls and appointments, versioned CDD/evidence, matter risk and gate enforcement, sanctions screening/freezes/licences, separately encrypted internal disclosures with nominated-officer-only SAR/DAML records, controlled retention/disposal, separated regulatory exports and staff screens ([compliance.md](compliance.md), [review](reviews/2026-10-11-compliance.md)) |
-| People / HR | Steps 16a to 16d built: separate HR authority; protected employment/work-pattern and lifecycle history; encrypted personal data/files, right-to-work detail and competence/review narratives; safe self/manager views; exact minute leave ledger and serialized decisions; payroll-supplied holiday-pay evidence; reason-free sickness; restricted health and operational adjustment projections; leaver blockers; qualifications/professional checks; development, required learning, objectives, appraisals and worker responses. Cases/retention/exports and screens follow in 16e-16f ([hr.md](hr.md)) |
+| People / HR | Steps 16a to 16e built: separate HR authority; protected employment/work-pattern and lifecycle history; encrypted personal data/files, right-to-work detail and competence/review narratives; safe self/manager views; exact minute leave ledger and serialized decisions; payroll-supplied holiday-pay evidence; reason-free sickness; restricted health and operational adjustment projections; leaver blockers; qualifications/professional checks; development, required learning, objectives, appraisals and worker responses; explicit confidential-case teams and role separation; category rules, legal holds, controlled disposal and reviewed fixed exports. Staff/manager/HR screens follow in 16f ([hr.md](hr.md)) |
 | AI | Not started |
 | Web app | Staff screens and the read-only client portal are built: set-up, security headers, API pass-through, account set-up and recovery, clients, matters, documents, tasks, notifications, Finance, Compliance and staff administration (`apps/web/`). The web foundation, portal and every implemented domain through Compliance are security-reviewed ([web.md](web.md)) |

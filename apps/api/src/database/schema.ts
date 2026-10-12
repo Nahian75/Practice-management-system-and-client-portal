@@ -1333,6 +1333,81 @@ export interface HrReviewWorkerEventsTable extends HrSealedColumns {
   action: DatabaseSet<'acknowledged' | 'response' | 'disagreement'>;
   recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
 }
+export type HrCaseKind = 'grievance' | 'disciplinary' | 'capability';
+export type HrCaseRole = 'hr_member' | 'investigator' | 'decision_maker' | 'appeal_officer';
+export type HrRetentionCategory = 'personal' | 'employment' | 'leave' | 'health' | 'right_to_work' | 'competence' | 'case';
+export type HrExportPurpose = 'worker_access' | 'litigation' | 'regulator';
+export interface HrCasesTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; kind: DatabaseSet<HrCaseKind>;
+  raised_by_person_id: DatabaseSet<string | null>; policy_version: DatabaseSet<string>; due_on: DatabaseSet<string | null>;
+  issue_context: DatabaseSet<string>; issue_key_version: DatabaseSet<number>; issue_nonce: DatabaseSet<Buffer>;
+  issue_ciphertext: DatabaseSet<Buffer>; issue_auth_tag: DatabaseSet<Buffer>;
+  opened_by: DatabaseSet<string>; opened_at: DatabaseSet<Date>;
+}
+export interface HrCaseMembershipsTable {
+  id: DatabaseSet<string>; case_id: DatabaseSet<string>; account_id: DatabaseSet<string>; role: DatabaseSet<HrCaseRole>;
+  override_context: DatabaseSet<string | null>; override_key_version: DatabaseSet<number | null>;
+  override_nonce: DatabaseSet<Buffer | null>; override_ciphertext: DatabaseSet<Buffer | null>;
+  override_auth_tag: DatabaseSet<Buffer | null>; added_by: DatabaseSet<string>; added_at: DatabaseSet<Date>;
+}
+export interface HrCaseMembershipEndingsTable {
+  id: DatabaseSet<string>; membership_id: DatabaseSet<string>; reason_context: DatabaseSet<string>;
+  reason_key_version: DatabaseSet<number>; reason_nonce: DatabaseSet<Buffer>; reason_ciphertext: DatabaseSet<Buffer>;
+  reason_auth_tag: DatabaseSet<Buffer>; ended_by: DatabaseSet<string>; ended_at: DatabaseSet<Date>;
+}
+export interface HrCaseEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; case_id: DatabaseSet<string>;
+  kind: DatabaseSet<'evidence' | 'meeting' | 'response' | 'notice' | 'outcome' | 'action' | 'appeal' | 'correction' | 'status'>;
+  state: DatabaseSet<'open' | 'investigating' | 'decision_due' | 'appeal_open' | 'closed' | null>;
+  occurred_on: DatabaseSet<string>; supersedes_event_id: DatabaseSet<string | null>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrCaseAccessLogTable {
+  id: DatabaseSet<string>; case_id: DatabaseSet<string>; action: DatabaseSet<'view' | 'export'>;
+  accessed_by: DatabaseSet<string>; accessed_at: DatabaseSet<Date>;
+}
+export interface HrRetentionRulesTable {
+  id: DatabaseSet<string>; category: DatabaseSet<HrRetentionCategory>; version: DatabaseSet<number>;
+  effective_from: DatabaseSet<string>; review_after_months: DatabaseSet<number>; retain_months: DatabaseSet<number>;
+  governing_rule: DatabaseSet<string>; rationale_context: DatabaseSet<string>; rationale_key_version: DatabaseSet<number>;
+  rationale_nonce: DatabaseSet<Buffer>; rationale_ciphertext: DatabaseSet<Buffer>; rationale_auth_tag: DatabaseSet<Buffer>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrRetentionSchedulesTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; rule_id: DatabaseSet<string>;
+  category: DatabaseSet<HrRetentionCategory>; source_id: DatabaseSet<string | null>; basis_on: DatabaseSet<string>;
+  review_on: DatabaseSet<string>; dispose_after: DatabaseSet<string>; evidence_context: DatabaseSet<string>;
+  evidence_key_version: DatabaseSet<number>; evidence_nonce: DatabaseSet<Buffer>; evidence_ciphertext: DatabaseSet<Buffer>;
+  evidence_auth_tag: DatabaseSet<Buffer>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLegalHoldEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; schedule_id: DatabaseSet<string>; action: DatabaseSet<'imposed' | 'reviewed' | 'released'>;
+  review_on: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrDisposalRunsTable {
+  id: DatabaseSet<string>; schedule_id: DatabaseSet<string>; person_id: DatabaseSet<string>;
+  category: DatabaseSet<HrRetentionCategory>; rule_version: DatabaseSet<number>; governing_rule: DatabaseSet<string>;
+  state: DatabaseSet<'prepared' | 'completed'>; object_keys: DatabaseSet<string[]>; prepared_by: DatabaseSet<string>;
+  prepared_at: DatabaseSet<Date>; completed_by: DatabaseSet<string | null>; completed_at: DatabaseSet<Date | null>;
+  record_count: DatabaseSet<number | null>;
+}
+export interface HrDisposedRecordsTable {
+  id: DatabaseSet<string>; run_id: DatabaseSet<string>; record_id: DatabaseSet<string>; record_kind: DatabaseSet<string>;
+  category: DatabaseSet<HrRetentionCategory>; rule_version: DatabaseSet<number>; disposed_by: DatabaseSet<string>;
+  disposed_at: DatabaseSet<Date>;
+}
+export interface HrExportsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; purpose: DatabaseSet<HrExportPurpose>;
+  scopes: DatabaseSet<string[]>; case_ids: DatabaseSet<string[]>; sha256: DatabaseSet<Buffer>; byte_size: DatabaseSet<number>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrExportDecisionsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; export_id: DatabaseSet<string>; decision: DatabaseSet<'approved' | 'rejected'>;
+  decided_by: DatabaseSet<string>; decided_at: DatabaseSet<Date>;
+}
+export interface HrExportAccessLogTable {
+  id: DatabaseSet<string>; export_id: DatabaseSet<string>; accessed_by: DatabaseSet<string>; accessed_at: DatabaseSet<Date>;
+}
 
 export interface Database {
   account_roles: AccountRolesTable;
@@ -1421,6 +1496,11 @@ export interface Database {
   finance_postings: FinancePostingsTable;
   finance_transactions: FinanceTransactionsTable;
   hr_contact_versions: HrContactVersionsTable;
+  hr_case_access_log: HrCaseAccessLogTable;
+  hr_case_events: HrCaseEventsTable;
+  hr_case_membership_endings: HrCaseMembershipEndingsTable;
+  hr_case_memberships: HrCaseMembershipsTable;
+  hr_cases: HrCasesTable;
   hr_development_cycles: HrDevelopmentCyclesTable;
   hr_development_events: HrDevelopmentEventsTable;
   hr_adjustment_decisions: HrAdjustmentDecisionsTable;
@@ -1431,6 +1511,9 @@ export interface Database {
   hr_employment_terms: HrEmploymentTermsTable;
   hr_engagement_endings: HrEngagementEndingsTable;
   hr_engagements: HrEngagementsTable;
+  hr_export_access_log: HrExportAccessLogTable;
+  hr_export_decisions: HrExportDecisionsTable;
+  hr_exports: HrExportsTable;
   hr_files: HrFilesTable;
   hr_health_records: HrHealthRecordsTable;
   hr_holiday_pay_records: HrHolidayPayRecordsTable;
@@ -1439,6 +1522,7 @@ export interface Database {
   hr_leave_request_days: HrLeaveRequestDaysTable;
   hr_leave_request_events: HrLeaveRequestEventsTable;
   hr_leave_requests: HrLeaveRequestsTable;
+  hr_legal_hold_events: HrLegalHoldEventsTable;
   hr_learning_assignments: HrLearningAssignmentsTable;
   hr_learning_events: HrLearningEventsTable;
   hr_lifecycle_checklist_events: HrLifecycleChecklistEventsTable;
@@ -1453,6 +1537,10 @@ export interface Database {
   hr_right_to_work_checks: HrRightToWorkChecksTable;
   hr_review_records: HrReviewRecordsTable;
   hr_review_worker_events: HrReviewWorkerEventsTable;
+  hr_retention_rules: HrRetentionRulesTable;
+  hr_retention_schedules: HrRetentionSchedulesTable;
+  hr_disposal_runs: HrDisposalRunsTable;
+  hr_disposed_records: HrDisposedRecordsTable;
   hr_sickness_absences: HrSicknessAbsencesTable;
   hr_work_patterns: HrWorkPatternsTable;
   invitations: InvitationsTable;

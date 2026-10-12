@@ -1,12 +1,13 @@
 # People and HR
 
-**Current state (2026-10-12):** First-version design approved. Steps 16a to
-16d are built: separate HR authority, protected employment and lifecycle
+**Current state (2026-10-13):** First-version design approved. Steps 16a to
+16e are built: separate HR authority, protected employment and lifecycle
 history, encrypted personnel files/data and right-to-work evidence, exact leave
 evidence, reason-free sickness administration, restricted health records,
 bounded manager projections, versioned professional checks, development cycles,
-required learning, objectives and appraisals. Steps 16e and 16f and the final HR
-security review remain.
+required learning, objectives and appraisals, membership-scoped confidential
+cases, category retention/disposal and reviewed fixed exports. Step 16f and the
+final HR security review remain.
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -88,8 +89,8 @@ retention rule, privacy information and responsible owner.
 ## Roles and proposed permissions
 
 `hr.directory`, `hr.manage`, `hr.leave`, `hr.health`, `hr.vetting` and
-`hr.competence` are implemented through step 16d. The remaining permission
-names are reserved design and are added only with their step.
+`hr.competence`, `hr.cases`, `hr.retention` and `hr.export` are implemented
+through step 16e. No reserved HR permission remains.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
 |---|---:|---:|---:|---:|---:|---:|
@@ -544,6 +545,58 @@ split, assignment state/date rules, fixed review and response history,
 encryption/audit separation, safe AML projection, strict shapes, direct-table
 denial and owner immutability.
 
+### Step 16e: confidential cases, retention and exports
+
+Built on 13 October 2026 in migration `0063_hr_cases_retention_exports.sql`
+and the HR API module:
+
+- A grievance, disciplinary or capability case starts with an encrypted issue,
+  a fixed policy version, optional raiser and due date. Its queue contains only
+  neutral ids, type, state and due information. Case detail is available only
+  to active staff with a current explicit membership; holding HR alone does not
+  open it.
+- The opening HR holder becomes the first `hr_member`. A current HR case member
+  can assign an active staff member as investigator, decision-maker or appeal
+  officer, or add another live HR holder. One person cannot hold incompatible
+  procedural roles unless the encrypted small-firm separation reason is
+  recorded. The last live HR case owner cannot be removed.
+- Evidence, meeting, response, notice, outcome, action, appeal, correction and
+  status events are append-only encrypted records. PostgreSQL reserves outcomes
+  for the decision-maker, appeals for the appeal officer and status for a live
+  HR case member. A correction names the earlier same-case event; it never
+  replaces it. Every detail view or export writes a separate protected access
+  row and a content-free ordinary audit event.
+- Versioned retention rules cover personal, employment, leave, health,
+  right-to-work, competence and case records. Leave rules cannot be shorter
+  than 72 months and right-to-work rules cannot be shorter than 24 months.
+  Each schedule's basis must equal the latest date derived by PostgreSQL from
+  the protected source records; a newer record or active engagement changes the
+  basis and blocks disposal.
+- Legal holds are permanent imposed/reviewed/released events with encrypted
+  authority and reason. Preparation and finalization both lock the person and,
+  for a case, the case; recheck the due date, source basis and latest hold; and
+  serialize against new events or holds. Disposal removes eligible encrypted
+  rows and `hr/` objects, removes fixed exports that could retain the content,
+  and keeps only record id, kind, category, rule version, actor and trusted time
+  in a tombstone.
+- HR prepares a fixed AES-256-GCM JSON bundle for worker access, litigation or
+  a regulator by selecting explicit scopes. Case material includes only cases
+  assigned to the preparer, and both preparer and reviewer must retain those
+  memberships. A different active HR holder must inspect the fixed bundle and
+  approve it before download. Rejection is permanent; approved downloads check
+  SHA-256 integrity and use attachment, private/no-store, nosniff and sandbox
+  headers. Stass never emails the bundle.
+- `pms_app` has no table access. Protected functions recheck active accounts,
+  live HR roles and current case membership under row locks. Owner changes and
+  truncation are refused outside the sole disposal path.
+
+Focused HTTP and exclusive migration coverage proves membership and live-role
+revocation, role separation and encrypted override reasons, event authorship,
+access logging, ciphertext/audit separation, trusted retention bases, legal
+holds, content-free disposal, two-person export release, strict shapes, direct
+table denial, owner immutability and races between reads/revocation, holds/
+disposal and events/disposal.
+
 - **16a. Foundation and employment records — built.** Separate `hr` role and
   permissions, protected employment/person/manager/work-pattern history, HR
   encryption and private-file boundary, safe directory, self-service and
@@ -556,7 +609,7 @@ denial and owner immutability.
   status without giving HR account-management authority.
 - **16d. Competence and reviews — built.** Reflect/identify/plan/activity/evaluate,
   firm assignments, objectives, appraisal acknowledgement and worker response.
-- **16e. Confidential cases, retention and exports.** Add explicit case teams,
+- **16e. Confidential cases, retention and exports — built.** Explicit case teams,
   investigation/decision/appeal event history, category schedules, holds,
   controlled disposal and reviewable fixed exports.
 - **16f. Staff, manager and HR screens.** Add the complete People/self-service,
@@ -572,6 +625,6 @@ next step.
 
 ## Approval
 
-The first-version scope is approved and steps 16a to 16d are implemented. A change to
+The first-version scope is approved and steps 16a to 16e are implemented. A change to
 role authority, health/case access, retention, payroll boundary or automated
 decision policy changes the security model and is agreed here before code.

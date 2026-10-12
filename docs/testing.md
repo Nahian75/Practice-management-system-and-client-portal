@@ -1,9 +1,9 @@
 # Testing
 
-**Current state (2026-10-12):** Unit, HTTP and database integration tests for
+**Current state (2026-10-13):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus People / HR steps 16a to 16d. Playwright end-to-end tests cover the staff app,
+plus People / HR steps 16a to 16e. Playwright end-to-end tests cover the staff app,
 Tasks, Notifications,
 Compliance and the client portal.
 
@@ -92,6 +92,18 @@ safe AML-training projection, strict request shapes, direct-table denial and
 owner immutability. The final clean run passed 106 API files/1,950 tests with
 four workers after unbounded local runs exposed existing Mailpit/appointment
 fixture contention; the focused 16d file passed 8/8. API type-check and
+production build, the all-files hidden-character scan and `git diff --check`
+also passed.
+
+Step 16e integration tests exercise explicit case membership and immediate
+live-role loss, procedural-role separation and encrypted overrides, event
+authorship, ciphertext/audit separation, access logging, database-derived
+retention bases, legal holds, content-free disposal, two-person fixed-export
+release, strict request/response shapes, direct-table denial and owner
+immutability. Exclusive migration tests prove defined serialization for a case
+read versus membership revocation, legal hold versus disposal, and a new case
+event versus disposal. The final clean run passed 108 API files/1,980 tests
+with four workers; the focused 16e files passed 12/12. API type-check and
 production build, the all-files hidden-character scan and `git diff --check`
 also passed.
 

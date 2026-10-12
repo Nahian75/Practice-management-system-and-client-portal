@@ -55,6 +55,9 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'hr.health': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
   'hr.vetting': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
   'hr.competence': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.cases': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.retention': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.export': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
 };
 
 describe('role permissions', () => {
