@@ -41,7 +41,7 @@ retention, encrypted legal-hold evidence, transaction-locked object/database
 disposal, content-free tombstones, segregated regulatory exports and a
 restricted-content-free attention count. The Compliance security review is in
 [`reviews/2026-10-11-compliance.md`](reviews/2026-10-11-compliance.md).
-People / HR steps 16a and 16b add an independent HR role and encryption key, protected
+People / HR steps 16a to 16c add an independent HR role and encryption key, protected
 append-only employment history, live self/HR/current-manager database checks,
 bounded manager response schemas and a private `hr/` file namespace. Direct
 application-table reads/writes and owner mutation/truncation are refused. The
@@ -49,8 +49,13 @@ leave boundary adds serialized person/year approval, exact immutable daily
 minutes and signed ledger entries. Manager projections exclude pay, ledger
 notes, health facts and private adjustment grounds; sickness accepts no medical
 free text. Health and each private/operational adjustment purpose have distinct
-authenticated encryption contexts. The HR module security review remains due
-after step 16f.
+authenticated encryption contexts. Lifecycle and vetting tables add no direct
+application access; protected functions serialize current-check versions,
+bind evidence to the same person's encrypted identity file and keep checklist,
+right-to-work and professional history owner-immutable. Manager vetting output
+is limited to expiry/action and public status. Leaver checks expose safe blocker
+ids/statuses but give HR no account, role, client, matter, task or AML mutation
+path. The HR module security review remains due after step 16f.
 
 This file lists only the controls that are actually in place.
 

@@ -3,7 +3,7 @@
 **Current state (2026-10-12):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules and
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus People / HR steps 16a and 16b. Playwright end-to-end tests cover the staff app,
+plus People / HR steps 16a to 16c. Playwright end-to-end tests cover the staff app,
 Tasks, Notifications,
 Compliance and the client portal.
 
@@ -75,6 +75,15 @@ manager-safe adjustment projection/progress, six-year holiday-pay evidence,
 direct-table denial and owner immutability. Migration reset, API type-check/build,
 focused/full API suites and hidden-character checks are run before handoff.
 
+Step 16c integration tests exercise HR-only lifecycle administration, safe
+self/current-manager projections, mandatory-item and latest-right-to-work
+completion gates, read-only leaver blockers, evidence-person binding, encrypted
+right-to-work and professional detail, version/follow-up/backdate handling, the
+due queue, strict request shapes, content-free audit metadata, direct-table
+denial and owner immutability. The final clean run passed 105 API files/1,942
+tests; the focused 16c file passed 10/10. API type-check and production build,
+the all-files hidden-character scan and `git diff --check` also passed.
+
 In the browser tests, the `aml-setup` Playwright project publishes and approves
 the framework through the API once, before any test, and `openMatter` clears
 each matter it opens unless told not to.
@@ -91,7 +100,7 @@ Five deliberate 15f mutations were caught and restored: UUID-only legal-hold
 ordering, a 6-10-year request window, a cacheable regulatory download, a
 general attention count that leaked restricted-report existence and disposal
 without the live nominated-officer check.
-The final clean run passed 101 API files/1,821 tests and 83/83 Playwright tests,
+The step 15f clean run passed 101 API files/1,821 tests and 83/83 Playwright tests,
 including the web production build. API production build, both strict type-
 checks, the all-files hidden-character scan and `git diff --check` also passed.
 

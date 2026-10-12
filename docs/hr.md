@@ -1,10 +1,11 @@
 # People and HR
 
-**Current state (2026-10-12):** First-version design approved. Steps 16a and
-16b are built: separate HR authority, protected employment history, encrypted
-personnel files/data, exact leave evidence, reason-free sickness administration,
-restricted health records and a bounded operational-adjustment projection.
-Steps 16c to 16f and the final HR security review remain.
+**Current state (2026-10-12):** First-version design approved. Steps 16a to
+16c are built: separate HR authority, protected employment and lifecycle
+history, encrypted personnel files/data and right-to-work evidence, exact leave
+evidence, reason-free sickness administration, restricted health records,
+bounded manager projections and versioned professional checks. Steps 16d to
+16f and the final HR security review remain.
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -85,9 +86,9 @@ retention rule, privacy information and responsible owner.
 
 ## Roles and proposed permissions
 
-`hr.directory`, `hr.manage`, `hr.leave` and `hr.health` are implemented through
-step 16b. The remaining permission names are reserved design and are added only
-with their step.
+`hr.directory`, `hr.manage`, `hr.leave`, `hr.health`, `hr.vetting` and
+`hr.competence` are implemented through step 16c. The remaining permission
+names are reserved design and are added only with their step.
 
 | Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
 |---|---:|---:|---:|---:|---:|---:|
@@ -466,6 +467,48 @@ and overlap enforcement, cancellation return, reason-free sickness, health and
 adjustment projections, holiday-pay retention, direct-table denial and immutable
 history.
 
+### Step 16c: joiners, movers, leavers and vetting
+
+Built on 12 October 2026 in migration `0061_hr_lifecycle_vetting.sql` and the
+HR API module:
+
+- HR creates joiner, mover and leaver checklists tied to one engagement and a
+  real effective date. Leavers require the already-recorded final day and a
+  structured departure category. Checklist and item completion/reopening are
+  permanent encrypted events; completed checklists must be reopened before
+  more item work.
+- Completing a joiner or mover requires every required item and the latest
+  right-to-work check to be a non-overdue pass. Completing a leaver also
+  requires the account to be disabled and existing protected roles, client
+  responsibility, matter supervision, open tasks and AML appointments to have
+  been resolved in their owning modules. HR receives safe blocker ids/statuses
+  but cannot change accounts or those records.
+- Right-to-work checks are versioned per engagement under a database lock. They
+  fix the guidance version, route, date, permission type, outcome, expiry,
+  follow-up and checker. Private identity-match, restriction and provider facts
+  are encrypted under `HR_ENCRYPTION_KEY`; evidence must be an existing
+  encrypted `identity` HR file belonging to the same person.
+- The due queue shows only each engagement's latest failed, follow-up-required
+  or next-30-day follow-up/expiry check. A check cannot be future-dated or
+  backdated over the previous one, and a later failure replaces an earlier
+  pass for lifecycle completion.
+- Qualification, professional-registration and practising-certificate records
+  keep encrypted identifiers/restrictions plus append-only dated status checks
+  with encrypted source/notes. A check cannot be future-dated or backdated over
+  later evidence.
+- Self-service returns the worker's safe current vetting status and professional
+  record. A current manager receives expiry/action and public professional
+  status only; result, permission, check date, identifiers, restrictions,
+  sources and notes are null. HR receives full history and the read is audited.
+- `pms_app` cannot read or write the seven lifecycle/vetting tables directly.
+  Protected functions recheck live HR or self/current-manager access, and owner
+  update, deletion and truncation are refused.
+
+Focused integration coverage proves lifecycle state and blocker enforcement,
+safe self/manager/HR projections, evidence-person binding, ciphertext/audit
+separation, right-to-work versioning and due dates, professional check history,
+strict inputs, direct-table denial and owner immutability.
+
 - **16a. Foundation and employment records — built.** Separate `hr` role and
   permissions, protected employment/person/manager/work-pattern history, HR
   encryption and private-file boundary, safe directory, self-service and
@@ -473,7 +516,7 @@ history.
 - **16b. Leave, sickness administration and adjustments — built.** Exact entitlement
   ledgers, approval concurrency, six-year holiday/pay evidence, health-separated
   absence and the operational-adjustment projection.
-- **16c. Joiners, movers, leavers and vetting.** Add lifecycle checklists,
+- **16c. Joiners, movers, leavers and vetting — built.** Lifecycle checklists,
   right-to-work versions/evidence/follow-ups, qualifications and professional
   status without giving HR account-management authority.
 - **16d. Competence and reviews.** Add reflect/identify/plan/activity/evaluate,
@@ -494,6 +537,6 @@ next step.
 
 ## Approval
 
-The first-version scope is approved and steps 16a and 16b are implemented. A change to
+The first-version scope is approved and steps 16a to 16c are implemented. A change to
 role authority, health/case access, retention, payroll boundary or automated
 decision policy changes the security model and is agreed here before code.

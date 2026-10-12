@@ -52,6 +52,8 @@ export const PERMISSIONS = [
   'hr.manage',
   'hr.leave',
   'hr.health',
+  'hr.vetting',
+  'hr.competence',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -146,7 +148,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.export',
     'hr.directory',
   ],
-  hr: ['aml.internal_report', 'hr.directory', 'hr.manage', 'hr.leave', 'hr.health'],
+  hr: ['aml.internal_report', 'hr.directory', 'hr.manage', 'hr.leave', 'hr.health', 'hr.vetting', 'hr.competence'],
 };
 
 export function permissionsFor(roles: Iterable<StaffRole>): ReadonlySet<Permission> {

@@ -1263,6 +1263,46 @@ export interface HrAdjustmentProgressEventsTable extends HrSealedColumns {
   id: DatabaseSet<string>; decision_id: DatabaseSet<string>;
   action: DatabaseSet<'implemented' | 'reviewed' | 'closed'>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
 }
+export interface HrLifecycleChecklistsTable {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; engagement_id: DatabaseSet<string>;
+  kind: DatabaseSet<'joiner' | 'mover' | 'leaver'>; effective_on: DatabaseSet<string>;
+  reason_category: DatabaseSet<'resignation' | 'dismissal' | 'redundancy' | 'retirement' | 'end_of_fixed_term' | 'transfer' | 'other' | null>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrLifecycleItemsTable {
+  id: DatabaseSet<string>; checklist_id: DatabaseSet<string>; code: DatabaseSet<string>; title: DatabaseSet<string>;
+  owner_kind: DatabaseSet<'hr' | 'administrator' | 'manager' | 'worker' | 'other_module'>;
+  required: DatabaseSet<boolean>; due_on: DatabaseSet<string | null>;
+  created_by: DatabaseSet<string>; created_at: DatabaseSet<Date>;
+}
+export interface HrLifecycleItemEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; item_id: DatabaseSet<string>; action: DatabaseSet<'completed' | 'reopened'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrLifecycleChecklistEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; checklist_id: DatabaseSet<string>; action: DatabaseSet<'completed' | 'reopened'>;
+  recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrRightToWorkChecksTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>; engagement_id: DatabaseSet<string>;
+  version: DatabaseSet<number>; previous_check_id: DatabaseSet<string | null>; guidance_version: DatabaseSet<string>;
+  check_route: DatabaseSet<'manual' | 'online' | 'digital_provider'>; checked_on: DatabaseSet<string>;
+  permission_type: DatabaseSet<'british_or_irish' | 'settled' | 'pre_settled' | 'time_limited' | 'other'>;
+  result: DatabaseSet<'passed' | 'failed' | 'follow_up_required'>; expires_on: DatabaseSet<string | null>;
+  follow_up_on: DatabaseSet<string | null>; evidence_file_id: DatabaseSet<string>;
+  checked_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrProfessionalRecordsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; person_id: DatabaseSet<string>;
+  kind: DatabaseSet<'qualification' | 'professional_registration' | 'practising_certificate'>;
+  title: DatabaseSet<string>; issuer: DatabaseSet<string>; valid_from: DatabaseSet<string | null>;
+  valid_to: DatabaseSet<string | null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+export interface HrProfessionalCheckEventsTable extends HrSealedColumns {
+  id: DatabaseSet<string>; record_id: DatabaseSet<string>;
+  status: DatabaseSet<'current' | 'expired' | 'restricted' | 'suspended' | 'not_verified'>;
+  checked_on: DatabaseSet<string>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
 
 export interface Database {
   account_roles: AccountRolesTable;
@@ -1367,9 +1407,16 @@ export interface Database {
   hr_leave_request_days: HrLeaveRequestDaysTable;
   hr_leave_request_events: HrLeaveRequestEventsTable;
   hr_leave_requests: HrLeaveRequestsTable;
+  hr_lifecycle_checklist_events: HrLifecycleChecklistEventsTable;
+  hr_lifecycle_checklists: HrLifecycleChecklistsTable;
+  hr_lifecycle_item_events: HrLifecycleItemEventsTable;
+  hr_lifecycle_items: HrLifecycleItemsTable;
   hr_manager_events: HrManagerEventsTable;
   hr_people: HrPeopleTable;
   hr_private_versions: HrPrivateVersionsTable;
+  hr_professional_check_events: HrProfessionalCheckEventsTable;
+  hr_professional_records: HrProfessionalRecordsTable;
+  hr_right_to_work_checks: HrRightToWorkChecksTable;
   hr_sickness_absences: HrSicknessAbsencesTable;
   hr_work_patterns: HrWorkPatternsTable;
   invitations: InvitationsTable;

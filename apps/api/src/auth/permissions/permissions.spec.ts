@@ -53,6 +53,8 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'hr.manage': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
   'hr.leave': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
   'hr.health': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.vetting': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
+  'hr.competence': { administrator: false, partner: false, fee_earner: false, accounts: false, compliance: false, hr: true },
 };
 
 describe('role permissions', () => {

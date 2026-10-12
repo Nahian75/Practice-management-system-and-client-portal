@@ -11,10 +11,14 @@ import { HrLeaveRepository } from './hr-leave.repository.js';
 import { HrLeaveService } from './hr-leave.service.js';
 import { HrRepository } from './hr.repository.js';
 import { HrService } from './hr.service.js';
+import { HrVettingController } from './hr-vetting.controller.js';
+import { HrVettingRepository } from './hr-vetting.repository.js';
+import { HrVettingService } from './hr-vetting.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
-  controllers: [HrController, HrLeaveController],
-  providers: [HrRepository, HrService, HrDataCipher, HrFileVault, HrLeaveRepository, HrLeaveService],
+  controllers: [HrController, HrLeaveController, HrVettingController],
+  providers: [HrRepository, HrService, HrDataCipher, HrFileVault, HrLeaveRepository, HrLeaveService,
+    HrVettingRepository, HrVettingService],
 })
 export class HrModule {}

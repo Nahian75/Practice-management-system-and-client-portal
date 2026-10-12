@@ -12,10 +12,11 @@ Compliance steps 15a to 15f add firm controls, versioned CDD, risk and clearance
 gate enforcement, sanctions screening/freezes/licences, and separately encrypted
 nominated-officer restricted reports and SAR/DAML records, plus retention,
 disposal, fixed regulatory exports and the staff-screen capability responses.
-People / HR steps 16a and 16b add the safe directory, self-service and
+People / HR steps 16a to 16c add the safe directory, self-service and
 current-manager projections, protected employment/work-pattern history, exact
 leave records, reason-free sickness, restricted health and separately shaped
-operational adjustments.
+operational adjustments, lifecycle checklists, versioned right-to-work evidence
+and professional-status records.
 
 ## Endpoints
 
@@ -57,6 +58,19 @@ operational adjustments.
 | GET | `/hr/people/:personId/adjustments` | `hr.health` and live HR role | Audited full private and operational adjustment history |
 | POST | `/hr/adjustments/:requestId/decision` | `hr.health` and live HR role | Append an accountable agreed/refused decision; agreed records require a separate operational instruction |
 | POST | `/hr/adjustments/decisions/:decisionId/progress` | Current manager or live HR in PostgreSQL | Append implementation/review; only HR may close |
+| GET | `/hr/me/lifecycle` | Active staff with linked personnel record | Own lifecycle checklists and item states |
+| GET | `/hr/reports/:personId/lifecycle` | Current effective manager in PostgreSQL | Direct report's lifecycle checklist and item states |
+| GET / POST | `/hr/people/:personId/lifecycle` | `hr.manage` and live HR role | Full lifecycle history or a joiner/mover/leaver checklist tied to an engagement |
+| POST | `/hr/lifecycle/items/:itemId/events` | `hr.manage` and live HR role | Append encrypted completion/reopening evidence for one item |
+| POST | `/hr/lifecycle/:checklistId/events` | `hr.manage` and live HR role | Complete/reopen a checklist; required items, current right-to-work and leaver blockers are enforced in PostgreSQL |
+| GET | `/hr/lifecycle/:checklistId/blockers` | `hr.manage` and live HR role | Safe ids/statuses for unresolved account, protected-role, client, matter, task or AML ownership; read-only to HR |
+| GET | `/hr/me/vetting` | Active staff with linked personnel record | Own safe current right-to-work status and professional records; no right-to-work evidence/detail history |
+| GET | `/hr/reports/:personId/vetting` | Current effective manager in PostgreSQL | Expiry/action and public professional status only; sensitive right-to-work and professional fields are null |
+| GET | `/hr/people/:personId/vetting` | `hr.vetting` and live HR role | Audited full right-to-work history plus qualifications and professional checks |
+| GET | `/hr/vetting/due` | `hr.vetting` and live HR role | Latest failed/follow-up-required or next-30-day right-to-work expiry/follow-up items |
+| POST | `/hr/people/:personId/right-to-work` | `hr.vetting` and live HR role | Append a serialized right-to-work version linked to the same person's encrypted identity file |
+| POST | `/hr/people/:personId/professional-records` | `hr.competence` and live HR role | Append an encrypted qualification, registration or practising-certificate record |
+| POST | `/hr/professional-records/:recordId/checks` | `hr.competence` and live HR role | Append a dated, encrypted-source professional-status check |
 | POST | `/compliance/restricted-reports` | `aml.internal_report`; every active staff role | JSON report or multipart report followed by one protected attachment -> neutral `{receiptId,received}` only |
 | GET | `/compliance/restricted-reports` | Current nominated officer + active Compliance, rechecked in PostgreSQL | 100 safe restricted-queue summaries; `before` continues the keyset page |
 | GET | `/compliance/restricted-reports/:reportId` | Current nominated officer + active Compliance | Decrypted report, attachments, decision, external report and DAML/DATF history; records a protected access event |

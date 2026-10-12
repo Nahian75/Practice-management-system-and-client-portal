@@ -1,8 +1,8 @@
 # Data Model
 
 **Current state (2026-10-12):** The database foundation through Compliance
-step 15f and People / HR step 16b exists, with separate owner and application
-roles and forward-only migrations through `0060`.
+step 15f and People / HR step 16c exists, with separate owner and application
+roles and forward-only migrations through `0061`.
 
 ## Database
 
@@ -103,6 +103,9 @@ Plain SQL files in `apps/api/migrations/`, named `NNNN_description.sql`.
 | `hr_leave_policies`, `hr_leave_requests`, `hr_leave_request_events`, `hr_leave_request_days`, `hr_leave_entitlement_entries` | `0060_hr_leave_health_adjustments.sql` | Versioned policy evidence including annual approval route, pinned by each request; encrypted requests/decisions; immutable approved local-date minute expansion; append-only signed entitlement ledger. Person/year advisory locks serialize balance and overlap checks; cancellation appends a return entry | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
 | `hr_holiday_pay_records`, `hr_sickness_absences`, `hr_health_records` | `0060_hr_leave_health_adjustments.sql` | Immutable payroll-supplied total pence, basis and named component pence that must arithmetically reconcile, with a six-year minimum retention date; reason-free sickness dates/notification/fitness; separately encrypted health evidence unavailable to managers | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
 | `hr_adjustment_requests`, `hr_adjustment_decisions`, `hr_adjustment_progress_events` | `0060_hr_leave_health_adjustments.sql` | Encrypted private request/decision history separated from the encrypted operational instruction managers need. Agreed/refused shape and permanent implementation/review/closure events are database-enforced | [hr.md](hr.md#step-16b-leave-sickness-administration-and-adjustments) |
+| `hr_lifecycle_checklists`, `hr_lifecycle_items`, `hr_lifecycle_item_events`, `hr_lifecycle_checklist_events` | `0061_hr_lifecycle_vetting.sql` | Engagement-bound joiner/mover/leaver workflows with structured departure category and encrypted append-only evidence. Completion requires all mandatory work, current right-to-work for joiners/movers, and no account/role/ownership blockers for leavers | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
+| `hr_right_to_work_checks` | `0061_hr_lifecycle_vetting.sql` | Advisory-lock serialized versions linked to the same person's encrypted identity file. Guidance/route/date/status/follow-up are permanent; identity-match, restriction and provider detail is authenticated ciphertext. Latest-check projections and due work are derived | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
+| `hr_professional_records`, `hr_professional_check_events` | `0061_hr_lifecycle_vetting.sql` | Immutable qualification/registration/certificate records with encrypted identifier/restriction and append-only status checks whose source/note is separately encrypted; backdating over later evidence is refused | [hr.md](hr.md#step-16c-joiners-movers-leavers-and-vetting) |
 | `audit_events` | `0001_audit_events.sql` | `SELECT`; `INSERT` on descriptive columns only | [audit.md](audit.md) |
 
 TypeScript types for each table live in `apps/api/src/database/schema.ts`.

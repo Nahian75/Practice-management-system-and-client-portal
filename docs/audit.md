@@ -2,7 +2,7 @@
 
 **Current state (2026-10-12):** The protected audit table and `AuditService`
 are used by authentication, staff, clients, matters, documents, portal access,
-Tasks, Notifications, Finance, Compliance and People / HR steps 16a and 16b.
+Tasks, Notifications, Finance, Compliance and People / HR steps 16a to 16c.
 
 ## Purpose
 
@@ -82,6 +82,16 @@ totals, fitness status, adjustment outcome/action and retention facts. Leave or
 decision reasons, entitlement notes, medical facts, adjustment grounds and
 instructions, included narrative, ciphertext and key material never enter the
 ordinary audit row.
+
+Step 16c adds `hr.lifecycle_created`, `hr.lifecycle_item_completed`,
+`hr.lifecycle_item_reopened`, `hr.lifecycle_completed`,
+`hr.lifecycle_reopened`, `hr.right_to_work_recorded`, `hr.vetting_viewed`,
+`hr.professional_recorded` and `hr.professional_check_recorded`. Changes and
+their audit entry share one transaction. Metadata contains only record/person/
+engagement ids, checklist kind/date/item count, version, professional kind or
+check status/date. Checklist notes, right-to-work outcomes and private detail,
+professional identifiers/restrictions/source/notes, ciphertext, filenames and
+encryption material never enter the ordinary audit row.
 
 Tasks records `task.created` with the task and matter ids, assignee id,
 priority, and whether a due date exists. Detail changes use `task.updated`

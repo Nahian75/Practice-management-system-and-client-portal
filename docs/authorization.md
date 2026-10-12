@@ -21,11 +21,13 @@ a Partner, for high-risk or PEP senior-management approval. Step 15d adds the
 Compliance-only `aml.sanctions`. Step 15e gives every staff role submission-only
 `aml.internal_report`; reading and deciding require both a live Compliance role
 and current nominated-officer appointment in PostgreSQL.
-People / HR steps 16a and 16b add a separate `hr` role. All staff roles receive only
+People / HR steps 16a to 16c add a separate `hr` role. All staff roles receive only
 the safe directory; self-service and manager routes use live record
 relationships, while personnel management, firm-wide leave administration and
 restricted health access require the respective permission plus a live HR role
-rechecked in PostgreSQL.
+rechecked in PostgreSQL. Lifecycle administration uses `hr.manage`; full
+right-to-work history/due work uses `hr.vetting`; professional writes use
+`hr.competence`.
 
 Three layers, each checked by the server on every request. A request must pass
 all that apply. Hiding something in the user interface is never a control.
@@ -132,6 +134,8 @@ active staff can use. Step 16a adds this separate matrix:
 | `hr.manage` - personnel and employment history | | | | | | ✓ |
 | `hr.leave` - firm-wide entitlement, absence and holiday-pay evidence | | | | | | ✓ |
 | `hr.health` - health facts, adjustment grounds and private decisions | | | | | | ✓ |
+| `hr.vetting` - right-to-work and professional-check evidence | | | | | | ✓ |
+| `hr.competence` - qualifications, development and reviews | | | | | | ✓ |
 
 Self-service does not grant `hr.manage`. The database binds `/hr/me` to the
 caller's account and `/hr/reports/:personId` to the current effective reporting
@@ -145,6 +149,13 @@ only ordinary annual leave, and record operational adjustment progress, but
 cannot self-approve, see holiday pay or entitlement notes, read health facts or
 see adjustment grounds/private decisions. HR can administer all categories.
 Every protected function rechecks the live relationship or HR role.
+
+Lifecycle and vetting routes use the same live subject/manager/HR record rule.
+The worker gets current safe status, while a current manager gets only expiry/
+action and public professional status. Full right-to-work versions and private
+professional fields require HR. Leaver blockers are a read-only projection:
+HR cannot disable the account, remove protected roles, transfer client/matter/
+task ownership or end AML appointments through the HR module.
 
 Restricted-report reads and decisions deliberately have no role permission that
 an administrator can grant. Each protected database function locks and rechecks
