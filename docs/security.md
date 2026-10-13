@@ -256,6 +256,7 @@ process before it accepts any request.
 | 2026-10-11 | Compliance / AML module | [reviews/2026-10-11-compliance.md](reviews/2026-10-11-compliance.md) |
 | 2026-10-13 | Client onboarding module | [reviews/2026-10-13-onboarding.md](reviews/2026-10-13-onboarding.md) |
 | 2026-10-14 | People / HR module | [reviews/2026-10-14-hr.md](reviews/2026-10-14-hr.md) |
+| 2026-10-14 | AI & Legal Drafting Assistant | [reviews/2026-10-14-ai.md](reviews/2026-10-14-ai.md) |
 
 Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), C6 (encrypted storage and backups).
