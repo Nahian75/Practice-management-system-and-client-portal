@@ -34,6 +34,7 @@ export default async function CompliancePage() {
       <li><Link href="/policies">Firm policies</Link></li>
       <li><Link href="/compliance/retention">Retention and disposal</Link></li>
       <li><Link href="/compliance/exports">Regulatory exports</Link></li>
+      <li><Link href="/compliance/ai">AI Governance & Audit</Link></li>
       {access.body.canRestricted && <li><Link href="/compliance/restricted-reports">Nominated-officer records</Link></li>}
     </ul></nav>
     <ComplianceOperations candidates={candidates.body.candidates} holds={holds.body.holds} clients={clients.body.clients} />

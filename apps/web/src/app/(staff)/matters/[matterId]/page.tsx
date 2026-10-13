@@ -10,10 +10,12 @@ import type { ComplianceGate } from '@/lib/compliance';
 import { formatCalendarDate, formatDate, formatDateTime } from '@/lib/format';
 import { MATTER_STATUS_LABELS, type ComplianceAccess, type ConflictCheck, type Matter } from '@/lib/matters';
 import type { Task } from '@/lib/tasks';
+import type { AiDraftSummary, MatterAiMetrics } from '@/lib/ai';
 import { ClearanceForm } from './clearance-form';
 import { DocumentsSection } from './documents-section';
 import { TasksSection } from './tasks-section';
 import { FinanceSection } from './finance-section';
+import { AiWorkbenchSection } from './ai-workbench-section';
 
 export const metadata: Metadata = { title: 'Matter' };
 
@@ -53,7 +55,7 @@ export default async function MatterPage({
     ? await apiGet<{ accesses: ComplianceAccess[] }>(`/matters/${encodeURIComponent(matter.id)}/compliance-accesses`)
     : undefined;
   const closed = matter.status === 'closed';
-  const [documents, tasks, amlGate] = await Promise.all([
+  const [documents, tasks, amlGate, aiDrafts, aiMetrics] = await Promise.all([
     apiGet<{ documents: DocumentSummary[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/documents`, {
       before: typeof documentsBefore === 'string' ? documentsBefore : undefined,
     }),
@@ -61,6 +63,8 @@ export default async function MatterPage({
       before: typeof tasksBefore === 'string' ? tasksBefore : undefined,
     }),
     apiGet<ComplianceGate>(`/matters/${encodeURIComponent(matter.id)}/aml-gate`),
+    apiGet<{ drafts: AiDraftSummary[] }>(`/matters/${encodeURIComponent(matter.id)}/ai/drafts`),
+    apiGet<MatterAiMetrics>(`/matters/${encodeURIComponent(matter.id)}/ai/metrics`),
   ]);
 
   return (
@@ -103,6 +107,14 @@ export default async function MatterPage({
       </section>}
 
       <TasksSection matter={matter} tasks={tasks.body?.tasks} next={tasks.body?.next ?? null} />
+
+      <AiWorkbenchSection
+        matterId={matter.id}
+        documents={documents.body?.documents}
+        initialDrafts={aiDrafts.body?.drafts}
+        metrics={aiMetrics.body}
+        canUseAi={!closed && aiDrafts.status !== 403}
+      />
 
       <DocumentsSection
         matterId={matter.id}

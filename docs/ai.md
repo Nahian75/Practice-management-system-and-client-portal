@@ -269,9 +269,8 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
   Correspondence drafting assistant, attendance note structuring (`AttendanceNotesService`), review state machine (`draft` -> `accepted` | `modified` | `rejected`), and one-click promotion to official Matter Documents (`app.documents`) and Matter Tasks (`app.tasks`).
 - **18e. Budgeting, rate limits and supervisory audit controls — built.**
   Pre-flight token estimation, per-matter and monthly firm token budgets with automatic hard stops, supervisory compliance audit metrics (`GET /api/ai/metrics`), and matter metrics (`GET /api/matters/:matterId/ai/metrics`).
-- **18f. Staff web app AI workbench and review interfaces:**
-  Matter AI side-panel, side-by-side diff viewer for human edits, one-click
-  document/task promotion, mobile 390px responsiveness, and WCAG AA axe compliance.
+- **18f. Staff web app AI workbench and review interfaces — built.**
+  Matter AI assistant & interactive review workbench, side-by-side diff viewer for human edits, grounded citation inspector, supervisory governance dashboard (/compliance/ai) with model configuration & emergency kill-switch, one-click document/task promotion, and responsive UX.
 - **Security review (Step 18):**
   Prompt-injection red-teaming, cross-matter ethical wall penetration testing,
   token exhaustion testing, privilege escalation verification, and audit review.
