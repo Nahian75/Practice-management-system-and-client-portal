@@ -265,10 +265,8 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
   matter document ownership verification, automated UK financial/PII masking, and prompt injection detection.
 - **18c. Document summarisation and chronology extraction — built.**
   Text extraction and chunking pipeline (`DocumentChunkerService`), citation grounding & hallucination defense (`CitationGroundingService`, SRA Code 1.4/2.1), and structured chronology extraction (`ChronologyExtractorService`) with semantic endpoints.
-- **18d. Human-in-the-loop drafting and attendance note processing:**
-  Correspondence drafting assistant, attendance note structuring, and review
-  state machine (`draft` -> `accepted` | `modified` | `rejected`) with promotion
-  to official Matter Documents or Tasks upon fee earner approval.
+- **18d. Human-in-the-loop drafting and attendance note processing — built.**
+  Correspondence drafting assistant, attendance note structuring (`AttendanceNotesService`), review state machine (`draft` -> `accepted` | `modified` | `rejected`), and one-click promotion to official Matter Documents (`app.documents`) and Matter Tasks (`app.tasks`).
 - **18e. Budgeting, rate limits and supervisory audit controls:**
   Per-matter and monthly firm token budgets with automatic hard stops, audit log
   reporting for Compliance, and hallucination warning flags.

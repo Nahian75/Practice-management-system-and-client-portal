@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql, type Kysely } from 'kysely';
 import { DATABASE } from '../database/database.module.js';
-import type { Database } from '../database/schema.js';
+import type { Database, DocumentCategory, TaskPriority } from '../database/schema.js';
 import type {
   AiFeature,
   AiDraftType,
@@ -190,6 +190,50 @@ export class AiRepository {
     }
 
     return first.record_ai_review;
+  }
+
+  async createPromotedDocument(
+    matterId: string,
+    actorId: string,
+    title: string,
+    category: DocumentCategory = 'correspondence',
+  ): Promise<string> {
+    const result = await this.db
+      .insertInto('documents')
+      .values({
+        matter_id: matterId,
+        title,
+        category,
+        created_by: actorId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return result.id;
+  }
+
+  async createPromotedTask(
+    matterId: string,
+    actorId: string,
+    title: string,
+    description: string | null = null,
+    dueOn: string | null = null,
+    priority: TaskPriority = 'normal',
+    assignedTo?: string | null,
+  ): Promise<string> {
+    const result = await this.db
+      .insertInto('tasks')
+      .values({
+        matter_id: matterId,
+        title,
+        description,
+        due_on: dueOn,
+        priority,
+        assigned_to: assignedTo ?? actorId,
+        created_by: actorId,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return result.id;
   }
 
   async assertMatterAccess(actorId: string, matterId: string): Promise<void> {

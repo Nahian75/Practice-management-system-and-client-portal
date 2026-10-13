@@ -80,6 +80,21 @@ const semanticFeatureInputSchema = z.strictObject({
     .optional(),
 });
 
+const attendanceNoteInputSchema = z.strictObject({
+  title: text(200),
+  rawNotes: z.string().min(1).max(50000),
+  feeEarnerName: text(100).optional(),
+  contextDocuments: z
+    .array(
+      z.strictObject({
+        id: z.uuid(),
+        title: text(200),
+        content: z.string().max(50000),
+      }),
+    )
+    .optional(),
+});
+
 const generateResponseSchema = z.object({
   requestId: z.uuid(),
   draftId: z.uuid(),
@@ -135,10 +150,29 @@ const reviewInputSchema = z.strictObject({
   feedbackReason: text(1000).nullable().optional(),
   promotedToDocumentId: z.uuid().nullable().optional(),
   promotedToTaskId: z.uuid().nullable().optional(),
+  promoteToDocument: z
+    .strictObject({
+      title: text(200),
+      category: z.enum(['correspondence', 'contract', 'evidence', 'identity', 'court', 'other']).optional(),
+    })
+    .nullable()
+    .optional(),
+  promoteToTask: z
+    .strictObject({
+      title: text(200),
+      description: text(2000).nullable().optional(),
+      dueOn: z.string().nullable().optional(),
+      priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+      assigneeId: z.uuid().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 const reviewResponseSchema = z.object({
   reviewId: z.uuid(),
+  promotedDocumentId: z.uuid().nullable().optional(),
+  promotedTaskId: z.uuid().nullable().optional(),
 });
 
 const auditEventSchema = z.object({
@@ -212,6 +246,28 @@ export class AiController {
     @CurrentSession() session: ResolvedSession,
   ) {
     return this.aiService.extractChronology(session.account.id, matterId, body);
+  }
+
+  @Post('matters/:matterId/ai/draft-correspondence')
+  @RequirePermission('ai.use')
+  @ResponseSchema(generateResponseSchema)
+  async draftCorrespondence(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: semanticFeatureInputSchema }) body: z.infer<typeof semanticFeatureInputSchema>,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    return this.aiService.draftCorrespondence(session.account.id, matterId, body);
+  }
+
+  @Post('matters/:matterId/ai/structure-attendance-note')
+  @RequirePermission('ai.use')
+  @ResponseSchema(generateResponseSchema)
+  async structureAttendanceNote(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: attendanceNoteInputSchema }) body: z.infer<typeof attendanceNoteInputSchema>,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    return this.aiService.structureAttendanceNote(session.account.id, matterId, body);
   }
 
   @Get('matters/:matterId/ai/drafts')

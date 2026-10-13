@@ -7,11 +7,12 @@ import { PromptBuilderService } from './prompt-builder.service.js';
 import { CitationGroundingService } from './citation-grounding.service.js';
 import { DocumentChunkerService } from './document-chunker.service.js';
 import { ChronologyExtractorService } from './chronology-extractor.service.js';
+import { AttendanceNotesService } from './attendance-notes.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AiRepository } from './ai.repository.js';
 import type { ResolvedSession } from '../auth/sessions/authenticated-session.js';
 
-describe('AI Module (Step 18a, 18b, 18c)', () => {
+describe('AI Module (Step 18a, 18b, 18c, 18d)', () => {
   let mockProvider: OfflineMockAiProvider;
   let mockRepo: Partial<AiRepository>;
   let mockAudit: Partial<AuditService>;
@@ -20,6 +21,7 @@ describe('AI Module (Step 18a, 18b, 18c)', () => {
   let citationGroundingService: CitationGroundingService;
   let documentChunkerService: DocumentChunkerService;
   let chronologyExtractorService: ChronologyExtractorService;
+  let attendanceNotesService: AttendanceNotesService;
   let aiService: AiService;
   let aiController: AiController;
 
@@ -44,6 +46,7 @@ describe('AI Module (Step 18a, 18b, 18c)', () => {
     citationGroundingService = new CitationGroundingService();
     documentChunkerService = new DocumentChunkerService();
     chronologyExtractorService = new ChronologyExtractorService();
+    attendanceNotesService = new AttendanceNotesService();
     mockAudit = {
       record: vi.fn().mockResolvedValue(undefined),
     };
@@ -68,6 +71,8 @@ describe('AI Module (Step 18a, 18b, 18c)', () => {
         draftId: sampleDraftId,
       }),
       recordReview: vi.fn().mockResolvedValue('66666666-6666-6666-6666-666666666666'),
+      createPromotedDocument: vi.fn().mockResolvedValue('doc-promoted-uuid'),
+      createPromotedTask: vi.fn().mockResolvedValue('task-promoted-uuid'),
       listMatterDrafts: vi.fn().mockResolvedValue([
         {
           id: sampleDraftId,
@@ -136,6 +141,7 @@ describe('AI Module (Step 18a, 18b, 18c)', () => {
       citationGroundingService,
       documentChunkerService,
       chronologyExtractorService,
+      attendanceNotesService,
       mockAudit as AuditService,
     );
     aiController = new AiController(aiService);
@@ -465,6 +471,116 @@ describe('AI Module (Step 18a, 18b, 18c)', () => {
           outcome: 'denied',
         }),
       );
+    });
+
+    it('drafts correspondence via semantic endpoint', async () => {
+      const result = await aiController.draftCorrespondence(
+        sampleMatterId,
+        {
+          title: 'Settlement Offer Update',
+          instruction: 'Please write to the client explaining the counterparty offer.',
+          contextDocuments: [],
+        },
+        mockSession,
+      );
+
+      expect(result.generatedText).toContain('Dear Client');
+      expect(result.generatedText).toContain('Yours sincerely');
+    });
+
+    it('structures raw attendance notes via semantic endpoint', async () => {
+      const result = await aiController.structureAttendanceNote(
+        sampleMatterId,
+        {
+          title: 'Initial Client Call',
+          rawNotes: 'Spoke on phone for 20 mins. Client instructed to settle. Action: send letter.',
+          feeEarnerName: 'Partner User',
+          contextDocuments: [],
+        },
+        mockSession,
+      );
+
+      expect(result.generatedText).toBeDefined();
+      expect(mockRepo.recordGeneration).toHaveBeenCalled();
+    });
+
+    it('promotes approved draft to matter document during review', async () => {
+      const result = await aiController.review(
+        sampleMatterId,
+        sampleDraftId,
+        {
+          decision: 'accepted',
+          finalText: 'Final approved text.',
+          promoteToDocument: {
+            title: 'Official Client Update Letter.pdf',
+            category: 'correspondence',
+          },
+        },
+        mockSession,
+      );
+
+      expect(mockRepo.createPromotedDocument).toHaveBeenCalledWith(
+        sampleMatterId,
+        mockSession.account.id,
+        'Official Client Update Letter.pdf',
+        'correspondence',
+      );
+      expect(result.promotedDocumentId).toBe('doc-promoted-uuid');
+      expect(mockRepo.recordReview).toHaveBeenCalledWith(
+        mockSession.account.id,
+        sampleDraftId,
+        'accepted',
+        'Final approved text.',
+        null,
+        'doc-promoted-uuid',
+        null,
+      );
+    });
+
+    it('promotes approved draft action item to matter task during review', async () => {
+      const result = await aiController.review(
+        sampleMatterId,
+        sampleDraftId,
+        {
+          decision: 'modified',
+          finalText: 'Modified approved text.',
+          promoteToTask: {
+            title: 'File defense at County Court',
+            dueOn: '2026-11-01',
+            priority: 'urgent',
+          },
+        },
+        mockSession,
+      );
+
+      expect(mockRepo.createPromotedTask).toHaveBeenCalledWith(
+        sampleMatterId,
+        mockSession.account.id,
+        'File defense at County Court',
+        null,
+        '2026-11-01',
+        'urgent',
+        mockSession.account.id,
+      );
+      expect(result.promotedTaskId).toBe('task-promoted-uuid');
+    });
+
+    it('does not promote document or task when draft is rejected', async () => {
+      const result = await aiController.review(
+        sampleMatterId,
+        sampleDraftId,
+        {
+          decision: 'rejected',
+          feedbackReason: 'Inaccurate case facts.',
+          promoteToDocument: {
+            title: 'Should Not Be Created',
+          },
+        },
+        mockSession,
+      );
+
+      expect(mockRepo.createPromotedDocument).not.toHaveBeenCalled();
+      expect(result.promotedDocumentId).toBeNull();
     });
   });
 });

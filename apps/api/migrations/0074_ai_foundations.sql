@@ -75,7 +75,7 @@ CREATE TABLE app.ai_reviews (
     CONSTRAINT ai_review_decision_valid CHECK (decision IN ('accepted', 'modified', 'rejected')),
   final_text text,
   feedback_reason text,
-  promoted_to_document_id uuid REFERENCES app.matter_documents (id),
+  promoted_to_document_id uuid REFERENCES app.documents (id),
   promoted_to_task_id uuid REFERENCES app.tasks (id),
   reviewed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );

@@ -8,6 +8,7 @@ import { PromptBuilderService } from './prompt-builder.service.js';
 import { CitationGroundingService } from './citation-grounding.service.js';
 import { DocumentChunkerService } from './document-chunker.service.js';
 import { ChronologyExtractorService } from './chronology-extractor.service.js';
+import { AttendanceNotesService } from './attendance-notes.service.js';
 import { AiRepository } from './ai.repository.js';
 import { AiService } from './ai.service.js';
 import { AiController } from './ai.controller.js';
@@ -23,6 +24,7 @@ import { AiController } from './ai.controller.js';
     CitationGroundingService,
     DocumentChunkerService,
     ChronologyExtractorService,
+    AttendanceNotesService,
     OfflineMockAiProvider,
     {
       provide: AI_PROVIDER_TOKEN,
@@ -37,6 +39,7 @@ import { AiController } from './ai.controller.js';
     CitationGroundingService,
     DocumentChunkerService,
     ChronologyExtractorService,
+    AttendanceNotesService,
   ],
 })
 export class AiModule {}

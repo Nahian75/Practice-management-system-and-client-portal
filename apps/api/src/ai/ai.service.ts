@@ -14,6 +14,8 @@ import { PromptBuilderService } from './prompt-builder.service.js';
 import { CitationGroundingService } from './citation-grounding.service.js';
 import { DocumentChunkerService } from './document-chunker.service.js';
 import { ChronologyExtractorService } from './chronology-extractor.service.js';
+import { AttendanceNotesService } from './attendance-notes.service.js';
+import type { DocumentCategory, TaskPriority } from '../database/schema.js';
 import type {
   AiDraftType,
   AiFeature,
@@ -38,6 +40,17 @@ export interface ReviewDraftInput {
   feedbackReason?: string | null;
   promotedToDocumentId?: string | null;
   promotedToTaskId?: string | null;
+  promoteToDocument?: {
+    title: string;
+    category?: DocumentCategory;
+  } | null;
+  promoteToTask?: {
+    title: string;
+    description?: string | null;
+    dueOn?: string | null;
+    priority?: TaskPriority;
+    assigneeId?: string | null;
+  } | null;
 }
 
 @Injectable()
@@ -50,6 +63,7 @@ export class AiService {
     private readonly citationGrounding: CitationGroundingService,
     private readonly documentChunker: DocumentChunkerService,
     private readonly chronologyExtractor: ChronologyExtractorService,
+    private readonly attendanceNotes: AttendanceNotesService,
     private readonly audit: AuditService,
   ) {}
 
@@ -285,13 +299,83 @@ export class AiService {
     return this.chronologyExtractor.formatToMarkdown(entries, matterTitle);
   }
 
+  async draftCorrespondence(
+    actorId: string,
+    matterId: string,
+    input: {
+      title: string;
+      instruction: string;
+      contextDocuments?: Array<{ id: string; title: string; content: string }>;
+    },
+  ) {
+    return this.generateDraft(actorId, matterId, {
+      feature: 'draft_correspondence',
+      draftType: 'correspondence_draft',
+      title: input.title,
+      instruction: input.instruction,
+      contextDocuments: input.contextDocuments,
+    });
+  }
+
+  async structureAttendanceNote(
+    actorId: string,
+    matterId: string,
+    input: {
+      title: string;
+      rawNotes: string;
+      feeEarnerName?: string;
+      contextDocuments?: Array<{ id: string; title: string; content: string }>;
+    },
+  ) {
+    const structured = this.attendanceNotes.structureRawNotes(input.rawNotes, {
+      matterTitle: input.title,
+      feeEarnerName: input.feeEarnerName,
+    });
+    const markdown = this.attendanceNotes.formatToMarkdown(structured);
+
+    return this.generateDraft(actorId, matterId, {
+      feature: 'draft_correspondence',
+      draftType: 'correspondence_draft',
+      title: `Attendance Note: ${input.title}`,
+      instruction: `Structure, refine and professionalize the following raw attendance note:\n\n${markdown}`,
+      contextDocuments: input.contextDocuments,
+    });
+  }
+
   async reviewDraft(
     actorId: string,
     matterId: string,
     draftId: string,
     input: ReviewDraftInput,
-  ): Promise<{ reviewId: string }> {
+  ): Promise<{
+    reviewId: string;
+    promotedDocumentId?: string | null;
+    promotedTaskId?: string | null;
+  }> {
     await this.repository.assertMatterAccess(actorId, matterId);
+
+    let docId = input.promotedToDocumentId ?? null;
+    if (!docId && input.promoteToDocument && input.decision !== 'rejected') {
+      docId = await this.repository.createPromotedDocument(
+        matterId,
+        actorId,
+        input.promoteToDocument.title,
+        input.promoteToDocument.category ?? 'correspondence',
+      );
+    }
+
+    let taskId = input.promotedToTaskId ?? null;
+    if (!taskId && input.promoteToTask && input.decision !== 'rejected') {
+      taskId = await this.repository.createPromotedTask(
+        matterId,
+        actorId,
+        input.promoteToTask.title,
+        input.promoteToTask.description ?? null,
+        input.promoteToTask.dueOn ?? null,
+        input.promoteToTask.priority ?? 'normal',
+        input.promoteToTask.assigneeId ?? actorId,
+      );
+    }
 
     const reviewId = await this.repository.recordReview(
       actorId,
@@ -299,8 +383,8 @@ export class AiService {
       input.decision,
       input.finalText,
       input.feedbackReason,
-      input.promotedToDocumentId,
-      input.promotedToTaskId,
+      docId,
+      taskId,
     );
 
     await this.audit.record({
@@ -312,12 +396,16 @@ export class AiService {
         draftId,
         reviewId,
         decision: input.decision,
-        promotedToDocumentId: input.promotedToDocumentId ?? null,
-        promotedToTaskId: input.promotedToTaskId ?? null,
+        promotedToDocumentId: docId,
+        promotedToTaskId: taskId,
       },
     });
 
-    return { reviewId };
+    return {
+      reviewId,
+      promotedDocumentId: docId,
+      promotedTaskId: taskId,
+    };
   }
 
   async listMatterDrafts(actorId: string, matterId: string): Promise<AiDraftSummary[]> {
