@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { AI_PROVIDER_TOKEN, type AiProvider } from './ai-provider.interface.js';
 import {
@@ -21,6 +21,8 @@ import type {
   AiFeature,
   AiPromptRequest,
   AiReviewDecision,
+  AiSupervisoryMetrics,
+  MatterAiMetrics,
   ChronologyEntry,
   DocumentChunk,
   StructuredCitation,
@@ -132,6 +134,34 @@ export class AiService {
     const validOwnership = await this.repository.validateMatterDocumentOwnership(matterId, docIds);
     if (!validOwnership) {
       throw new ForbiddenException('One or more referenced documents do not belong to this matter');
+    }
+
+    // 2b. Pre-flight budgeting and rate limit checks (Step 18e)
+    const config = await this.readConfiguration();
+    if (!config.enabled) {
+      throw new ForbiddenException('AI drafting assistant is disabled by firm policy');
+    }
+
+    const totalChars = input.instruction.length + contextDocuments.reduce((sum, d) => sum + d.content.length, 0);
+    const estimatedTokens = Math.ceil(totalChars / 4);
+
+    if (estimatedTokens > config.maxTokensPerRequest) {
+      throw new BadRequestException(
+        `Estimated request tokens (${estimatedTokens}) exceed configured limit (${config.maxTokensPerRequest})`,
+      );
+    }
+
+    if (config.tokensUsedThisMonth + estimatedTokens > config.monthlyTokenBudget) {
+      throw new ForbiddenException(
+        `Monthly firm AI token budget exhausted (${config.tokensUsedThisMonth} of ${config.monthlyTokenBudget} tokens used)`,
+      );
+    }
+
+    const matterTokensUsed = await this.repository.getMatterTokenUsageThisMonth(matterId);
+    if (matterTokensUsed + estimatedTokens > 150000) {
+      throw new ForbiddenException(
+        `Monthly AI token allowance for this matter is exhausted (${matterTokensUsed} tokens used)`,
+      );
     }
 
     // 3. Pre-prompt redaction pipeline (data minimisation)
@@ -426,5 +456,14 @@ export class AiService {
 
   async listAuditEvents(limit = 100): Promise<AiAuditRow[]> {
     return this.repository.listAuditEvents(limit);
+  }
+
+  async getSupervisoryMetrics(): Promise<AiSupervisoryMetrics> {
+    return this.repository.getAiMetrics();
+  }
+
+  async getMatterMetrics(actorId: string, matterId: string): Promise<MatterAiMetrics> {
+    await this.repository.assertMatterAccess(actorId, matterId);
+    return this.repository.getMatterMetrics(matterId);
   }
 }

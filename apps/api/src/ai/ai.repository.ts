@@ -6,6 +6,8 @@ import type {
   AiFeature,
   AiDraftType,
   AiReviewDecision,
+  AiSupervisoryMetrics,
+  MatterAiMetrics,
   StructuredCitation,
 } from './ai.types.js';
 
@@ -400,5 +402,140 @@ export class AiRepository {
       status: r.status,
       createdAt: r.created_at.toISOString(),
     }));
+  }
+
+  async getMatterTokenUsageThisMonth(matterId: string): Promise<number> {
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const row = await this.db
+      .selectFrom('ai_requests')
+      .select(sql<string>`COALESCE(SUM(prompt_tokens + completion_tokens), 0)`.as('total'))
+      .where('matter_id', '=', matterId)
+      .where('created_at', '>=', startOfMonth)
+      .executeTakeFirst();
+
+    return Number(row?.total ?? 0);
+  }
+
+  async getAiMetrics(): Promise<AiSupervisoryMetrics> {
+    const cfg = await this.readConfiguration();
+
+    const totalRequestsRow = await this.db
+      .selectFrom('ai_requests')
+      .select(sql<string>`COUNT(*)`.as('total'))
+      .executeTakeFirst();
+
+    const featuresRows = await this.db
+      .selectFrom('ai_requests')
+      .select(['feature', sql<string>`COUNT(*)`.as('cnt')])
+      .groupBy('feature')
+      .execute();
+
+    const requestsByFeature: Record<string, number> = {};
+    for (const f of featuresRows) {
+      requestsByFeature[f.feature] = Number(f.cnt);
+    }
+
+    const reviewsRows = await this.db
+      .selectFrom('ai_reviews')
+      .select(['decision', sql<string>`COUNT(*)`.as('cnt')])
+      .groupBy('decision')
+      .execute();
+
+    const reviewDecisions = {
+      accepted: 0,
+      modified: 0,
+      rejected: 0,
+      pending: 0,
+    };
+    for (const r of reviewsRows) {
+      if (r.decision === 'accepted') reviewDecisions.accepted = Number(r.cnt);
+      else if (r.decision === 'modified') reviewDecisions.modified = Number(r.cnt);
+      else if (r.decision === 'rejected') reviewDecisions.rejected = Number(r.cnt);
+    }
+
+    const pendingDraftsRow = await this.db
+      .selectFrom('ai_drafts as d')
+      .leftJoin('ai_reviews as r', 'r.draft_id', 'd.id')
+      .where('r.id', 'is', null)
+      .select(sql<string>`COUNT(*)`.as('cnt'))
+      .executeTakeFirst();
+    reviewDecisions.pending = Number(pendingDraftsRow?.cnt ?? 0);
+
+    const topMatters = await this.db
+      .selectFrom('ai_requests as req')
+      .innerJoin('matters as m', 'm.id', 'req.matter_id')
+      .select([
+        'req.matter_id',
+        'm.title as matter_title',
+        sql<string>`SUM(req.prompt_tokens + req.completion_tokens)`.as('total_tokens'),
+        sql<string>`COUNT(*)`.as('req_count'),
+      ])
+      .groupBy(['req.matter_id', 'm.title'])
+      .orderBy(sql`total_tokens`, 'desc')
+      .limit(5)
+      .execute();
+
+    const topMattersUsage = topMatters.map((tm) => ({
+      matterId: tm.matter_id,
+      matterTitle: tm.matter_title,
+      totalTokens: Number(tm.total_tokens || 0),
+      requestCount: Number(tm.req_count || 0),
+    }));
+
+    return {
+      monthlyBudget: {
+        monthlyTokenBudget: cfg?.monthlyTokenBudget ?? 500000,
+        tokensUsedThisMonth: cfg?.tokensUsedThisMonth ?? 0,
+        budgetResetOn: cfg?.budgetResetOn ?? new Date().toISOString().slice(0, 10),
+        percentUsed: cfg?.monthlyTokenBudget
+          ? Math.round((cfg.tokensUsedThisMonth / cfg.monthlyTokenBudget) * 100)
+          : 0,
+      },
+      totalRequestsCount: Number(totalRequestsRow?.total ?? 0),
+      requestsByFeature,
+      reviewDecisions,
+      securityAndCompliance: {
+        injectionsDetectedCount: 0,
+        unverifiedCitationsCount: 0,
+      },
+      topMattersUsage,
+    };
+  }
+
+  async getMatterMetrics(matterId: string, matterAllowance = 100000): Promise<MatterAiMetrics> {
+    const tokensUsedThisMonth = await this.getMatterTokenUsageThisMonth(matterId);
+
+    const requestsRow = await this.db
+      .selectFrom('ai_requests')
+      .where('matter_id', '=', matterId)
+      .select(sql<string>`COUNT(*)`.as('cnt'))
+      .executeTakeFirst();
+
+    const draftsRow = await this.db
+      .selectFrom('ai_drafts')
+      .where('matter_id', '=', matterId)
+      .select(sql<string>`COUNT(*)`.as('cnt'))
+      .executeTakeFirst();
+
+    const pendingRow = await this.db
+      .selectFrom('ai_drafts as d')
+      .leftJoin('ai_reviews as r', 'r.draft_id', 'd.id')
+      .where('d.matter_id', '=', matterId)
+      .where('r.id', 'is', null)
+      .select(sql<string>`COUNT(*)`.as('cnt'))
+      .executeTakeFirst();
+
+    return {
+      matterId,
+      tokensUsedThisMonth,
+      matterTokenAllowance: matterAllowance,
+      percentUsed: Math.min(100, Math.round((tokensUsedThisMonth / matterAllowance) * 100)),
+      totalRequests: Number(requestsRow?.cnt ?? 0),
+      totalDrafts: Number(draftsRow?.cnt ?? 0),
+      pendingReviews: Number(pendingRow?.cnt ?? 0),
+    };
   }
 }

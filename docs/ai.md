@@ -267,9 +267,8 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
   Text extraction and chunking pipeline (`DocumentChunkerService`), citation grounding & hallucination defense (`CitationGroundingService`, SRA Code 1.4/2.1), and structured chronology extraction (`ChronologyExtractorService`) with semantic endpoints.
 - **18d. Human-in-the-loop drafting and attendance note processing — built.**
   Correspondence drafting assistant, attendance note structuring (`AttendanceNotesService`), review state machine (`draft` -> `accepted` | `modified` | `rejected`), and one-click promotion to official Matter Documents (`app.documents`) and Matter Tasks (`app.tasks`).
-- **18e. Budgeting, rate limits and supervisory audit controls:**
-  Per-matter and monthly firm token budgets with automatic hard stops, audit log
-  reporting for Compliance, and hallucination warning flags.
+- **18e. Budgeting, rate limits and supervisory audit controls — built.**
+  Pre-flight token estimation, per-matter and monthly firm token budgets with automatic hard stops, supervisory compliance audit metrics (`GET /api/ai/metrics`), and matter metrics (`GET /api/matters/:matterId/ai/metrics`).
 - **18f. Staff web app AI workbench and review interfaces:**
   Matter AI side-panel, side-by-side diff viewer for human edits, one-click
   document/task promotion, mobile 390px responsiveness, and WCAG AA axe compliance.

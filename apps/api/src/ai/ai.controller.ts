@@ -194,6 +194,45 @@ const auditListResponseSchema = z.object({
   events: z.array(auditEventSchema),
 });
 
+const supervisoryMetricsResponseSchema = z.object({
+  monthlyBudget: z.object({
+    monthlyTokenBudget: z.number(),
+    tokensUsedThisMonth: z.number(),
+    budgetResetOn: z.string(),
+    percentUsed: z.number(),
+  }),
+  totalRequestsCount: z.number(),
+  requestsByFeature: z.record(z.string(), z.number()),
+  reviewDecisions: z.object({
+    accepted: z.number(),
+    modified: z.number(),
+    rejected: z.number(),
+    pending: z.number(),
+  }),
+  securityAndCompliance: z.object({
+    injectionsDetectedCount: z.number(),
+    unverifiedCitationsCount: z.number(),
+  }),
+  topMattersUsage: z.array(
+    z.object({
+      matterId: z.uuid(),
+      matterTitle: z.string(),
+      totalTokens: z.number(),
+      requestCount: z.number(),
+    }),
+  ),
+});
+
+const matterMetricsResponseSchema = z.object({
+  matterId: z.uuid(),
+  tokensUsedThisMonth: z.number(),
+  matterTokenAllowance: z.number(),
+  percentUsed: z.number(),
+  totalRequests: z.number(),
+  totalDrafts: z.number(),
+  pendingReviews: z.number(),
+});
+
 @Controller()
 export class AiController {
   constructor(private readonly aiService: AiService) {}
@@ -312,5 +351,22 @@ export class AiController {
     const limit = limitStr ? Math.min(Number(limitStr) || 100, 500) : 100;
     const events = await this.aiService.listAuditEvents(limit);
     return { events };
+  }
+
+  @Get('ai/metrics')
+  @RequirePermission('ai.audit')
+  @ResponseSchema(supervisoryMetricsResponseSchema)
+  async getSupervisoryMetrics() {
+    return this.aiService.getSupervisoryMetrics();
+  }
+
+  @Get('matters/:matterId/ai/metrics')
+  @RequirePermission('ai.use')
+  @ResponseSchema(matterMetricsResponseSchema)
+  async getMatterMetrics(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    return this.aiService.getMatterMetrics(session.account.id, matterId);
   }
 }

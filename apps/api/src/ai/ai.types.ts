@@ -83,3 +83,40 @@ export interface GroundingVerificationResult {
   hallucinationWarning?: string | null;
 }
 
+export interface AiSupervisoryMetrics {
+  monthlyBudget: {
+    monthlyTokenBudget: number;
+    tokensUsedThisMonth: number;
+    budgetResetOn: string;
+    percentUsed: number;
+  };
+  totalRequestsCount: number;
+  requestsByFeature: Record<string, number>;
+  reviewDecisions: {
+    accepted: number;
+    modified: number;
+    rejected: number;
+    pending: number;
+  };
+  securityAndCompliance: {
+    injectionsDetectedCount: number;
+    unverifiedCitationsCount: number;
+  };
+  topMattersUsage: Array<{
+    matterId: string;
+    matterTitle: string;
+    totalTokens: number;
+    requestCount: number;
+  }>;
+}
+
+export interface MatterAiMetrics {
+  matterId: string;
+  tokensUsedThisMonth: number;
+  matterTokenAllowance: number;
+  percentUsed: number;
+  totalRequests: number;
+  totalDrafts: number;
+  pendingReviews: number;
+}
+

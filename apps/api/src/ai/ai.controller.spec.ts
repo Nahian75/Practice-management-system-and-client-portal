@@ -131,6 +131,36 @@ describe('AI Module (Step 18a, 18b, 18c, 18d)', () => {
           createdAt: '2026-10-14T01:00:00.000Z',
         },
       ]),
+      getMatterTokenUsageThisMonth: vi.fn().mockResolvedValue(1250),
+      getAiMetrics: vi.fn().mockResolvedValue({
+        monthlyBudget: {
+          monthlyTokenBudget: 500000,
+          tokensUsedThisMonth: 1250,
+          budgetResetOn: '2026-11-01',
+          percentUsed: 0,
+        },
+        totalRequestsCount: 1,
+        requestsByFeature: { summarise_document: 1 },
+        reviewDecisions: { accepted: 1, modified: 0, rejected: 0, pending: 0 },
+        securityAndCompliance: { injectionsDetectedCount: 0, unverifiedCitationsCount: 0 },
+        topMattersUsage: [
+          {
+            matterId: sampleMatterId,
+            matterTitle: 'Matter Alpha',
+            totalTokens: 205,
+            requestCount: 1,
+          },
+        ],
+      }),
+      getMatterMetrics: vi.fn().mockResolvedValue({
+        matterId: sampleMatterId,
+        tokensUsedThisMonth: 1250,
+        matterTokenAllowance: 100000,
+        percentUsed: 1,
+        totalRequests: 1,
+        totalDrafts: 1,
+        pendingReviews: 0,
+      }),
     };
 
     aiService = new AiService(
@@ -581,6 +611,107 @@ describe('AI Module (Step 18a, 18b, 18c, 18d)', () => {
 
       expect(mockRepo.createPromotedDocument).not.toHaveBeenCalled();
       expect(result.promotedDocumentId).toBeNull();
+    });
+
+    it('rejects generation when AI assistant is disabled by firm policy', async () => {
+      mockRepo.readConfiguration = vi.fn().mockResolvedValue({
+        id: '00000000-0000-0000-0000-000000000001',
+        provider: 'offline_mock',
+        modelName: 'mock-legal-assistant',
+        endpointUrl: null,
+        maxTokensPerRequest: 4096,
+        monthlyTokenBudget: 500000,
+        tokensUsedThisMonth: 1250,
+        budgetResetOn: '2026-11-01',
+        enabled: false,
+        updatedAt: '2026-10-14T00:00:00.000Z',
+      });
+
+      await expect(
+        aiController.generate(
+          sampleMatterId,
+          {
+            feature: 'summarise_document',
+            draftType: 'document_summary',
+            title: 'Test',
+            instruction: 'Summarise document',
+            contextDocuments: [],
+          },
+          mockSession,
+        ),
+      ).rejects.toThrow('AI drafting assistant is disabled by firm policy');
+    });
+
+    it('rejects generation when estimated request tokens exceed per-request limit', async () => {
+      mockRepo.readConfiguration = vi.fn().mockResolvedValue({
+        id: '00000000-0000-0000-0000-000000000001',
+        provider: 'offline_mock',
+        modelName: 'mock-legal-assistant',
+        endpointUrl: null,
+        maxTokensPerRequest: 100, // Very low ceiling
+        monthlyTokenBudget: 500000,
+        tokensUsedThisMonth: 1250,
+        budgetResetOn: '2026-11-01',
+        enabled: true,
+        updatedAt: '2026-10-14T00:00:00.000Z',
+      });
+
+      await expect(
+        aiController.generate(
+          sampleMatterId,
+          {
+            feature: 'summarise_document',
+            draftType: 'document_summary',
+            title: 'Huge Document',
+            instruction: 'A'.repeat(500), // ~125 tokens > 100 maxTokens
+            contextDocuments: [],
+          },
+          mockSession,
+        ),
+      ).rejects.toThrow('Estimated request tokens');
+    });
+
+    it('rejects generation when firm monthly token budget is exhausted', async () => {
+      mockRepo.readConfiguration = vi.fn().mockResolvedValue({
+        id: '00000000-0000-0000-0000-000000000001',
+        provider: 'offline_mock',
+        modelName: 'mock-legal-assistant',
+        endpointUrl: null,
+        maxTokensPerRequest: 4096,
+        monthlyTokenBudget: 500000,
+        tokensUsedThisMonth: 499990, // Almost full
+        budgetResetOn: '2026-11-01',
+        enabled: true,
+        updatedAt: '2026-10-14T00:00:00.000Z',
+      });
+
+      await expect(
+        aiController.generate(
+          sampleMatterId,
+          {
+            feature: 'summarise_document',
+            draftType: 'document_summary',
+            title: 'Over Budget',
+            instruction: 'Please summarize this agreement thoroughly with citations.',
+            contextDocuments: [],
+          },
+          mockSession,
+        ),
+      ).rejects.toThrow('Monthly firm AI token budget exhausted');
+    });
+
+    it('retrieves supervisory audit metrics for compliance and partners', async () => {
+      const metrics = await aiController.getSupervisoryMetrics();
+      expect(metrics.monthlyBudget.monthlyTokenBudget).toBe(500000);
+      expect(metrics.totalRequestsCount).toBe(1);
+      expect(mockRepo.getAiMetrics).toHaveBeenCalled();
+    });
+
+    it('retrieves matter-level AI metrics for fee earner review', async () => {
+      const metrics = await aiController.getMatterMetrics(sampleMatterId, mockSession);
+      expect(metrics.matterId).toBe(sampleMatterId);
+      expect(metrics.tokensUsedThisMonth).toBe(1250);
+      expect(mockRepo.getMatterMetrics).toHaveBeenCalledWith(sampleMatterId);
     });
   });
 });
