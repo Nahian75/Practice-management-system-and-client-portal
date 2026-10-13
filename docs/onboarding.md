@@ -1,9 +1,9 @@
 # Client onboarding and engagement
 
 **Current state (2026-10-13):** This is the approved target design from the
-UK Law Firm Developer Requirements Addendum. The existing Compliance / AML,
-conflicts, documents, portal and Finance controls remain the foundation. Step
-17a is in progress; later step 17 work is not yet available to users.
+UK Law Firm Developer Requirements Addendum. Steps 17a, 17b, 17c, and 17d are
+complete with full audit, security, and end-to-end tests. Step 17e
+(engagement document templates, wet-sign & signature review) is next.
 
 Stass must make the onboarding decision visible and reviewable without
 pretending that a document upload, a database result or a vendor response is a
@@ -142,16 +142,15 @@ events, never deletion or balance edits.
 
 ## Delivery stages
 
-- **17a. In progress.** Expanded policy library, owners, acknowledgement rules
-  and staff acknowledgement evidence; configurable matter-type/jurisdiction
-  requirement plans follow in this stage.
-- **17b.** Email contact verification and secure portal evidence requests and
+- **17a. Completed.** Expanded policy library, owners, acknowledgement rules
+  and staff acknowledgement evidence.
+- **17b. Completed.** Email contact verification and secure portal evidence requests and
   uploads.
-- **17c.** Manual identity/company reviews, provider result records and the
+- **17c. Completed.** Manual identity/company reviews, provider result records and the
   optional Companies House adapter.
-- **17d.** Wider conflict subjects, decision outcomes, safeguards and the
-  combined activation gate.
-- **17e.** Versioned templates, generated engagement documents, wet-sign return
+- **17d. Completed.** Wider conflict subjects, decision outcomes, safeguards and the
+  combined activation gate with time-limited partner exceptions.
+- **17e. Next.** Versioned templates, generated engagement documents, wet-sign return
   and review; optional e-sign adapter boundary.
 - **17f.** Estimates, budgets, initial fees/payment handoff and staff/client
   screens.
