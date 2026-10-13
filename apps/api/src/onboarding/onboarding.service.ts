@@ -723,11 +723,17 @@ export class OnboardingService {
   }
 
   async sendEngagementDocument(
+    clientId: string,
     documentId: string,
     input: { expiresAt: Date | null },
     by: OnboardingActor,
   ): Promise<{ outcome: 'sent' } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
     try {
+      const doc = await this.records.getEngagementDocument(documentId);
+      if (!doc || doc.clientId !== clientId) {
+        return { outcome: 'not_found' };
+      }
+
       await this.records.transaction(async (trx) => {
         await this.records.sendEngagementDocument({
           documentId,
@@ -740,7 +746,7 @@ export class OnboardingService {
           action: 'onboarding.engagement_document_sent',
           outcome: 'success',
           resource: { type: 'engagement_document', id: documentId },
-          metadata: { expiresAt: input.expiresAt?.toISOString() ?? null },
+          metadata: { clientId, expiresAt: input.expiresAt?.toISOString() ?? null },
           ...by.context,
         }, trx);
       });
@@ -998,6 +1004,7 @@ export class OnboardingService {
   }
 
   async recordOnboardingPaymentReceipt(
+    clientId: string,
     requestId: string,
     input: {
       paymentMethod: OnboardingPaymentMethod;
@@ -1010,6 +1017,7 @@ export class OnboardingService {
       await this.records.transaction(async (trx) => {
         await this.records.recordOnboardingPaymentReceipt({
           requestId,
+          clientId,
           paymentMethod: input.paymentMethod,
           reference: input.reference,
           notes: input.notes ?? null,
@@ -1022,6 +1030,7 @@ export class OnboardingService {
           outcome: 'success',
           resource: { type: 'onboarding_payment_request', id: requestId },
           metadata: {
+            clientId,
             paymentMethod: input.paymentMethod,
             reference: input.reference,
           },
@@ -1039,6 +1048,7 @@ export class OnboardingService {
   }
 
   async waiveOnboardingPaymentRequest(
+    clientId: string,
     requestId: string,
     input: { reason: string },
     by: OnboardingActor,
@@ -1047,6 +1057,7 @@ export class OnboardingService {
       await this.records.transaction(async (trx) => {
         await this.records.waiveOnboardingPaymentRequest({
           requestId,
+          clientId,
           reason: input.reason,
           actorId: by.accountId,
         }, trx);
@@ -1056,7 +1067,7 @@ export class OnboardingService {
           action: 'onboarding.payment_request_waived',
           outcome: 'success',
           resource: { type: 'onboarding_payment_request', id: requestId },
-          metadata: { reason: input.reason },
+          metadata: { clientId, reason: input.reason },
           ...by.context,
         }, trx);
       });

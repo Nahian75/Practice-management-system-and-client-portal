@@ -847,12 +847,12 @@ export class OnboardingController {
 
   @Post('clients/:clientId/engagement-documents/:documentId/send') @RequirePermission('clients.edit') @ResponseSchema(sendEngagementDocumentResponse)
   async sendEngagementDocument(
-    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
     @Param('documentId', { schema: z.uuid() }) documentId: string,
     @Body({ schema: sendEngagementDocumentBody }) body: z.infer<typeof sendEngagementDocumentBody>,
     @CurrentSession() session: ResolvedSession, @Req() request: Request,
   ) {
-    const result = await this.onboarding.sendEngagementDocument(documentId, {
+    const result = await this.onboarding.sendEngagementDocument(clientId, documentId, {
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
     }, actorFor(session, request));
     switch (result.outcome) {
@@ -981,12 +981,12 @@ export class OnboardingController {
 
   @Post('clients/:clientId/payment-requests/:requestId/receipt') @RequirePermission('clients.edit') @ResponseSchema(paymentReceiptResponse)
   async recordOnboardingPaymentReceipt(
-    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
     @Param('requestId', { schema: z.uuid() }) requestId: string,
     @Body({ schema: paymentReceiptBody }) body: z.infer<typeof paymentReceiptBody>,
     @CurrentSession() session: ResolvedSession, @Req() request: Request,
   ) {
-    const result = await this.onboarding.recordOnboardingPaymentReceipt(requestId, {
+    const result = await this.onboarding.recordOnboardingPaymentReceipt(clientId, requestId, {
       paymentMethod: body.paymentMethod,
       reference: body.reference,
       notes: body.notes,
@@ -1001,12 +1001,12 @@ export class OnboardingController {
 
   @Post('clients/:clientId/payment-requests/:requestId/waive') @RequirePermission('clients.edit') @ResponseSchema(paymentWaiveResponse)
   async waiveOnboardingPaymentRequest(
-    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
     @Param('requestId', { schema: z.uuid() }) requestId: string,
     @Body({ schema: paymentWaiveBody }) body: z.infer<typeof paymentWaiveBody>,
     @CurrentSession() session: ResolvedSession, @Req() request: Request,
   ) {
-    const result = await this.onboarding.waiveOnboardingPaymentRequest(requestId, {
+    const result = await this.onboarding.waiveOnboardingPaymentRequest(clientId, requestId, {
       reason: body.reason,
     }, actorFor(session, request));
     switch (result.outcome) {

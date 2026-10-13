@@ -880,26 +880,48 @@ export class OnboardingRepository {
     reference: string;
     notes: string | null;
     actorId: string;
+    clientId?: string;
   }, trx: Kysely<Database> = this.db): Promise<void> {
-    await sql`select app.record_onboarding_payment_receipt(
-      ${input.requestId}::uuid,
-      ${input.paymentMethod},
-      ${input.reference},
-      ${input.notes},
-      ${input.actorId}::uuid
-    )`.execute(trx);
+    if (input.clientId) {
+      await sql`select app.record_onboarding_payment_receipt(
+        ${input.requestId}::uuid,
+        ${input.paymentMethod}::text,
+        ${input.reference}::text,
+        ${input.notes}::text,
+        ${input.actorId}::uuid,
+        ${input.clientId}::uuid
+      )`.execute(trx);
+    } else {
+      await sql`select app.record_onboarding_payment_receipt(
+        ${input.requestId}::uuid,
+        ${input.paymentMethod}::text,
+        ${input.reference}::text,
+        ${input.notes}::text,
+        ${input.actorId}::uuid
+      )`.execute(trx);
+    }
   }
 
   async waiveOnboardingPaymentRequest(input: {
     requestId: string;
     reason: string;
     actorId: string;
+    clientId?: string;
   }, trx: Kysely<Database> = this.db): Promise<void> {
-    await sql`select app.waive_onboarding_payment_request(
-      ${input.requestId}::uuid,
-      ${input.reason},
-      ${input.actorId}::uuid
-    )`.execute(trx);
+    if (input.clientId) {
+      await sql`select app.waive_onboarding_payment_request(
+        ${input.requestId}::uuid,
+        ${input.reason}::text,
+        ${input.actorId}::uuid,
+        ${input.clientId}::uuid
+      )`.execute(trx);
+    } else {
+      await sql`select app.waive_onboarding_payment_request(
+        ${input.requestId}::uuid,
+        ${input.reason}::text,
+        ${input.actorId}::uuid
+      )`.execute(trx);
+    }
   }
 
   async listClientPaymentRequests(clientId: string): Promise<OnboardingPaymentRequest[]> {

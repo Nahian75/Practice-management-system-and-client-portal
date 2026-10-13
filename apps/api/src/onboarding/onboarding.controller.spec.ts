@@ -621,6 +621,69 @@ describe('Contact verification API', () => {
     expect(updatedReq2.status).toBe('waived');
     expect(updatedReq2.notes).toBe('Waived as part of engagement agreement promotion.');
   });
+
+  it('enforces route scope isolation, role permissions, and portal isolation (security review)', async () => {
+    const otherClient = await db.transaction().execute(async (trx) => {
+      const client = await trx.insertInto('clients').values({ kind: 'individual', created_by: outsider.id })
+        .returning('id').executeTakeFirstOrThrow();
+      await trx.insertInto('client_individuals').values({
+        client_id: client.id,
+        given_names: 'Other',
+        family_name: 'Client',
+        email: `other-${randomUUID()}@example.com`,
+      }).execute();
+      return client.id;
+    });
+
+    const reqRes = await api(token).post(`/clients/${clientId}/payment-requests`, {
+      kind: 'consultation',
+      description: 'Consultation fee for Client 1',
+      amountPence: 50000,
+      dueOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    });
+    expect(reqRes.status).toBe(201);
+    const reqId = reqRes.body.requestId;
+
+    await grantTestRole(db, feeEarner.id, 'partner');
+
+    // Cross-client receipt attempt: passing otherClient in path but reqId of clientId -> 404
+    const crossReceipt = await api(token).post(`/clients/${otherClient}/payment-requests/${reqId}/receipt`, {
+      paymentMethod: 'bank_transfer',
+      reference: 'BACS-TEST-CROSS',
+    });
+    expect(crossReceipt.status).toBe(404);
+
+    // Cross-client waiver attempt: passing otherClient in path but reqId of clientId -> 404
+    const crossWaive = await api(token).post(`/clients/${otherClient}/payment-requests/${reqId}/waive`, {
+      reason: 'Attempt cross-client waiver',
+    });
+    expect(crossWaive.status).toBe(404);
+
+    // Test waiver permission: fee earner without partner or accounts role cannot waive
+    const regularStaff = await createTestAccount(db, 'staff');
+    await grantTestRole(db, regularStaff.id, 'fee_earner');
+    const regularStaffToken = await sessions.start(regularStaff, 'authenticated', {});
+    const feeEarnerWaive = await api(regularStaffToken).post(`/clients/${clientId}/payment-requests/${reqId}/waive`, {
+      reason: 'Regular fee earner attempting waiver',
+    });
+    expect(feeEarnerWaive.status).toBe(403);
+
+    // Test portal isolation: client portal user cannot call staff endpoints
+    const portalAccount = await createTestAccount(db, 'client');
+    const portalToken = await sessions.start(portalAccount, 'authenticated', {});
+    const portalStaffAttempt = await api(portalToken).post(`/clients/${clientId}/payment-requests`, {
+      kind: 'consultation',
+      description: 'Portal attempting staff creation',
+      amountPence: 10000,
+      dueOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    });
+    expect(portalStaffAttempt.status).toBe(403);
+
+    // Portal user listing payment requests only sees requests linked to their account
+    const portalList = await api(portalToken).get('/portal/payment-requests');
+    expect(portalList.status).toBe(200);
+    expect(portalList.body.requests).toHaveLength(0);
+  });
 });
 
 

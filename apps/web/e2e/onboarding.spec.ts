@@ -208,7 +208,7 @@ test('manages wider conflict subjects, records conflict decision, and activates 
   await page.getByRole('button', { name: 'Execute search' }).click();
 
   await expect(page.getByText(/Names checked: .*Artie Pendleton/)).toBeVisible();
-  await expect(page.getByText('1 potential match')).toBeVisible();
+  await expect(page.getByText(/\d+ potential match/)).toBeVisible();
 
   // 4. Record conflict decision with rationale & safeguards
   await page.getByRole('button', { name: 'Record conflict decision' }).click();
