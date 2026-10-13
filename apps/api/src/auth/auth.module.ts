@@ -33,6 +33,7 @@ import { TotpCredentialsRepository } from './two-factor/totp-credentials.reposit
 import { TwoFactorSignInController } from './two-factor/two-factor-sign-in.controller.js';
 import { TwoFactorSignInService } from './two-factor/two-factor-sign-in.service.js';
 import { TwoFactorService } from './two-factor/two-factor.service.js';
+import { SecurityRetentionService } from './retention/security-retention.service.js';
 
 const CURRENT_KEY_VERSION = 1;
 
@@ -73,6 +74,7 @@ const CURRENT_KEY_VERSION = 1;
     RolesService,
     PermissionsService,
     PermissionGuard,
+    SecurityRetentionService,
   ],
   exports: [
     SessionsService,
@@ -87,6 +89,7 @@ const CURRENT_KEY_VERSION = 1;
     CLOCK,
     InvitationsService,
     SecurityNoticesService,
+    SecurityRetentionService,
   ],
 })
 export class AuthModule {}

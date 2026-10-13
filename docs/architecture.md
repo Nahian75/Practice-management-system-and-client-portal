@@ -48,6 +48,12 @@ correspondence drafting, attendance note structuring and human-in-the-loop revie
 document/task promotion (18d); token budgeting, rate limits and supervisory audit controls (18e);
 staff web workbench and supervisory governance dashboard (18f); and security review with
 adversarial penetration verification ([ai.md](ai.md), [ai-security.md](ai-security.md)).
+Pre-production hardening and go-live readiness is implemented in steps 19a to 19d:
+edge reverse proxy configurations for Nginx and Caddy with streaming upload boundaries and sign-in
+brute-force rate limiting (19a); automated ephemeral security data retention sweep for expired sessions,
+failures, resets, invitations and outbox rows via migration 0075 and CLI command (19b); encrypted storage,
+backup immutability, RPO/RTO targets and post-restore disposal replay runbook (19c); and production
+hygiene gate script (19d) ([deployment.md](deployment.md), [disaster-recovery.md](disaster-recovery.md), [security.md](security.md)).
 
 This file describes the target shape. Sections are updated as each part is built.
 

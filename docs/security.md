@@ -258,10 +258,12 @@ process before it accepts any request.
 | 2026-10-14 | People / HR module | [reviews/2026-10-14-hr.md](reviews/2026-10-14-hr.md) |
 | 2026-10-14 | AI & Legal Drafting Assistant | [reviews/2026-10-14-ai.md](reviews/2026-10-14-ai.md) |
 
-Open items from reviews that must be closed before production: F2 (load
-balancer rate limiting), F3 (retention), C6 (encrypted storage and backups).
-Authentication review F5 is closed by the persistent email outbox in
-[Notifications step 13a](notifications.md).
+Pre-production security items closed (Step 19):
+- **F2 (Edge Reverse Proxy & Rate Limiting):** Closed. Production Nginx and Caddy reverse proxy configurations in `infra/proxy/` enforce 52 MB streaming upload limits on document/evidence routes, 1 MB default limits, connection limits, and sign-in brute-force rate limits.
+- **F3 (Ephemeral Security Retention):** Closed. Migration `0075_security_ephemeral_retention.sql`, `SecurityRetentionService`, and CLI command `retention:sweep` purge expired sessions, sign-in failures, password resets, invitations, and completed email outbox rows.
+- **C6 (Encrypted Storage & Backups):** Closed. [docs/disaster-recovery.md](disaster-recovery.md) specifies AES-256 block encryption, continuous WAL archiving, RPO ≤ 15 min, RTO ≤ 4 hr, dual-region UK residency, immutable WORM backups, and the post-restore disposal replay procedure.
+- **Authentication F5:** Closed by the persistent email outbox in [Notifications step 13a](notifications.md).
+- **Production Hygiene Gate:** Enforced via `npm run check:production-hygiene`.
 
 Local demo conveniences that must not reach production (to fix before
 deploying): `code.bat` and `scripts/demo-code.mjs`, which show the current

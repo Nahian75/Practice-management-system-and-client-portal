@@ -11,6 +11,8 @@
     "migrate:local": "node --env-file=.env --enable-source-maps dist/database/migrate.js",
     "invite": "node --enable-source-maps dist/cli/invite.js",
     "invite:local": "node --env-file=.env --enable-source-maps dist/cli/invite.js",
+    "retention:sweep": "node --enable-source-maps dist/cli/retention-sweep.js",
+    "retention:sweep:local": "node --env-file=.env --enable-source-maps dist/cli/retention-sweep.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
