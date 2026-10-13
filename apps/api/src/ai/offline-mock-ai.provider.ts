@@ -14,13 +14,22 @@ export class OfflineMockAiProvider implements AiProvider {
     }
 
     const citations: StructuredCitation[] = [];
-    for (const doc of request.contextDocuments) {
+    if (request.instruction.includes('SIMULATE_HALLUCINATION')) {
       citations.push({
-        sourceDocumentId: doc.id,
-        documentTitle: doc.title,
-        pageNumber: 1,
-        quote: doc.content.slice(0, 120).trim() || 'Referenced matter documentation extract.',
+        sourceDocumentId: '00000000-0000-0000-0000-000000000000',
+        documentTitle: 'NonExistentDoc.pdf',
+        pageNumber: 99,
+        quote: 'This is a completely fabricated quotation never appearing in any matter file.',
       });
+    } else {
+      for (const doc of request.contextDocuments) {
+        citations.push({
+          sourceDocumentId: doc.id,
+          documentTitle: doc.title,
+          pageNumber: 1,
+          quote: doc.content.slice(0, 120).trim() || 'Referenced matter documentation extract.',
+        });
+      }
     }
 
     let generatedText = '';
@@ -44,10 +53,12 @@ export class OfflineMockAiProvider implements AiProvider {
         break;
 
       case 'extract_chronology':
-        generatedText = `Matter Event Chronology:\n\n` +
-          `- Date 1: Initial client intake and conflict clearance completed.\n` +
-          `- Date 2: Receipt of original instructions and client care letter verification.\n` +
-          `- Date 3: Review of counterparty correspondence and preliminary evidence disclosure.`;
+        generatedText = `### Chronology of Events — ${request.title}\n\n` +
+          `| Date | Event Description | Actors | Source & Page | Citation Quote |\n` +
+          `| :--- | :--- | :--- | :--- | :--- |\n` +
+          `| **2024-01-15** | Initial contract execution and exchange | Claimant & Defendant | [Agreement.pdf] p. 1 | "The parties agree to the terms set forth herein." |\n` +
+          `| **2024-06-30** | Notice of alleged breach dispatched | Claimant Solicitor | [Notice.pdf] p. 1 | "Formal notice is hereby given of breach." |\n\n` +
+          `#### Chronology Notes\n- Verified against uploaded matter documentation.`;
         break;
 
       case 'review_clauses':

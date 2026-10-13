@@ -11,11 +11,16 @@ import {
 } from './ai.repository.js';
 import { RedactionService } from './redaction.service.js';
 import { PromptBuilderService } from './prompt-builder.service.js';
+import { CitationGroundingService } from './citation-grounding.service.js';
+import { DocumentChunkerService } from './document-chunker.service.js';
+import { ChronologyExtractorService } from './chronology-extractor.service.js';
 import type {
   AiDraftType,
   AiFeature,
   AiPromptRequest,
   AiReviewDecision,
+  ChronologyEntry,
+  DocumentChunk,
   StructuredCitation,
 } from './ai.types.js';
 
@@ -42,6 +47,9 @@ export class AiService {
     @Inject(AI_PROVIDER_TOKEN) private readonly aiProvider: AiProvider,
     private readonly redaction: RedactionService,
     private readonly promptBuilder: PromptBuilderService,
+    private readonly citationGrounding: CitationGroundingService,
+    private readonly documentChunker: DocumentChunkerService,
+    private readonly chronologyExtractor: ChronologyExtractorService,
     private readonly audit: AuditService,
   ) {}
 
@@ -160,6 +168,30 @@ export class AiService {
     // 5. Dispatch to provider (offline mock or private cloud)
     const result = await this.aiProvider.generate(promptRequest);
 
+    // 5b. Citation grounding verification (SRA Code 1.4 & 2.1 - hallucination defense)
+    const grounding = this.citationGrounding.verifyCitations(
+      result.structuredCitations,
+      sanitizedDocs,
+    );
+    let finalConfidenceNotes = result.confidenceNotes ?? '';
+    if (!grounding.grounded && grounding.hallucinationWarning) {
+      finalConfidenceNotes = finalConfidenceNotes
+        ? `${finalConfidenceNotes} | ${grounding.hallucinationWarning}`
+        : grounding.hallucinationWarning;
+
+      await this.audit.record({
+        actor: { type: 'user', id: actorId },
+        action: 'ai.citation_unverified',
+        outcome: 'denied',
+        resource: { type: 'matter', id: matterId },
+        metadata: {
+          unverifiedCount: grounding.unverifiedCount,
+          verificationScore: grounding.verificationScore,
+          feature: input.feature,
+        },
+      });
+    }
+
     // 6. Record generation in PostgreSQL
     const { requestId, draftId } = await this.repository.recordGeneration(
       actorId,
@@ -174,7 +206,7 @@ export class AiService {
       input.title,
       result.generatedText,
       result.structuredCitations,
-      result.confidenceNotes,
+      finalConfidenceNotes,
     );
 
     // 7. Record transactional audit event
@@ -191,6 +223,8 @@ export class AiService {
         totalTokens: result.promptTokens + result.completionTokens,
         redactionsCount: totalRedactions,
         isPotentialInjection: promptAssembly.isPotentialInjection,
+        citationVerificationScore: grounding.verificationScore,
+        citationsGrounded: grounding.grounded,
       },
     });
 
@@ -199,8 +233,56 @@ export class AiService {
       draftId,
       generatedText: result.generatedText,
       structuredCitations: result.structuredCitations,
-      confidenceNotes: result.confidenceNotes,
+      confidenceNotes: finalConfidenceNotes,
     };
+  }
+
+  async summariseDocument(
+    actorId: string,
+    matterId: string,
+    input: {
+      title: string;
+      instruction: string;
+      contextDocuments?: Array<{ id: string; title: string; content: string }>;
+    },
+  ) {
+    return this.generateDraft(actorId, matterId, {
+      feature: 'summarise_document',
+      draftType: 'document_summary',
+      title: input.title,
+      instruction: input.instruction,
+      contextDocuments: input.contextDocuments,
+    });
+  }
+
+  async extractChronology(
+    actorId: string,
+    matterId: string,
+    input: {
+      title: string;
+      instruction: string;
+      contextDocuments?: Array<{ id: string; title: string; content: string }>;
+    },
+  ) {
+    return this.generateDraft(actorId, matterId, {
+      feature: 'extract_chronology',
+      draftType: 'chronology',
+      title: input.title,
+      instruction: input.instruction,
+      contextDocuments: input.contextDocuments,
+    });
+  }
+
+  chunkDocument(
+    documentId: string,
+    documentTitle: string,
+    rawText: string,
+  ): DocumentChunk[] {
+    return this.documentChunker.chunkDocument(documentId, documentTitle, rawText);
+  }
+
+  formatChronology(entries: ChronologyEntry[], matterTitle?: string): string {
+    return this.chronologyExtractor.formatToMarkdown(entries, matterTitle);
   }
 
   async reviewDraft(

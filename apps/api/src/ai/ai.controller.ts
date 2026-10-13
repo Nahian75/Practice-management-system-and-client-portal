@@ -66,6 +66,20 @@ const generateInputSchema = z.strictObject({
     .optional(),
 });
 
+const semanticFeatureInputSchema = z.strictObject({
+  title: text(200),
+  instruction: text(4000),
+  contextDocuments: z
+    .array(
+      z.strictObject({
+        id: z.uuid(),
+        title: text(200),
+        content: z.string().max(50000),
+      }),
+    )
+    .optional(),
+});
+
 const generateResponseSchema = z.object({
   requestId: z.uuid(),
   draftId: z.uuid(),
@@ -176,6 +190,28 @@ export class AiController {
     @CurrentSession() session: ResolvedSession,
   ) {
     return this.aiService.generateDraft(session.account.id, matterId, body);
+  }
+
+  @Post('matters/:matterId/ai/summarise-document')
+  @RequirePermission('ai.use')
+  @ResponseSchema(generateResponseSchema)
+  async summariseDocument(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: semanticFeatureInputSchema }) body: z.infer<typeof semanticFeatureInputSchema>,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    return this.aiService.summariseDocument(session.account.id, matterId, body);
+  }
+
+  @Post('matters/:matterId/ai/extract-chronology')
+  @RequirePermission('ai.use')
+  @ResponseSchema(generateResponseSchema)
+  async extractChronology(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: semanticFeatureInputSchema }) body: z.infer<typeof semanticFeatureInputSchema>,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    return this.aiService.extractChronology(session.account.id, matterId, body);
   }
 
   @Get('matters/:matterId/ai/drafts')

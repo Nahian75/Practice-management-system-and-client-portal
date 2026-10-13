@@ -263,9 +263,8 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
 - **18b. Matter boundary enforcement, redaction pipeline and prompt injection defense — built.**
   Matter team access validation, system prompt hardening, XML delimiter isolation,
   matter document ownership verification, automated UK financial/PII masking, and prompt injection detection.
-- **18c. Document summarisation and chronology extraction:**
-  Text extraction and chunking pipeline for matter documents; structured extraction
-  of key obligations, dates, deadlines, counterparties, and verifiable citations.
+- **18c. Document summarisation and chronology extraction — built.**
+  Text extraction and chunking pipeline (`DocumentChunkerService`), citation grounding & hallucination defense (`CitationGroundingService`, SRA Code 1.4/2.1), and structured chronology extraction (`ChronologyExtractorService`) with semantic endpoints.
 - **18d. Human-in-the-loop drafting and attendance note processing:**
   Correspondence drafting assistant, attendance note structuring, and review
   state machine (`draft` -> `accepted` | `modified` | `rejected`) with promotion

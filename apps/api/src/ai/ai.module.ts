@@ -5,6 +5,9 @@ import { AI_PROVIDER_TOKEN } from './ai-provider.interface.js';
 import { OfflineMockAiProvider } from './offline-mock-ai.provider.js';
 import { RedactionService } from './redaction.service.js';
 import { PromptBuilderService } from './prompt-builder.service.js';
+import { CitationGroundingService } from './citation-grounding.service.js';
+import { DocumentChunkerService } from './document-chunker.service.js';
+import { ChronologyExtractorService } from './chronology-extractor.service.js';
 import { AiRepository } from './ai.repository.js';
 import { AiService } from './ai.service.js';
 import { AiController } from './ai.controller.js';
@@ -17,12 +20,23 @@ import { AiController } from './ai.controller.js';
     AiService,
     RedactionService,
     PromptBuilderService,
+    CitationGroundingService,
+    DocumentChunkerService,
+    ChronologyExtractorService,
     OfflineMockAiProvider,
     {
       provide: AI_PROVIDER_TOKEN,
       useExisting: OfflineMockAiProvider,
     },
   ],
-  exports: [AiService, AiRepository, RedactionService, PromptBuilderService],
+  exports: [
+    AiService,
+    AiRepository,
+    RedactionService,
+    PromptBuilderService,
+    CitationGroundingService,
+    DocumentChunkerService,
+    ChronologyExtractorService,
+  ],
 })
 export class AiModule {}

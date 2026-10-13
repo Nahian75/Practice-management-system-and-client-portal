@@ -51,3 +51,35 @@ export interface AiPromptResponse {
   completionTokens: number;
   latencyMs: number;
 }
+
+export interface ChronologyEntry {
+  date: string;
+  time?: string | null;
+  eventDescription: string;
+  actorsInvolved: string[];
+  sourceDocumentId: string;
+  sourceDocumentTitle: string;
+  pageNumber?: number | null;
+  quote: string;
+  importance?: 'critical' | 'material' | 'background';
+}
+
+export interface DocumentChunk {
+  chunkIndex: number;
+  totalChunks: number;
+  documentId: string;
+  documentTitle: string;
+  text: string;
+  startChar: number;
+  endChar: number;
+  estimatedTokens: number;
+}
+
+export interface GroundingVerificationResult {
+  grounded: boolean;
+  verificationScore: number;
+  verifiedCitations: Array<StructuredCitation & { verified: boolean; matchSimilarity: number }>;
+  unverifiedCount: number;
+  hallucinationWarning?: string | null;
+}
+

@@ -4,16 +4,22 @@ import { AiService } from './ai.service.js';
 import { AiController } from './ai.controller.js';
 import { RedactionService } from './redaction.service.js';
 import { PromptBuilderService } from './prompt-builder.service.js';
+import { CitationGroundingService } from './citation-grounding.service.js';
+import { DocumentChunkerService } from './document-chunker.service.js';
+import { ChronologyExtractorService } from './chronology-extractor.service.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AiRepository } from './ai.repository.js';
 import type { ResolvedSession } from '../auth/sessions/authenticated-session.js';
 
-describe('AI Module (Step 18a & 18b)', () => {
+describe('AI Module (Step 18a, 18b, 18c)', () => {
   let mockProvider: OfflineMockAiProvider;
   let mockRepo: Partial<AiRepository>;
   let mockAudit: Partial<AuditService>;
   let redactionService: RedactionService;
   let promptBuilderService: PromptBuilderService;
+  let citationGroundingService: CitationGroundingService;
+  let documentChunkerService: DocumentChunkerService;
+  let chronologyExtractorService: ChronologyExtractorService;
   let aiService: AiService;
   let aiController: AiController;
 
@@ -35,6 +41,9 @@ describe('AI Module (Step 18a & 18b)', () => {
     mockProvider = new OfflineMockAiProvider();
     redactionService = new RedactionService();
     promptBuilderService = new PromptBuilderService();
+    citationGroundingService = new CitationGroundingService();
+    documentChunkerService = new DocumentChunkerService();
+    chronologyExtractorService = new ChronologyExtractorService();
     mockAudit = {
       record: vi.fn().mockResolvedValue(undefined),
     };
@@ -124,6 +133,9 @@ describe('AI Module (Step 18a & 18b)', () => {
       mockProvider,
       redactionService,
       promptBuilderService,
+      citationGroundingService,
+      documentChunkerService,
+      chronologyExtractorService,
       mockAudit as AuditService,
     );
     aiController = new AiController(aiService);
@@ -376,6 +388,80 @@ describe('AI Module (Step 18a & 18b)', () => {
       expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'ai.prompt_injection_detected',
+          outcome: 'denied',
+        }),
+      );
+    });
+
+    it('summarises document via semantic endpoint', async () => {
+      const result = await aiController.summariseDocument(
+        sampleMatterId,
+        {
+          title: 'Contract Review',
+          instruction: 'Extract key clauses and risks.',
+          contextDocuments: [
+            {
+              id: '77777777-7777-7777-7777-777777777777',
+              title: 'Contract.pdf',
+              content: 'The Supplier guarantees 99.9% uptime and service availability.',
+            },
+          ],
+        },
+        mockSession,
+      );
+
+      expect(mockRepo.assertMatterAccess).toHaveBeenCalledWith(
+        mockSession.account.id,
+        sampleMatterId,
+      );
+      expect(result.generatedText).toContain('Document Summary: Contract Review');
+      expect(result.structuredCitations).toHaveLength(1);
+    });
+
+    it('extracts chronology via semantic endpoint', async () => {
+      const result = await aiController.extractChronology(
+        sampleMatterId,
+        {
+          title: 'Breach of Contract Chronology',
+          instruction: 'Timeline of events leading to default.',
+          contextDocuments: [
+            {
+              id: '77777777-7777-7777-7777-777777777777',
+              title: 'Notice.pdf',
+              content: 'On 2024-01-15 the agreement was executed. On 2024-06-30 breach notice served.',
+            },
+          ],
+        },
+        mockSession,
+      );
+
+      expect(result.generatedText).toContain('Chronology of Events — Breach of Contract Chronology');
+      expect(result.generatedText).toContain('2024-01-15');
+    });
+
+    it('detects unverified citations, logs audit warning, and attaches SRA regulatory notice', async () => {
+      const result = await aiController.generate(
+        sampleMatterId,
+        {
+          feature: 'summarise_document',
+          draftType: 'document_summary',
+          title: 'Unverified Citation Test',
+          instruction: 'SIMULATE_HALLUCINATION in citations please.',
+          contextDocuments: [
+            {
+              id: '77777777-7777-7777-7777-777777777777',
+              title: 'Real Document.pdf',
+              content: 'Only actual facts exist here.',
+            },
+          ],
+        },
+        mockSession,
+      );
+
+      expect(result.confidenceNotes).toContain('Regulatory Notice (SRA Code 1.4 & 2.1)');
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ai.citation_unverified',
           outcome: 'denied',
         }),
       );
