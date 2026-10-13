@@ -4,23 +4,25 @@ import { redirect } from 'next/navigation';
 import { apiGet } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { MATTER_STATUS_LABELS, MATTER_TYPE_LABELS, TEAM_ROLE_LABELS } from '@/lib/matters';
-import type { PortalEvidenceRequest, PortalMatter } from '@/lib/portal';
+import type { EngagementDocument, PortalEvidenceRequest, PortalMatter } from '@/lib/portal';
 import { EvidenceRequests } from './evidence-requests';
+import { PortalEngagementDocuments } from './portal-engagement-documents';
 
 export const metadata: Metadata = { title: 'Your matters' };
 
 export default async function PortalMattersPage({ searchParams }: { searchParams: Promise<{ before?: string | string[] }> }) {
   const { before } = await searchParams;
-  const [mattersResult, evidenceResult] = await Promise.all([
+  const [mattersResult, evidenceResult, engagementResult] = await Promise.all([
     apiGet<{ matters: PortalMatter[]; next: string | null }>('/portal/matters', {
       before: typeof before === 'string' ? before : undefined,
     }),
     apiGet<{ requests: PortalEvidenceRequest[] }>('/portal/evidence-requests'),
+    apiGet<{ documents: EngagementDocument[] }>('/portal/engagement-documents'),
   ]);
-  if (mattersResult.status === 401 || evidenceResult.status === 401) {
+  if (mattersResult.status === 401 || evidenceResult.status === 401 || engagementResult.status === 401) {
     redirect('/sign-in');
   }
-  if (mattersResult.status === 403 || evidenceResult.status === 403) {
+  if (mattersResult.status === 403 || evidenceResult.status === 403 || engagementResult.status === 403) {
     redirect('/');
   }
   if (mattersResult.status === 400) {
@@ -31,9 +33,11 @@ export default async function PortalMattersPage({ searchParams }: { searchParams
   }
 
   const requests = evidenceResult.body?.requests ?? [];
+  const engagementDocs = engagementResult.body?.documents ?? [];
 
   return (
     <>
+      <PortalEngagementDocuments documents={engagementDocs} />
       <EvidenceRequests requests={requests} />
       <hr className="rule" />
       <h1>Your matters</h1>

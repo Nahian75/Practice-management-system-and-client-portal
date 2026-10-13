@@ -399,6 +399,93 @@ describe('Contact verification API', () => {
     expect(gateFinal.body.status).toBe('activated');
     expect(gateFinal.body.isActivated).toBe(true);
   });
+
+  it('manages engagement templates, document generation, portal signature, and staff review', async () => {
+    const templatesRes = await api(token).get('/onboarding/engagement-templates');
+    expect(templatesRes.status).toBe(200);
+    expect(templatesRes.body.templates.length).toBeGreaterThanOrEqual(3);
+    const clientCareTemplate = templatesRes.body.templates.find((t: any) => t.templateKey === 'client_care_letter');
+    expect(clientCareTemplate).toBeDefined();
+
+    const genRes = await api(token).post(`/clients/${clientId}/engagement-documents`, {
+      templateId: clientCareTemplate.id,
+      title: 'Client Care Letter - Initial Instructions',
+      fields: {
+        client_name: 'Contact Test',
+        firm_name: 'Apex Legal LLP',
+        matter_title: 'Commercial Lease Advisory',
+        scope_of_work: 'Review and negotiation of lease agreements.',
+        fee_earner_name: 'Jane Solicitor',
+        supervising_partner: 'John Senior',
+        fee_arrangement: 'Fixed fee of £2,500 plus VAT.',
+        complaints_partner: 'Sarah Compliance',
+      },
+    });
+    expect(genRes.status, JSON.stringify(genRes.body)).toBe(201);
+    expect(genRes.body).toMatchObject({ outcome: 'generated', documentId: expect.any(String) });
+    const docId = genRes.body.documentId;
+
+    const docsRes = await api(token).get(`/clients/${clientId}/engagement-documents`);
+    expect(docsRes.status).toBe(200);
+    const doc = docsRes.body.documents.find((d: any) => d.id === docId);
+    expect(doc).toBeDefined();
+    expect(doc.state).toBe('draft');
+    expect(doc.renderedContent).toContain('Fixed fee of £2,500 plus VAT.');
+    expect(doc.contentHash).toMatch(/^[a-f0-9]{64}$/);
+
+    const sendRes = await api(token).post(`/clients/${clientId}/engagement-documents/${docId}/send`, {
+      expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+    });
+    expect(sendRes.status, JSON.stringify(sendRes.body)).toBe(201);
+    expect(sendRes.body.outcome).toBe('sent');
+
+    const portalAccount = await createTestAccount(db, 'client');
+    await db.updateTable('client_individuals').set({ email: portalAccount.email })
+      .where('client_id', '=', clientId).execute();
+    await db.insertInto('portal_links').values({
+      account_id: portalAccount.id,
+      client_id: clientId,
+      contact_id: null,
+      linked_by: feeEarner.id,
+    }).execute();
+    const portalToken = await sessions.start(portalAccount, 'authenticated', {});
+
+    const portalListRes = await api(portalToken).get('/portal/engagement-documents');
+    expect(portalListRes.status).toBe(200);
+    expect(portalListRes.body.documents.some((d: any) => d.id === docId)).toBe(true);
+
+    const portalViewRes = await api(portalToken).get(`/portal/engagement-documents/${docId}`);
+    expect(portalViewRes.status).toBe(200);
+    expect(portalViewRes.body.state).toBe('viewed');
+
+    const portalSignRes = await api(portalToken).post(`/portal/engagement-documents/${docId}/sign`, {
+      signerName: 'Contact Test',
+      signerRole: 'client',
+      signatureMethod: 'portal_drawn',
+      metadata: { drawnSignatureSvg: '<svg>signature</svg>' },
+    });
+    expect(portalSignRes.status, JSON.stringify(portalSignRes.body)).toBe(201);
+    expect(portalSignRes.body).toMatchObject({ outcome: 'recorded', signatureId: expect.any(String) });
+    const sigId = portalSignRes.body.signatureId;
+
+    const signedDocsRes = await api(token).get(`/clients/${clientId}/engagement-documents`);
+    const signedDoc = signedDocsRes.body.documents.find((d: any) => d.id === docId);
+    expect(signedDoc.state).toBe('signed');
+    expect(signedDoc.signature).toBeDefined();
+    expect(signedDoc.signature.signerName).toBe('Contact Test');
+
+    const reviewRes = await api(token).post(`/clients/${clientId}/engagement-signatures/${sigId}/review`, {
+      outcome: 'accepted',
+      reason: 'Signature verified against client identity records.',
+    });
+    expect(reviewRes.status, JSON.stringify(reviewRes.body)).toBe(201);
+    expect(reviewRes.body).toMatchObject({ outcome: 'reviewed', reviewId: expect.any(String) });
+
+    const verifiedDocsRes = await api(token).get(`/clients/${clientId}/engagement-documents`);
+    const verifiedDoc = verifiedDocsRes.body.documents.find((d: any) => d.id === docId);
+    expect(verifiedDoc.state).toBe('verified');
+    expect(verifiedDoc.signature.review.outcome).toBe('accepted');
+  });
 });
 
 

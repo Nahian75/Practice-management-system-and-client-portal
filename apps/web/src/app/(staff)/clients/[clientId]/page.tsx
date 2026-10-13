@@ -13,6 +13,7 @@ import { CompanyVerification } from './company-verification';
 import { ElectronicChecks } from './electronic-checks';
 import { ConflictManagement } from './conflict-management';
 import { ActivationGatePanel } from './activation-gate';
+import { EngagementDocuments } from './engagement-documents';
 import type {
   ActivationException,
   ActivationGate,
@@ -22,6 +23,8 @@ import type {
   ConflictConnectedPerson,
   ConflictDecision,
   ElectronicCheck,
+  EngagementDocument,
+  EngagementTemplate,
 } from '@/lib/onboarding';
 import { TakeOverForm } from './take-over-form';
 
@@ -62,6 +65,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     conflictDecisions,
     activationGate,
     activationExceptions,
+    engagementDocs,
+    engagementTemplates,
   ] = await Promise.all([
     apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`),
     apiGet<{ cases: CddSummary[]; next: string | null }>(`/clients/${encodeURIComponent(clientId)}/cdd`),
@@ -79,6 +84,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     apiGet<{ decisions: ConflictDecision[] }>(`/clients/${encodeURIComponent(clientId)}/conflict-decisions`),
     apiGet<ActivationGate>(`/clients/${encodeURIComponent(clientId)}/activation-gate`),
     apiGet<{ exceptions: ActivationException[] }>(`/clients/${encodeURIComponent(clientId)}/activation-exceptions`),
+    apiGet<{ documents: EngagementDocument[] }>(`/clients/${encodeURIComponent(clientId)}/engagement-documents`),
+    apiGet<{ templates: EngagementTemplate[] }>('/onboarding/engagement-templates'),
   ]);
   // Only for roles that manage portal access; for others the API refuses and the section is left out.
   const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
@@ -206,6 +213,14 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
         connectedPersons={conflictConnectedPersons.body?.connectedPersons ?? []}
         checks={conflictChecks.body?.checks ?? []}
         decisions={conflictDecisions.body?.decisions ?? []}
+      />
+
+      <EngagementDocuments
+        clientId={client.id}
+        clientName={clientName(client)}
+        documents={engagementDocs.body?.documents ?? []}
+        templates={engagementTemplates.body?.templates ?? []}
+        matters={matters.body?.matters ?? []}
       />
 
       {activationGate.body && (

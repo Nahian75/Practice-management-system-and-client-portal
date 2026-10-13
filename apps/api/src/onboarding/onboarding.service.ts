@@ -25,6 +25,10 @@ import type {
   ElectronicCheck,
   EvidenceRequest,
   PortalEvidenceRequest,
+  EngagementDocument,
+  EngagementTemplate,
+  SignerRole,
+  SignatureMethod,
 } from './onboarding.js';
 import { OnboardingRepository } from './onboarding.repository.js';
 
@@ -601,6 +605,273 @@ export class OnboardingService {
       if (hasCode(error, '23514')) return { outcome: 'blocked' };
       throw error;
     }
+  }
+
+  listEngagementTemplates(): Promise<EngagementTemplate[]> {
+    return this.records.listEngagementTemplates();
+  }
+
+  getEngagementTemplate(id: string): Promise<EngagementTemplate | null> {
+    return this.records.getEngagementTemplate(id);
+  }
+
+  async createEngagementTemplate(
+    input: { templateKey: string; title: string; bodyMarkdown: string; allowedFields: string[] },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'created'; templateId: string } | { outcome: 'forbidden' | 'conflict' }> {
+    try {
+      const templateId = await this.records.transaction(async (trx) => {
+        const id = await this.records.createEngagementTemplate({
+          templateKey: input.templateKey,
+          title: input.title,
+          bodyMarkdown: input.bodyMarkdown,
+          allowedFields: input.allowedFields,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_template_created',
+          outcome: 'success',
+          resource: { type: 'engagement_template', id },
+          metadata: { templateKey: input.templateKey, title: input.title },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'created', templateId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  listClientEngagementDocuments(clientId: string): Promise<EngagementDocument[]> {
+    return this.records.listClientEngagementDocuments(clientId);
+  }
+
+  getEngagementDocument(documentId: string): Promise<EngagementDocument | null> {
+    return this.records.getEngagementDocument(documentId);
+  }
+
+  async generateEngagementDocument(
+    input: {
+      clientId: string;
+      matterId: string | null;
+      templateId: string;
+      title: string;
+      fields: Record<string, string>;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'generated'; documentId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    const template = await this.records.getEngagementTemplate(input.templateId);
+    if (!template) return { outcome: 'not_found' };
+
+    const allowed = new Set(template.allowedFields);
+    const sanitizedSnapshot: Record<string, string> = {};
+    for (const [k, v] of Object.entries(input.fields)) {
+      if (allowed.has(k)) {
+        sanitizedSnapshot[k] = String(v ?? '').trim();
+      }
+    }
+
+    let rendered = template.bodyMarkdown;
+    for (const [k, v] of Object.entries(sanitizedSnapshot)) {
+      rendered = rendered.split(`{{${k}}}`).join(v);
+    }
+
+    const contentHash = createHash('sha256').update(rendered, 'utf8').digest('hex');
+
+    try {
+      const documentId = await this.records.transaction(async (trx) => {
+        const id = await this.records.generateEngagementDocument({
+          clientId: input.clientId,
+          matterId: input.matterId,
+          templateId: input.templateId,
+          title: input.title,
+          inputSnapshot: sanitizedSnapshot,
+          renderedContent: rendered,
+          contentHash,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_document_generated',
+          outcome: 'success',
+          resource: { type: 'client', id: input.clientId },
+          metadata: { documentId: id, documentKind: template.templateKey, title: input.title, contentHash },
+          ...by.context,
+        }, trx);
+
+        return id;
+      });
+
+      return { outcome: 'generated', documentId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002') || hasCode(error, '23503')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async sendEngagementDocument(
+    documentId: string,
+    input: { expiresAt: Date | null },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'sent' } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      await this.records.transaction(async (trx) => {
+        await this.records.sendEngagementDocument({
+          documentId,
+          expiresAt: input.expiresAt,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_document_sent',
+          outcome: 'success',
+          resource: { type: 'engagement_document', id: documentId },
+          metadata: { expiresAt: input.expiresAt?.toISOString() ?? null },
+          ...by.context,
+        }, trx);
+      });
+
+      return { outcome: 'sent' };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async recordEngagementSignature(
+    documentId: string,
+    input: {
+      signerName: string;
+      signerEmail: string | null;
+      signerRole: SignerRole;
+      signatureMethod: SignatureMethod;
+      documentIdRef: string | null;
+      metadata?: Record<string, unknown>;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded'; signatureId: string } | { outcome: 'not_found' | 'conflict' }> {
+    try {
+      const signatureId = await this.records.transaction(async (trx) => {
+        const id = await this.records.recordEngagementSignature({
+          documentId,
+          signerName: input.signerName,
+          signerEmail: input.signerEmail,
+          signerRole: input.signerRole,
+          signatureMethod: input.signatureMethod,
+          documentIdRef: input.documentIdRef,
+          metadata: input.metadata ?? {},
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_signature_recorded',
+          outcome: 'success',
+          resource: { type: 'engagement_document', id: documentId },
+          metadata: { signatureId: id, signerName: input.signerName, signatureMethod: input.signatureMethod },
+          ...by.context,
+        }, trx);
+
+        return id;
+      });
+
+      return { outcome: 'recorded', signatureId };
+    } catch (error) {
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async declineEngagementDocument(
+    documentId: string,
+    input: { reason: string },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'declined' } | { outcome: 'not_found' | 'conflict' }> {
+    try {
+      await this.records.transaction(async (trx) => {
+        await this.records.declineEngagementDocument({
+          documentId,
+          reason: input.reason,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_document_declined',
+          outcome: 'success',
+          resource: { type: 'engagement_document', id: documentId },
+          metadata: { reason: input.reason },
+          ...by.context,
+        }, trx);
+      });
+
+      return { outcome: 'declined' };
+    } catch (error) {
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async reviewEngagementSignature(
+    signatureId: string,
+    input: { outcome: 'accepted' | 'rejected'; reason: string },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'reviewed'; reviewId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      const reviewId = await this.records.transaction(async (trx) => {
+        const id = await this.records.reviewEngagementSignature({
+          signatureId,
+          outcome: input.outcome,
+          reason: input.reason,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.engagement_signature_reviewed',
+          outcome: 'success',
+          resource: { type: 'engagement_signature', id: signatureId },
+          metadata: { reviewId: id, reviewOutcome: input.outcome, reason: input.reason },
+          ...by.context,
+        }, trx);
+
+        return id;
+      });
+
+      return { outcome: 'reviewed', reviewId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  listPortalEngagementDocuments(accountId: string): Promise<EngagementDocument[]> {
+    return this.records.listPortalEngagementDocuments(accountId);
+  }
+
+  async getPortalEngagementDocument(documentId: string, accountId: string): Promise<EngagementDocument | null> {
+    const list = await this.records.listPortalEngagementDocuments(accountId);
+    const doc = list.find((d) => d.id === documentId);
+    if (!doc) return null;
+    if (doc.state === 'sent') {
+      await this.records.markEngagementDocumentViewed(documentId);
+      doc.state = 'viewed';
+      doc.viewedAt = new Date();
+    }
+    return doc;
   }
 
   private verificationLink(token: string): string {

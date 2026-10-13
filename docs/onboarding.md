@@ -1,9 +1,9 @@
 # Client onboarding and engagement
 
 **Current state (2026-10-13):** This is the approved target design from the
-UK Law Firm Developer Requirements Addendum. Steps 17a, 17b, 17c, and 17d are
-complete with full audit, security, and end-to-end tests. Step 17e
-(engagement document templates, wet-sign & signature review) is next.
+UK Law Firm Developer Requirements Addendum. Steps 17a, 17b, 17c, 17d, and 17e are
+complete with full audit, security, and end-to-end tests. Step 17f
+(estimates, budgets, initial fees/payment handoff) is next.
 
 Stass must make the onboarding decision visible and reviewable without
 pretending that a document upload, a database result or a vendor response is a
@@ -150,9 +150,9 @@ events, never deletion or balance edits.
   optional Companies House adapter.
 - **17d. Completed.** Wider conflict subjects, decision outcomes, safeguards and the
   combined activation gate with time-limited partner exceptions.
-- **17e. Next.** Versioned templates, generated engagement documents, wet-sign return
-  and review; optional e-sign adapter boundary.
-- **17f.** Estimates, budgets, initial fees/payment handoff and staff/client
+- **17e. Completed.** Versioned templates, generated engagement documents, wet-sign return
+  and review, portal signing and verification; provider-neutral e-sign boundary.
+- **17f. Next.** Estimates, budgets, initial fees/payment handoff and staff/client
   screens.
 - **Security review.** Authorization, confidentiality, provider callbacks,
   upload safety, concurrency, retention, gate bypasses and full regression.

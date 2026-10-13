@@ -16,6 +16,11 @@ import type {
   ElectronicCheck,
   EvidenceRequest,
   PortalEvidenceRequest,
+  EngagementDocument,
+  EngagementDocumentState,
+  EngagementSignature,
+  EngagementTemplate,
+  EngagementTemplateKey,
 } from './onboarding.js';
 
 interface VerificationRow {
@@ -473,6 +478,301 @@ export class OnboardingRepository {
     const result = await sql<{ id: string }>`select app.activate_client_onboarding(
       ${input.clientId}, ${input.notes}, ${input.actorId}) as id`.execute(trx);
     return result.rows[0]!.id;
+  }
+
+  async listEngagementTemplates(): Promise<EngagementTemplate[]> {
+    const rows = await this.db.selectFrom('engagement_templates as t')
+      .leftJoin('accounts as a', 'a.id', 't.created_by')
+      .select([
+        't.id', 't.template_key', 't.title', 't.version', 't.body_markdown',
+        't.allowed_fields', 't.is_active', 't.created_at',
+        'a.id as creator_id', 'a.display_name as creator_name',
+      ])
+      .where('t.is_active', '=', true)
+      .orderBy('t.template_key', 'asc')
+      .orderBy('t.version', 'desc')
+      .execute();
+
+    return rows.map((r) => ({
+      id: r.id,
+      templateKey: r.template_key,
+      title: r.title,
+      version: r.version,
+      bodyMarkdown: r.body_markdown,
+      allowedFields: r.allowed_fields as string[],
+      isActive: r.is_active,
+      createdBy: r.creator_id ? { accountId: r.creator_id, displayName: r.creator_name ?? 'Staff' } : null,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async getEngagementTemplate(id: string): Promise<EngagementTemplate | null> {
+    const r = await this.db.selectFrom('engagement_templates as t')
+      .leftJoin('accounts as a', 'a.id', 't.created_by')
+      .select([
+        't.id', 't.template_key', 't.title', 't.version', 't.body_markdown',
+        't.allowed_fields', 't.is_active', 't.created_at',
+        'a.id as creator_id', 'a.display_name as creator_name',
+      ])
+      .where('t.id', '=', id)
+      .executeTakeFirst();
+    if (!r) return null;
+    return {
+      id: r.id,
+      templateKey: r.template_key,
+      title: r.title,
+      version: r.version,
+      bodyMarkdown: r.body_markdown,
+      allowedFields: r.allowed_fields as string[],
+      isActive: r.is_active,
+      createdBy: r.creator_id ? { accountId: r.creator_id, displayName: r.creator_name ?? 'Staff' } : null,
+      createdAt: r.created_at,
+    };
+  }
+
+  async createEngagementTemplate(input: {
+    templateKey: string; title: string; bodyMarkdown: string; allowedFields: string[]; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_engagement_template(
+      ${input.templateKey}, ${input.title}, ${input.bodyMarkdown}, ${JSON.stringify(input.allowedFields)}::jsonb, ${input.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listClientEngagementDocuments(clientId: string): Promise<EngagementDocument[]> {
+    const docs = await this.db.selectFrom('engagement_documents as d')
+      .innerJoin('accounts as gen', 'gen.id', 'd.generated_by')
+      .select([
+        'd.id', 'd.client_id', 'd.matter_id', 'd.template_id', 'd.template_version',
+        'd.title', 'd.document_kind', 'd.state', 'd.input_snapshot', 'd.rendered_content',
+        'd.content_hash', 'd.generated_at', 'd.sent_at', 'd.viewed_at', 'd.declined_at',
+        'd.decline_reason', 'd.expires_at',
+        'gen.id as gen_id', 'gen.display_name as gen_name',
+      ])
+      .where('d.client_id', '=', clientId)
+      .orderBy('d.generated_at', 'desc')
+      .execute();
+
+    const docIds = docs.map((d) => d.id);
+    if (docIds.length === 0) return [];
+
+    const sigs = await this.db.selectFrom('engagement_signatures as s')
+      .innerJoin('accounts as rec', 'rec.id', 's.recorded_by')
+      .leftJoin('engagement_signature_reviews as rev', 'rev.signature_id', 's.id')
+      .leftJoin('accounts as rev_acc', 'rev_acc.id', 'rev.reviewed_by')
+      .select([
+        's.id', 's.engagement_document_id', 's.signer_name', 's.signer_email', 's.signer_role',
+        's.signature_method', 's.document_id', 's.raw_metadata', 's.signed_at', 's.recorded_at',
+        'rec.id as rec_id', 'rec.display_name as rec_name',
+        'rev.id as rev_id', 'rev.outcome as rev_outcome', 'rev.reason as rev_reason', 'rev.reviewed_at as rev_at',
+        'rev_acc.id as rev_acc_id', 'rev_acc.display_name as rev_acc_name',
+      ])
+      .where('s.engagement_document_id', 'in', docIds)
+      .execute();
+
+    const sigMap = new Map<string, EngagementSignature>();
+    for (const s of sigs) {
+      sigMap.set(s.engagement_document_id, {
+        id: s.id,
+        engagementDocumentId: s.engagement_document_id,
+        signerName: s.signer_name,
+        signerEmail: s.signer_email,
+        signerRole: s.signer_role,
+        signatureMethod: s.signature_method,
+        documentId: s.document_id,
+        rawMetadata: s.raw_metadata,
+        signedAt: s.signed_at,
+        recordedBy: { accountId: s.rec_id, displayName: s.rec_name },
+        recordedAt: s.recorded_at,
+        review: s.rev_id && s.rev_acc_id ? {
+          id: s.rev_id,
+          signatureId: s.id,
+          outcome: s.rev_outcome as 'accepted' | 'rejected',
+          reason: s.rev_reason!,
+          reviewedBy: { accountId: s.rev_acc_id, displayName: s.rev_acc_name! },
+          reviewedAt: s.rev_at!,
+        } : null,
+      });
+    }
+
+    return docs.map((d) => ({
+      id: d.id,
+      clientId: d.client_id,
+      matterId: d.matter_id,
+      templateId: d.template_id,
+      templateVersion: d.template_version,
+      title: d.title,
+      documentKind: d.document_kind,
+      state: d.state,
+      inputSnapshot: d.input_snapshot,
+      renderedContent: d.rendered_content,
+      contentHash: d.content_hash,
+      generatedBy: { accountId: d.gen_id, displayName: d.gen_name },
+      generatedAt: d.generated_at,
+      sentAt: d.sent_at,
+      viewedAt: d.viewed_at,
+      declinedAt: d.declined_at,
+      declineReason: d.decline_reason,
+      expiresAt: d.expires_at,
+      signature: sigMap.get(d.id) ?? null,
+    }));
+  }
+
+  async getEngagementDocument(id: string): Promise<EngagementDocument | null> {
+    const d = await this.db.selectFrom('engagement_documents as d')
+      .innerJoin('accounts as gen', 'gen.id', 'd.generated_by')
+      .select([
+        'd.id', 'd.client_id', 'd.matter_id', 'd.template_id', 'd.template_version',
+        'd.title', 'd.document_kind', 'd.state', 'd.input_snapshot', 'd.rendered_content',
+        'd.content_hash', 'd.generated_at', 'd.sent_at', 'd.viewed_at', 'd.declined_at',
+        'd.decline_reason', 'd.expires_at',
+        'gen.id as gen_id', 'gen.display_name as gen_name',
+      ])
+      .where('d.id', '=', id)
+      .executeTakeFirst();
+    if (!d) return null;
+
+    const s = await this.db.selectFrom('engagement_signatures as s')
+      .innerJoin('accounts as rec', 'rec.id', 's.recorded_by')
+      .leftJoin('engagement_signature_reviews as rev', 'rev.signature_id', 's.id')
+      .leftJoin('accounts as rev_acc', 'rev_acc.id', 'rev.reviewed_by')
+      .select([
+        's.id', 's.engagement_document_id', 's.signer_name', 's.signer_email', 's.signer_role',
+        's.signature_method', 's.document_id', 's.raw_metadata', 's.signed_at', 's.recorded_at',
+        'rec.id as rec_id', 'rec.display_name as rec_name',
+        'rev.id as rev_id', 'rev.outcome as rev_outcome', 'rev.reason as rev_reason', 'rev.reviewed_at as rev_at',
+        'rev_acc.id as rev_acc_id', 'rev_acc.display_name as rev_acc_name',
+      ])
+      .where('s.engagement_document_id', '=', id)
+      .executeTakeFirst();
+
+    const signature: EngagementSignature | null = s ? {
+      id: s.id,
+      engagementDocumentId: s.engagement_document_id,
+      signerName: s.signer_name,
+      signerEmail: s.signer_email,
+      signerRole: s.signer_role,
+      signatureMethod: s.signature_method,
+      documentId: s.document_id,
+      rawMetadata: s.raw_metadata,
+      signedAt: s.signed_at,
+      recordedBy: { accountId: s.rec_id, displayName: s.rec_name },
+      recordedAt: s.recorded_at,
+      review: s.rev_id && s.rev_acc_id ? {
+        id: s.rev_id,
+        signatureId: s.id,
+        outcome: s.rev_outcome as 'accepted' | 'rejected',
+        reason: s.rev_reason!,
+        reviewedBy: { accountId: s.rev_acc_id, displayName: s.rev_acc_name! },
+        reviewedAt: s.rev_at!,
+      } : null,
+    } : null;
+
+    return {
+      id: d.id,
+      clientId: d.client_id,
+      matterId: d.matter_id,
+      templateId: d.template_id,
+      templateVersion: d.template_version,
+      title: d.title,
+      documentKind: d.document_kind,
+      state: d.state,
+      inputSnapshot: d.input_snapshot,
+      renderedContent: d.rendered_content,
+      contentHash: d.content_hash,
+      generatedBy: { accountId: d.gen_id, displayName: d.gen_name },
+      generatedAt: d.generated_at,
+      sentAt: d.sent_at,
+      viewedAt: d.viewed_at,
+      declinedAt: d.declined_at,
+      declineReason: d.decline_reason,
+      expiresAt: d.expires_at,
+      signature,
+    };
+  }
+
+  async generateEngagementDocument(input: {
+    clientId: string; matterId: string | null; templateId: string; title: string;
+    inputSnapshot: Record<string, unknown>; renderedContent: string; contentHash: string; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.generate_engagement_document(
+      ${input.clientId}, ${input.matterId}, ${input.templateId}, ${input.title},
+      ${JSON.stringify(input.inputSnapshot)}::jsonb, ${input.renderedContent}, ${input.contentHash}, ${input.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async sendEngagementDocument(input: { documentId: string; expiresAt: Date | null; actorId: string }, trx: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.send_engagement_document(${input.documentId}, ${input.expiresAt}, ${input.actorId})`.execute(trx);
+  }
+
+  async markEngagementDocumentViewed(documentId: string, trx: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.mark_engagement_document_viewed(${documentId})`.execute(trx);
+  }
+
+  async recordEngagementSignature(input: {
+    documentId: string; signerName: string; signerEmail: string | null; signerRole: string;
+    signatureMethod: string; documentIdRef: string | null; metadata: Record<string, unknown>; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_engagement_signature(
+      ${input.documentId}, ${input.signerName}, ${input.signerEmail}, ${input.signerRole},
+      ${input.signatureMethod}, ${input.documentIdRef}, ${JSON.stringify(input.metadata)}::jsonb, ${input.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async declineEngagementDocument(input: { documentId: string; reason: string }, trx: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.decline_engagement_document(${input.documentId}, ${input.reason})`.execute(trx);
+  }
+
+  async reviewEngagementSignature(input: {
+    signatureId: string; outcome: 'accepted' | 'rejected'; reason: string; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.review_engagement_signature(
+      ${input.signatureId}, ${input.outcome}, ${input.reason}, ${input.actorId}
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listPortalEngagementDocuments(accountId: string): Promise<EngagementDocument[]> {
+    const rows = await sql<{
+      id: string; client_id: string; matter_id: string | null; template_id: string; template_version: number;
+      title: string; document_kind: EngagementTemplateKey; state: EngagementDocumentState; input_snapshot: Record<string, unknown>;
+      rendered_content: string; content_hash: string; generated_at: Date; sent_at: Date | null;
+      viewed_at: Date | null; declined_at: Date | null; decline_reason: string | null; expires_at: Date | null;
+      gen_id: string; gen_name: string;
+    }>`
+      select doc.id, doc.client_id, doc.matter_id, doc.template_id, doc.template_version,
+        doc.title, doc.document_kind, doc.state, doc.input_snapshot, doc.rendered_content,
+        doc.content_hash, doc.generated_at, doc.sent_at, doc.viewed_at, doc.declined_at,
+        doc.decline_reason, doc.expires_at, gen.id as gen_id, gen.display_name as gen_name
+      from app.engagement_documents doc
+      join app.portal_links link on link.client_id = doc.client_id and link.account_id = ${accountId} and link.ended_at is null
+      join app.accounts gen on gen.id = doc.generated_by
+      where doc.state in ('sent', 'viewed', 'signed', 'verified', 'declined')
+      order by doc.generated_at desc limit 100
+    `.execute(this.db);
+
+    return rows.rows.map((d) => ({
+      id: d.id,
+      clientId: d.client_id,
+      matterId: d.matter_id,
+      templateId: d.template_id,
+      templateVersion: d.template_version,
+      title: d.title,
+      documentKind: d.document_kind,
+      state: d.state,
+      inputSnapshot: d.input_snapshot,
+      renderedContent: d.rendered_content,
+      contentHash: d.content_hash,
+      generatedBy: { accountId: d.gen_id, displayName: d.gen_name },
+      generatedAt: d.generated_at,
+      sentAt: d.sent_at,
+      viewedAt: d.viewed_at,
+      declinedAt: d.declined_at,
+      declineReason: d.decline_reason,
+      expiresAt: d.expires_at,
+    }));
   }
 }
 

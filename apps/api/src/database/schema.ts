@@ -322,6 +322,64 @@ export interface ClientOnboardingActivationsTable {
   notes: InsertOnly<string | null>;
 }
 
+export interface EngagementTemplatesTable {
+  id: DatabaseSet<string>;
+  template_key: InsertOnly<'letter_of_authority' | 'client_care_letter' | 'fee_agreement'>;
+  title: InsertOnly<string>;
+  version: InsertOnly<number>;
+  body_markdown: InsertOnly<string>;
+  allowed_fields: InsertOnly<string[]>;
+  is_active: InsertOnly<boolean>;
+  created_by: InsertOnly<string | null>;
+  created_at: DatabaseSet<Date>;
+}
+
+export type EngagementDocumentState = 'draft' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired' | 'verified';
+
+export interface EngagementDocumentsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  matter_id: InsertOnly<string | null>;
+  template_id: InsertOnly<string>;
+  template_version: InsertOnly<number>;
+  title: InsertOnly<string>;
+  document_kind: InsertOnly<'letter_of_authority' | 'client_care_letter' | 'fee_agreement'>;
+  state: Writable<EngagementDocumentState>;
+  input_snapshot: InsertOnly<Record<string, unknown>>;
+  rendered_content: InsertOnly<string>;
+  content_hash: InsertOnly<string>;
+  generated_by: InsertOnly<string>;
+  generated_at: DatabaseSet<Date>;
+  sent_at: Writable<Date | null>;
+  viewed_at: Writable<Date | null>;
+  declined_at: Writable<Date | null>;
+  decline_reason: Writable<string | null>;
+  expires_at: Writable<Date | null>;
+}
+
+export interface EngagementSignaturesTable {
+  id: DatabaseSet<string>;
+  engagement_document_id: InsertOnly<string>;
+  signer_name: InsertOnly<string>;
+  signer_email: InsertOnly<string | null>;
+  signer_role: InsertOnly<'client' | 'representative' | 'director' | 'officer'>;
+  signature_method: InsertOnly<'wet_signature_upload' | 'portal_drawn' | 'provider_electronic'>;
+  document_id: InsertOnly<string | null>;
+  raw_metadata: InsertOnly<Record<string, unknown>>;
+  signed_at: DatabaseSet<Date>;
+  recorded_by: InsertOnly<string>;
+  recorded_at: DatabaseSet<Date>;
+}
+
+export interface EngagementSignatureReviewsTable {
+  id: DatabaseSet<string>;
+  signature_id: InsertOnly<string>;
+  outcome: InsertOnly<'accepted' | 'rejected'>;
+  reason: InsertOnly<string>;
+  reviewed_by: InsertOnly<string>;
+  reviewed_at: DatabaseSet<Date>;
+}
+
 interface ClientCorrespondenceColumns {
   email: Writable<string | null>;
   phone: Writable<string | null>;
@@ -1694,6 +1752,10 @@ export interface Database {
   conflict_decisions: ConflictDecisionsTable;
   onboarding_activation_exceptions: OnboardingActivationExceptionsTable;
   client_onboarding_activations: ClientOnboardingActivationsTable;
+  engagement_templates: EngagementTemplatesTable;
+  engagement_documents: EngagementDocumentsTable;
+  engagement_signatures: EngagementSignaturesTable;
+  engagement_signature_reviews: EngagementSignatureReviewsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

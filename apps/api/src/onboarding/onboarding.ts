@@ -146,3 +146,66 @@ export interface ActivationGate {
   requirements: ActivationRequirement[];
 }
 
+export type EngagementTemplateKey = 'letter_of_authority' | 'client_care_letter' | 'fee_agreement';
+export type EngagementDocumentState = 'draft' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired' | 'verified';
+export type SignerRole = 'client' | 'representative' | 'director' | 'officer';
+export type SignatureMethod = 'wet_signature_upload' | 'portal_drawn' | 'provider_electronic';
+
+export interface EngagementTemplate {
+  id: string;
+  templateKey: EngagementTemplateKey;
+  title: string;
+  version: number;
+  bodyMarkdown: string;
+  allowedFields: string[];
+  isActive: boolean;
+  createdBy: { accountId: string; displayName: string } | null;
+  createdAt: Date;
+}
+
+export interface EngagementSignatureReview {
+  id: string;
+  signatureId: string;
+  outcome: 'accepted' | 'rejected';
+  reason: string;
+  reviewedBy: { accountId: string; displayName: string };
+  reviewedAt: Date;
+}
+
+export interface EngagementSignature {
+  id: string;
+  engagementDocumentId: string;
+  signerName: string;
+  signerEmail: string | null;
+  signerRole: SignerRole;
+  signatureMethod: SignatureMethod;
+  documentId: string | null;
+  rawMetadata: Record<string, unknown>;
+  signedAt: Date;
+  recordedBy: { accountId: string; displayName: string };
+  recordedAt: Date;
+  review?: EngagementSignatureReview | null;
+}
+
+export interface EngagementDocument {
+  id: string;
+  clientId: string;
+  matterId: string | null;
+  templateId: string;
+  templateVersion: number;
+  title: string;
+  documentKind: EngagementTemplateKey;
+  state: EngagementDocumentState;
+  inputSnapshot: Record<string, unknown>;
+  renderedContent: string;
+  contentHash: string;
+  generatedBy: { accountId: string; displayName: string };
+  generatedAt: Date;
+  sentAt: Date | null;
+  viewedAt: Date | null;
+  declinedAt: Date | null;
+  declineReason: string | null;
+  expiresAt: Date | null;
+  signature?: EngagementSignature | null;
+}
+

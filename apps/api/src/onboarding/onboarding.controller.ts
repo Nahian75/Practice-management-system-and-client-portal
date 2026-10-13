@@ -20,6 +20,9 @@ import type {
   ElectronicCheck,
   EvidenceRequest,
   PortalEvidenceRequest,
+  EngagementDocument,
+  EngagementSignature,
+  EngagementTemplate,
 } from './onboarding.js';
 import { OnboardingService, type OnboardingActor } from './onboarding.service.js';
 
@@ -267,6 +270,157 @@ const serializeConflictAlias = (v: ConflictAlias) => ({ ...v, createdAt: v.creat
 const serializeConflictConnectedPerson = (v: ConflictConnectedPerson) => ({ ...v, createdAt: v.createdAt.toISOString() });
 const serializeConflictDecision = (v: ConflictDecision) => ({ ...v, decidedAt: v.decidedAt.toISOString() });
 const serializeActivationException = (v: ActivationException) => ({ ...v, expiresAt: v.expiresAt.toISOString(), grantedAt: v.grantedAt.toISOString() });
+
+const engagementTemplate = z.object({
+  id: z.uuid(),
+  templateKey: z.enum(['letter_of_authority', 'client_care_letter', 'fee_agreement']),
+  title: z.string(),
+  version: z.number().int(),
+  bodyMarkdown: z.string(),
+  allowedFields: z.array(z.string()),
+  isActive: z.boolean(),
+  createdBy: z.object({ accountId: z.uuid(), displayName: z.string() }).nullable(),
+  createdAt: z.iso.datetime(),
+});
+const engagementTemplateList = z.object({ templates: z.array(engagementTemplate) });
+const createEngagementTemplateBody = z.strictObject({
+  templateKey: z.enum(['letter_of_authority', 'client_care_letter', 'fee_agreement']),
+  title: text(200, 3),
+  bodyMarkdown: text(20_000, 10),
+  allowedFields: z.array(text(100, 1)).min(1),
+});
+const createEngagementTemplateResponse = z.object({
+  templateId: z.uuid(),
+  outcome: z.literal('created'),
+});
+
+const engagementSignatureReview = z.object({
+  id: z.uuid(),
+  signatureId: z.uuid(),
+  outcome: z.enum(['accepted', 'rejected']),
+  reason: z.string(),
+  reviewedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  reviewedAt: z.iso.datetime(),
+});
+
+const engagementSignature = z.object({
+  id: z.uuid(),
+  engagementDocumentId: z.uuid(),
+  signerName: z.string(),
+  signerEmail: z.string().nullable(),
+  signerRole: z.enum(['client', 'representative', 'director', 'officer']),
+  signatureMethod: z.enum(['wet_signature_upload', 'portal_drawn', 'provider_electronic']),
+  documentId: z.uuid().nullable(),
+  rawMetadata: z.unknown(),
+  signedAt: z.iso.datetime(),
+  recordedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  recordedAt: z.iso.datetime(),
+  review: engagementSignatureReview.nullable().optional(),
+});
+
+const engagementDocument = z.object({
+  id: z.uuid(),
+  clientId: z.uuid(),
+  matterId: z.uuid().nullable(),
+  templateId: z.uuid(),
+  templateVersion: z.number().int(),
+  title: z.string(),
+  documentKind: z.enum(['letter_of_authority', 'client_care_letter', 'fee_agreement']),
+  state: z.enum(['draft', 'sent', 'viewed', 'signed', 'declined', 'expired', 'verified']),
+  inputSnapshot: z.unknown(),
+  renderedContent: z.string(),
+  contentHash: z.string(),
+  generatedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  generatedAt: z.iso.datetime(),
+  sentAt: z.iso.datetime().nullable(),
+  viewedAt: z.iso.datetime().nullable(),
+  declinedAt: z.iso.datetime().nullable(),
+  declineReason: z.string().nullable(),
+  expiresAt: z.iso.datetime().nullable(),
+  signature: engagementSignature.nullable().optional(),
+});
+const engagementDocumentList = z.object({ documents: z.array(engagementDocument) });
+
+const generateEngagementDocumentBody = z.strictObject({
+  templateId: z.uuid(),
+  matterId: z.uuid().nullable().optional(),
+  title: text(200, 3),
+  fields: z.record(z.string(), z.string()),
+});
+const generateEngagementDocumentResponse = z.object({
+  documentId: z.uuid(),
+  outcome: z.literal('generated'),
+});
+
+const sendEngagementDocumentBody = z.strictObject({
+  expiresAt: z.iso.datetime().nullable().optional(),
+});
+const sendEngagementDocumentResponse = z.object({
+  outcome: z.literal('sent'),
+});
+
+const recordSignatureBody = z.strictObject({
+  signerName: text(200, 1),
+  signerEmail: z.string().email().nullable().optional(),
+  signerRole: z.enum(['client', 'representative', 'director', 'officer']),
+  signatureMethod: z.enum(['wet_signature_upload', 'portal_drawn', 'provider_electronic']),
+  documentIdRef: z.uuid().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+const recordSignatureResponse = z.object({
+  signatureId: z.uuid(),
+  outcome: z.literal('recorded'),
+});
+
+const declineDocumentBody = z.strictObject({
+  reason: text(2000, 3),
+});
+const declineDocumentResponse = z.object({
+  outcome: z.literal('declined'),
+});
+
+const reviewSignatureBody = z.strictObject({
+  outcome: z.enum(['accepted', 'rejected']),
+  reason: text(2000, 3),
+});
+const reviewSignatureResponse = z.object({
+  reviewId: z.uuid(),
+  outcome: z.literal('reviewed'),
+});
+
+const portalSignBody = z.strictObject({
+  signerName: text(200, 1),
+  signerEmail: z.string().email().nullable().optional(),
+  signerRole: z.enum(['client', 'representative', 'director', 'officer']).default('client'),
+  signatureMethod: z.enum(['wet_signature_upload', 'portal_drawn', 'provider_electronic']).default('portal_drawn'),
+  documentIdRef: z.uuid().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const serializeEngagementTemplate = (t: EngagementTemplate) => ({
+  ...t,
+  createdAt: t.createdAt.toISOString(),
+});
+
+const serializeEngagementSignature = (s: EngagementSignature) => ({
+  ...s,
+  signedAt: s.signedAt.toISOString(),
+  recordedAt: s.recordedAt.toISOString(),
+  review: s.review ? {
+    ...s.review,
+    reviewedAt: s.review.reviewedAt.toISOString(),
+  } : null,
+});
+
+const serializeEngagementDocument = (d: EngagementDocument) => ({
+  ...d,
+  generatedAt: d.generatedAt.toISOString(),
+  sentAt: d.sentAt?.toISOString() ?? null,
+  viewedAt: d.viewedAt?.toISOString() ?? null,
+  declinedAt: d.declinedAt?.toISOString() ?? null,
+  expiresAt: d.expiresAt?.toISOString() ?? null,
+  signature: d.signature ? serializeEngagementSignature(d.signature) : null,
+});
 
 @Controller()
 export class OnboardingController {
@@ -536,6 +690,128 @@ export class OnboardingController {
       case 'activated': return { activationId: result.activationId, outcome: 'activated' as const };
     }
   }
+
+  @Get('onboarding/engagement-templates') @RequirePermission('clients.view') @ResponseSchema(engagementTemplateList)
+  async listEngagementTemplates() {
+    const templates = await this.onboarding.listEngagementTemplates();
+    return { templates: templates.map(serializeEngagementTemplate) };
+  }
+
+  @Post('onboarding/engagement-templates') @RequirePermission('aml.assess') @ResponseSchema(createEngagementTemplateResponse)
+  async createEngagementTemplate(
+    @Body({ schema: createEngagementTemplateBody }) body: z.infer<typeof createEngagementTemplateBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.createEngagementTemplate(body, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only partner or compliance can create engagement templates');
+      case 'conflict': throw new ConflictException('Template with this key or version already exists or is invalid');
+      case 'created': return { templateId: result.templateId, outcome: 'created' as const };
+    }
+  }
+
+  @Get('clients/:clientId/engagement-documents') @RequirePermission('clients.view') @ResponseSchema(engagementDocumentList)
+  async listClientEngagementDocuments(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const documents = await this.onboarding.listClientEngagementDocuments(clientId);
+    return { documents: documents.map(serializeEngagementDocument) };
+  }
+
+  @Post('clients/:clientId/engagement-documents') @RequirePermission('clients.edit') @ResponseSchema(generateEngagementDocumentResponse)
+  async generateEngagementDocument(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: generateEngagementDocumentBody }) body: z.infer<typeof generateEngagementDocumentBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.generateEngagementDocument({
+      clientId,
+      matterId: body.matterId ?? null,
+      templateId: body.templateId,
+      title: body.title,
+      fields: body.fields,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner or partner can generate engagement documents');
+      case 'not_found': throw new NotFoundException('Client or engagement template not found');
+      case 'conflict': throw new ConflictException('Unable to generate engagement document');
+      case 'generated': return { documentId: result.documentId, outcome: 'generated' as const };
+    }
+  }
+
+  @Post('clients/:clientId/engagement-documents/:documentId/send') @RequirePermission('clients.edit') @ResponseSchema(sendEngagementDocumentResponse)
+  async sendEngagementDocument(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: sendEngagementDocumentBody }) body: z.infer<typeof sendEngagementDocumentBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.sendEngagementDocument(documentId, {
+      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner or partner can send engagement documents');
+      case 'not_found': throw new NotFoundException('Engagement document not found');
+      case 'conflict': throw new ConflictException('Document cannot be sent in its current state');
+      case 'sent': return { outcome: 'sent' as const };
+    }
+  }
+
+  @Post('clients/:clientId/engagement-documents/:documentId/signatures') @RequirePermission('clients.edit') @ResponseSchema(recordSignatureResponse)
+  async recordEngagementSignature(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: recordSignatureBody }) body: z.infer<typeof recordSignatureBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.recordEngagementSignature(documentId, {
+      signerName: body.signerName,
+      signerEmail: body.signerEmail ?? null,
+      signerRole: body.signerRole,
+      signatureMethod: body.signatureMethod,
+      documentIdRef: body.documentIdRef ?? null,
+      metadata: body.metadata,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Engagement document not found');
+      case 'conflict': throw new ConflictException('Document is not awaiting signature');
+      case 'recorded': return { signatureId: result.signatureId, outcome: 'recorded' as const };
+    }
+  }
+
+  @Post('clients/:clientId/engagement-documents/:documentId/decline') @RequirePermission('clients.edit') @ResponseSchema(declineDocumentResponse)
+  async declineEngagementDocument(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: declineDocumentBody }) body: z.infer<typeof declineDocumentBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.declineEngagementDocument(documentId, {
+      reason: body.reason,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Engagement document not found');
+      case 'conflict': throw new ConflictException('Document cannot be declined in its current state');
+      case 'declined': return { outcome: 'declined' as const };
+    }
+  }
+
+  @Post('clients/:clientId/engagement-signatures/:signatureId/review') @RequirePermission('aml.assess') @ResponseSchema(reviewSignatureResponse)
+  async reviewEngagementSignature(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('signatureId', { schema: z.uuid() }) signatureId: string,
+    @Body({ schema: reviewSignatureBody }) body: z.infer<typeof reviewSignatureBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.reviewEngagementSignature(signatureId, {
+      outcome: body.outcome,
+      reason: body.reason,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner, partner or compliance can review engagement signatures');
+      case 'not_found': throw new NotFoundException('Engagement signature not found');
+      case 'conflict': throw new ConflictException('Unable to review engagement signature');
+      case 'reviewed': return { reviewId: result.reviewId, outcome: 'reviewed' as const };
+    }
+  }
 }
 
 @Controller('portal/evidence-requests')
@@ -560,6 +836,77 @@ export class PortalEvidenceController {
       case 'conflict': throw new ConflictException('This evidence request is no longer open');
       case 'refused': throw uploadRefusal(result.reason);
       case 'uploaded': return serializePortalRequest(result.request);
+    }
+  }
+}
+
+@Controller('portal/engagement-documents')
+@ClientOnly()
+export class PortalEngagementController {
+  constructor(private readonly onboarding: OnboardingService) {}
+
+  @Get() @ResponseSchema(engagementDocumentList)
+  async list(@CurrentSession() session: ResolvedSession) {
+    const documents = await this.onboarding.listPortalEngagementDocuments(session.account.id);
+    return { documents: documents.map(serializeEngagementDocument) };
+  }
+
+  @Get(':documentId') @ResponseSchema(engagementDocument)
+  async get(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @CurrentSession() session: ResolvedSession,
+  ) {
+    const document = await this.onboarding.getPortalEngagementDocument(documentId, session.account.id);
+    if (!document) throw new NotFoundException('Engagement document not found');
+    return serializeEngagementDocument(document);
+  }
+
+  @Post(':documentId/sign') @ResponseSchema(recordSignatureResponse)
+  async sign(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: portalSignBody }) body: z.infer<typeof portalSignBody>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const doc = await this.onboarding.getPortalEngagementDocument(documentId, session.account.id);
+    if (!doc) throw new NotFoundException('Engagement document not found');
+    if (doc.state !== 'sent' && doc.state !== 'viewed') {
+      throw new ConflictException('Document is not awaiting signature');
+    }
+    const result = await this.onboarding.recordEngagementSignature(documentId, {
+      signerName: body.signerName,
+      signerEmail: body.signerEmail ?? null,
+      signerRole: body.signerRole,
+      signatureMethod: body.signatureMethod,
+      documentIdRef: body.documentIdRef ?? null,
+      metadata: body.metadata,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Engagement document not found');
+      case 'conflict': throw new ConflictException('Document is not awaiting signature');
+      case 'recorded': return { signatureId: result.signatureId, outcome: 'recorded' as const };
+    }
+  }
+
+  @Post(':documentId/decline') @ResponseSchema(declineDocumentResponse)
+  async decline(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Body({ schema: declineDocumentBody }) body: z.infer<typeof declineDocumentBody>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+  ) {
+    const doc = await this.onboarding.getPortalEngagementDocument(documentId, session.account.id);
+    if (!doc) throw new NotFoundException('Engagement document not found');
+    if (doc.state !== 'sent' && doc.state !== 'viewed') {
+      throw new ConflictException('Document cannot be declined in its current state');
+    }
+    const result = await this.onboarding.declineEngagementDocument(documentId, {
+      reason: body.reason,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Engagement document not found');
+      case 'conflict': throw new ConflictException('Document cannot be declined in its current state');
+      case 'declined': return { outcome: 'declined' as const };
     }
   }
 }

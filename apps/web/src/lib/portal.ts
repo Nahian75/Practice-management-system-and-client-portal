@@ -30,3 +30,5 @@ export interface PortalEvidenceRequest {
   state: 'open' | 'submitted';
   submittedAt: string | null;
 }
+
+export type { EngagementDocument, EngagementSignature, SignerRole, SignatureMethod } from './onboarding';

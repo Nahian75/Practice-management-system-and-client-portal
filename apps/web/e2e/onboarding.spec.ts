@@ -262,3 +262,68 @@ test('manages wider conflict subjects, records conflict decision, and activates 
   await noAxeViolations(page);
 });
 
+test('generates tailored engagement document, sends to client, client signs in portal, and staff reviews signature', async ({ page, request }) => {
+  const setup = await clientWithMatter(request);
+  const { client, clientId, feeEarner } = setup;
+
+  // 1. Fee earner navigates to client page to generate engagement document
+  await signIn(page, feeEarner.staff);
+  await page.goto(`/clients/${clientId}`);
+
+  await expect(page.getByRole('heading', { name: 'Engagement & Authority Documents' })).toBeVisible();
+  await page.getByRole('button', { name: '+ Generate document' }).click();
+
+  // Select standard letter of authority or client care letter
+  const docTitle = `Client Care Letter - ${randomName()}`;
+  await page.getByLabel('Document Title').fill(docTitle);
+  await page.getByRole('button', { name: 'Generate Document' }).click();
+
+  await expect(page.getByText('Engagement document generated successfully.')).toBeVisible();
+  await expect(page.getByText(docTitle)).toBeVisible();
+  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
+  await expect(page.getByText(/SHA-256:/)).toBeVisible();
+
+  // 2. Fee earner sends document to client
+  await page.getByRole('button', { name: 'Send to client' }).click();
+  await page.getByRole('button', { name: 'Confirm & Send' }).click();
+
+  await expect(page.getByText('Engagement document sent to client.')).toBeVisible();
+  await expect(page.getByText('Sent to client', { exact: true })).toBeVisible();
+
+  // 3. Client signs in to portal, views document, and signs
+  await signInClient(page, client);
+
+  await expect(page.getByRole('heading', { name: 'Letters of Authority & Client Care Terms' })).toBeVisible();
+  await expect(page.getByText(docTitle)).toBeVisible();
+  await expect(page.getByText('Awaiting your signature')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Review & Sign' }).click();
+  await expect(page.getByText('Document Content & Terms')).toBeVisible();
+
+  await page.getByLabel('Your Full Legal Name').fill(client.displayName);
+  await page.getByLabel(/I confirm that I am authorised to sign/).check();
+  await page.getByRole('button', { name: 'Affix Signature & Agree' }).click();
+
+  await expect(page.getByText('Document successfully signed. Your legal team has been notified.')).toBeVisible();
+  await expect(page.getByText('Signed (under legal review)')).toBeVisible();
+
+  // 4. Fee earner reviews and accepts the signature
+  await signIn(page, feeEarner.staff);
+  await page.goto(`/clients/${clientId}`);
+
+  const engagementSection = page.getByRole('region', { name: 'Engagement & Authority Documents' });
+  await expect(engagementSection.getByText(docTitle)).toBeVisible();
+  await expect(engagementSection.getByText('Signed (pending review)')).toBeVisible();
+  await expect(engagementSection.getByRole('strong')).toContainText(client.displayName);
+
+  await engagementSection.getByRole('button', { name: 'Review signature' }).click();
+  await page.getByLabel('Review Reasoning / Identity Verification Note').fill('Verified against passport and client onboarding file.');
+  await page.getByRole('button', { name: 'Submit Review' }).click();
+
+  await expect(page.getByText('Signature review recorded.')).toBeVisible();
+  await expect(engagementSection.getByText('Verified & active', { exact: true })).toBeVisible();
+  await expect(engagementSection.getByText(/Review: ACCEPTED/i)).toBeVisible();
+
+  await noAxeViolations(page);
+});
+
