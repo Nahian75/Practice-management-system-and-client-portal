@@ -140,4 +140,97 @@ action and requires typed confirmation before the browser submits it.
 
 ## Hosted environments
 
-Not yet decided. See the open questions in [disaster-recovery.md](disaster-recovery.md).
+The production architecture runs in a hardened single-tenant virtual private cloud (VPC) in the UK (e.g. AWS London `eu-west-2` or Azure UK South), complying with SRA data sovereignty and UK GDPR rules.
+
+### Production Topology
+
+```
+Internet
+   │
+   ▼ (HTTPS: 443)
+┌────────────────────────────────────────────────────────┐
+│ Edge Reverse Proxy (Nginx / Caddy in infra/proxy/)    │
+│ - TLS 1.3 / 1.2 termination, strict security headers   │
+│ - Upload streaming: 52 MB limit on multipart routes    │
+│ - Default limit: 1 MB on all other requests            │
+│ - Connection cap: 20 per client IP                     │
+│ - Brute-force rate limiting on /api/auth/sign-in       │
+└───────────────┬────────────────────────┬───────────────┘
+                │                        │
+       (Pass /api/...)             (Pass all other)
+                │                        │
+                ▼                        ▼
+┌─────────────────────────┐  ┌─────────────────────────┐
+│ NestJS Core API (3001)  │  │ Next.js Web App (3000)  │
+│ - Single data owner     │  │ - UI rendering only      │
+│ - Authorization engine  │  │ - Node.js 24 LTS         │
+│ - TRUSTED_PROXIES set   │  │ - 127.0.0.1 bind only    │
+└───────────┬─────────────┘  └─────────────────────────┘
+            │
+            ├──────────────► Private Object Storage (S3 / KMS encrypted)
+            │                - Matter Documents (`pms-documents`)
+            │                - CDD Evidence (`pms-compliance`)
+            │                - HR Personnel Files (`pms-hr`)
+            │
+            ├──────────────► ClamAV Scanning Daemon (Port 3310)
+            │                - Max scan size & stream inspection
+            │
+            ├──────────────► Production SMTP Provider (TLS 1.2+ mandatory)
+            │                - Encrypted queue (`email_outbox`)
+            │
+            ▼
+┌────────────────────────────────────────────────────────┐
+│ PostgreSQL 18 Managed Cluster                          │
+│ - Primary + Multi-AZ Standby Replica                   │
+│ - Private subnet only (No public IP)                   │
+│ - Two distinct roles:                                  │
+│   · pms_owner (DDL migrations only)                    │
+│   · pms_app (Least privilege, DML only)                │
+│ - Continuous WAL archiving to immutable secondary S3   │
+│ - RPO ≤ 15 min, RTO ≤ 4 hr (docs/disaster-recovery.md) │
+└────────────────────────────────────────────────────────┘
+```
+
+### Go-Live & Initial Firm Bootstrapping Runbook
+
+1. **Infrastructure Provisioning:**
+   - Deploy VPC, private subnets, security groups, and object storage buckets with AES-256 KMS encryption.
+   - Provision PostgreSQL 18 with `pms_owner` and `pms_app` roles (`infra/postgres/init/01-roles.sh`).
+   - Enable `pg_trgm` and `unaccent` extensions (`infra/postgres/init/02-extensions.sh`).
+
+2. **Environment Configuration:**
+   - Generate distinct 256-bit cryptographic keys for each security domain:
+     - `TOTP_ENCRYPTION_KEY`
+     - `MAIL_ENCRYPTION_KEY`
+     - `FINANCE_ENCRYPTION_KEY`
+     - `AML_ENCRYPTION_KEY`
+     - `SUSPICION_ENCRYPTION_KEY`
+     - `HR_ENCRYPTION_KEY`
+     - `DOCUMENT_ENCRYPTION_KEY`
+   - Configure `TRUSTED_PROXIES=loopback` (or proxy VPC CIDR).
+   - Configure S3 credentials and ClamAV daemon address.
+
+3. **Database Migration:**
+   ```bash
+   npm run --prefix apps/api migrate
+   ```
+
+4. **Bootstrap Initial Administrator:**
+   ```bash
+   npm run --prefix apps/api invite -- \
+     --kind staff \
+     --email admin@firm.example \
+     --name "Senior Partner" \
+     --role administrator
+   ```
+
+5. **Production Hygiene Verification:**
+   ```bash
+   npm run check:production-hygiene
+   ```
+
+6. **Edge Proxy Activation & DNS Cutover:**
+   - Deploy `infra/proxy/nginx.conf` or `infra/proxy/Caddyfile`.
+   - Verify health endpoints (`GET /api/health`).
+   - Route production DNS records to edge proxy.
+
