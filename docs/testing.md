@@ -1,11 +1,12 @@
 # Testing
 
-**Current state (2026-10-13):** Unit, HTTP and database integration tests for
-the API, including the security-reviewed Tasks and Notifications modules and
+**Current state (2026-10-14):** Unit, HTTP and database integration tests for
+the API, including the security-reviewed Tasks and Notifications modules,
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
-plus People / HR steps 16a to 16f. Playwright end-to-end tests cover the staff app,
-Tasks, Notifications,
-Compliance and the client portal.
+People / HR steps 16a to 16f, Onboarding steps 17a to 17f, Artificial Intelligence
+steps 18a to 18f and its adversarial security review, and Step 19 ephemeral security
+retention sweeps and production hygiene gates. Playwright end-to-end tests cover the
+staff app, Tasks, Notifications, Compliance, Onboarding and the client portal.
 
 ## Tools
 
@@ -364,6 +365,32 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
   sharing no word with any other test's names.
 - Every screen is checked with axe against WCAG 2.2 AA.
 - Traces and screenshots of failures stay in the git-ignored `test-results/`.
+
+## AI and Security Retention fixtures
+
+- **AI Unit & Semantic Suites (`apps/api/src/ai/*.spec.ts`):** 66 tests verify
+  UK PII redaction (`redaction.service.spec.ts`), XML delimiter encapsulation
+  and prompt injection detection (`prompt-builder.service.spec.ts`), document chunking
+  with overlap (`document-chunker.service.spec.ts`), Jaccard word-level citation
+  grounding verification (`citation-grounding.service.spec.ts`), structured chronology
+  extraction (`chronology-extractor.service.spec.ts`), attendance note structuring
+  (`attendance-notes.service.spec.ts`), and HTTP drafting controller endpoints
+  (`ai.controller.spec.ts`).
+- **Adversarial Security Penetration Tests (`ai-security-review.spec.ts`):**
+  15 focused adversarial tests cover:
+  1. *Prompt injection red-teaming:* delimiter escaping, injection heuristics, and audit events.
+  2. *Ethical wall isolation:* blocking context documents belonging to external matters and asserting PostgreSQL team access.
+  3. *Data minimisation:* regex masking of UK NI numbers (including HMRC QQ test prefix), cards, sort codes, bank accounts, passwords, API tokens, and DOBs.
+  4. *Denial-of-wallet protection:* pre-flight request limits (4,096 tokens), monthly firm budgets (100,000 tokens), matter limits (150,000 tokens), and emergency kill-switch.
+  5. *Human-in-the-loop authority:* `unapproved_draft` state enforcement, SRA regulatory warning notices, prohibition of rejected draft promotion, and grounded citation verification.
+- **Ephemeral Security Retention (`security-retention.service.spec.ts`):**
+  Tests verify execution of PostgreSQL procedure `app.purge_expired_ephemeral_security_data`,
+  default thresholds (30-day sessions, 90-day failures, 7-day resets, 14-day invitations, 30-day outbox),
+  custom threshold overrides, and transactional audit event recording (`security.ephemeral_retention_purged`).
+- **Production Deployment Hygiene (`scripts/check-production-hygiene.mjs`):**
+  Automated script asserts `.env` and `DEMO-LOGIN.txt` git-isolation, loopback-only
+  database binding, reverse proxy upload and default payload boundaries (52 MB / 1 MB),
+  and disaster recovery RPO/RTO and tombstone replay definitions.
 
 ## Conventions
 
