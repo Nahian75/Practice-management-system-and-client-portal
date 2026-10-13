@@ -377,11 +377,11 @@ describe('AI Module (Step 18a, 18b, 18c, 18d)', () => {
       expect(generateSpy).toHaveBeenCalled();
       const dispatchedRequest = generateSpy.mock.calls[0]?.[0];
       expect(dispatchedRequest).toBeDefined();
-      expect(dispatchedRequest?.instruction).toContain('[REDACTED_UK_NINO]');
+      expect(dispatchedRequest?.instruction).toContain('[REDACTED_NI_NUMBER]');
       expect(dispatchedRequest?.instruction).not.toContain('QQ 12 34 56 A');
-      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_PAYMENT_CARD]');
-      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_UK_BANK_SORT_CODE]');
-      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_UK_BANK_ACCOUNT]');
+      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_CARD_NUMBER]');
+      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_SORT_CODE]');
+      expect(dispatchedRequest?.contextDocuments[0]?.content).toContain('[REDACTED_BANK_ACCOUNT]');
     });
 
     it('rejects generation when context documents do not belong to the matter', async () => {

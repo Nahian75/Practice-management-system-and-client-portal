@@ -271,9 +271,8 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
   Pre-flight token estimation, per-matter and monthly firm token budgets with automatic hard stops, supervisory compliance audit metrics (`GET /api/ai/metrics`), and matter metrics (`GET /api/matters/:matterId/ai/metrics`).
 - **18f. Staff web app AI workbench and review interfaces — built.**
   Matter AI assistant & interactive review workbench, side-by-side diff viewer for human edits, grounded citation inspector, supervisory governance dashboard (/compliance/ai) with model configuration & emergency kill-switch, one-click document/task promotion, and responsive UX.
-- **Security review (Step 18):**
-  Prompt-injection red-teaming, cross-matter ethical wall penetration testing,
-  token exhaustion testing, privilege escalation verification, and audit review.
+- **Security review (Step 18) — completed.**
+  Prompt-injection red-teaming (zero XML delimiter escapes), cross-matter ethical wall penetration testing, sensitive UK PII pre-prompt masking verification, denial-of-wallet hard stops, human-in-the-loop review promotion gates, and comprehensive adversarial verification test suite (`ai-security-review.spec.ts`). Full threat verification report documented in [`docs/ai-security.md`](ai-security.md).
 
 ## Approval
 

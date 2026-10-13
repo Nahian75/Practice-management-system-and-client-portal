@@ -40,6 +40,14 @@ identity and company review with Companies House adapter, enhanced conflicts wit
 safeguards and activation gates, versioned engagement documents, wet/portal signing,
 and fee estimates, budgets, initial payment requests and manual bank reconciliation handoff
 ([onboarding.md](onboarding.md), [review](reviews/2026-10-13-onboarding.md)).
+The Artificial Intelligence & Legal Drafting Assistant module is implemented in steps 18a to 18f:
+foundation schema, permissions, provider-neutral architecture and offline mock (18a);
+matter boundary enforcement, pre-prompt UK PII/financial redaction and delimiter injection defense (18b);
+document summarisation, chronology extraction and citation grounding verification (18c);
+correspondence drafting, attendance note structuring and human-in-the-loop review state machine with
+document/task promotion (18d); token budgeting, rate limits and supervisory audit controls (18e);
+staff web workbench and supervisory governance dashboard (18f); and security review with
+adversarial penetration verification ([ai.md](ai.md), [ai-security.md](ai-security.md)).
 
 This file describes the target shape. Sections are updated as each part is built.
 

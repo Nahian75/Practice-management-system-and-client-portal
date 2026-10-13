@@ -17,8 +17,8 @@ export interface RedactionResult {
 
 @Injectable()
 export class RedactionService {
-  // UK National Insurance Number format
-  private readonly niRegex = /\b[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\s*\d{2}\s*\d{2}\s*\d{2}\s*[A-D]\b/gi;
+  // UK National Insurance Number format (including HMRC test prefix QQ)
+  private readonly niRegex = /\b(?:QQ|[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z])\s*\d{2}\s*\d{2}\s*\d{2}\s*[A-D]\b/gi;
 
   // Major payment card formats (Visa, MasterCard, Amex)
   private readonly cardRegex = /\b(?:\d{4}[ -]?){3}\d{4}\b|\b3[47]\d{2}[ -]?\d{6}[ -]?\d{5}\b/g;

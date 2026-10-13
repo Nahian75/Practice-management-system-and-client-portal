@@ -412,7 +412,7 @@ export class AiService {
       draftId,
       input.decision,
       input.finalText,
-      input.feedbackReason,
+      input.feedbackReason ?? null,
       docId,
       taskId,
     );

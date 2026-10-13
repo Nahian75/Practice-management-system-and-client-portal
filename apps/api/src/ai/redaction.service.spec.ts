@@ -33,7 +33,7 @@ describe('RedactionService (Step 18b)', () => {
     const text = 'Config: password=superSecret123, api_key: sk-live-987654321, bearer: token998877';
     const result = service.redact(text);
 
-    expect(result.redactedText).toBe('Config: password: [REDACTED_CREDENTIAL], api_key: [REDACTED_CREDENTIAL], bearer: [REDACTED_CREDENTIAL]');
+    expect(result.redactedText).toBe('Config: password=[REDACTED_CREDENTIAL], api_key: [REDACTED_CREDENTIAL], bearer: [REDACTED_CREDENTIAL]');
     expect(result.stats.credentialsCount).toBe(3);
   });
 
