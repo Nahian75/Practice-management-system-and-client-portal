@@ -327,3 +327,69 @@ test('generates tailored engagement document, sends to client, client signs in p
   await noAxeViolations(page);
 });
 
+test('records fee estimate with budget ceiling, requests deposit on account, client views in portal, and staff records bank receipt', async ({ page, request }) => {
+  const setup = await clientWithMatter(request);
+  const { client, clientId, feeEarner } = setup;
+
+  // 1. Fee earner navigates to client page
+  await signIn(page, feeEarner.staff);
+  await page.goto(`/clients/${clientId}`);
+
+  await expect(page.getByRole('heading', { name: 'Fee estimates, budgets & initial payments' })).toBeVisible();
+
+  // 2. Record fee estimate with integer breakdown and budget ceiling
+  await page.getByRole('button', { name: '+ Record fee estimate' }).click();
+  await page.getByLabel('Charging basis').selectOption('fixed');
+  await page.getByLabel(/Estimated fees/).fill('1500.00');
+  await page.getByLabel(/Estimated disbursements/).fill('200.00');
+  await page.getByLabel(/Estimated VAT/).fill('300.00');
+  await page.getByLabel(/Budget limit/).fill('2500.00');
+  await page.getByLabel(/Scope assumptions/).fill('Initial advice, document drafting, searches, and statutory registration fees.');
+  await page.getByRole('button', { name: 'Record Fee Estimate' }).click();
+
+  await expect(page.getByText('Matter fee estimate successfully recorded.')).toBeVisible();
+  await expect(page.getByText('£2,000.00')).toBeVisible();
+  await expect(page.getByText('Active', { exact: true })).toBeVisible();
+
+  // 3. Create initial payment request (deposit on account)
+  await page.getByRole('button', { name: '+ Request payment' }).click();
+  await page.getByLabel('Payment type').selectOption('deposit_on_account');
+  await page.getByLabel(/Amount \(£\)/).fill('500.00');
+  await page.getByLabel('Description').fill('Deposit on account for search disbursements');
+  await page.getByRole('button', { name: 'Create Payment Request' }).click();
+
+  await expect(page.getByText('Initial payment request created successfully.')).toBeVisible();
+  await expect(page.getByText('Deposit on account (client money)')).toBeVisible();
+  await expect(page.getByText('£500.00')).toBeVisible();
+  await expect(page.getByText('Pending payment')).toBeVisible();
+
+  // 4. Client signs into portal and views payment request
+  await signInClient(page, client);
+
+  await expect(page.getByRole('heading', { name: 'Payment requests & deposits on account' })).toBeVisible();
+  await expect(page.getByText('Deposit on account for search disbursements')).toBeVisible();
+  await expect(page.getByText('£500.00')).toBeVisible();
+  await expect(page.getByText('Awaiting your payment')).toBeVisible();
+
+  await page.getByRole('button', { name: 'View bank transfer details' }).click();
+  await expect(page.getByText('How to pay by UK Bank Transfer')).toBeVisible();
+  await expect(page.getByText('Stass Law Client Account')).toBeVisible();
+  await expect(page.getByText('20-00-00')).toBeVisible();
+
+  // 5. Staff records payment receipt with bank reference
+  await signIn(page, feeEarner.staff);
+  await page.goto(`/clients/${clientId}`);
+
+  await page.getByRole('button', { name: 'Record receipt' }).click();
+  await page.getByLabel(/Bank \/ transaction reference/).fill('BACS-998811');
+  await page.getByLabel('Audit notes').fill('Matched to Barclays client account statement');
+  await page.getByRole('button', { name: 'Confirm Receipt' }).click();
+
+  await expect(page.getByText('Payment receipt successfully recorded and reconciled.')).toBeVisible();
+  await expect(page.getByText('Paid & reconciled')).toBeVisible();
+  await expect(page.getByText(/Ref: BACS-998811/)).toBeVisible();
+
+  await noAxeViolations(page);
+});
+
+

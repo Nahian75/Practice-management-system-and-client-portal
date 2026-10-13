@@ -214,3 +214,116 @@ export interface EngagementDocument {
   signature?: EngagementSignature | null;
 }
 
+export type MatterChargingBasis = 'fixed' | 'hourly' | 'contingency' | 'capped' | 'pro_bono';
+export type MatterFeeEstimateStatus = 'active' | 'superseded';
+
+export const CHARGING_BASIS_LABELS: Record<MatterChargingBasis, string> = {
+  fixed: 'Fixed fee',
+  hourly: 'Hourly rates',
+  contingency: 'Damages-based / contingency',
+  capped: 'Capped fee',
+  pro_bono: 'Pro bono',
+};
+
+export interface MatterFeeEstimate {
+  id: string;
+  matterId: string;
+  clientId: string;
+  version: number;
+  chargingBasis: MatterChargingBasis;
+  estimatedFeesPence: string;
+  estimatedDisbursementsPence: string;
+  estimatedVatPence: string;
+  totalEstimatePence: string;
+  budgetLimitPence: string | null;
+  currency: string;
+  assumptions: string;
+  status: MatterFeeEstimateStatus;
+  agreedWithClient: boolean;
+  createdBy: { accountId: string; displayName: string };
+  createdAt: string;
+}
+
+export type OnboardingPaymentRequestKind = 'deposit_on_account' | 'initial_fixed_fee' | 'consultation';
+export type OnboardingPaymentRequestStatus = 'pending' | 'paid' | 'waived' | 'cancelled';
+export type OnboardingPaymentMethod = 'bank_transfer' | 'card' | 'portal_checkout' | 'cheque' | 'cash';
+
+export const PAYMENT_KIND_LABELS: Record<OnboardingPaymentRequestKind, string> = {
+  deposit_on_account: 'Deposit on account (client money)',
+  initial_fixed_fee: 'Initial fixed fee (office money)',
+  consultation: 'Initial consultation fee',
+};
+
+export const PAYMENT_METHOD_LABELS: Record<OnboardingPaymentMethod, string> = {
+  bank_transfer: 'Bank transfer',
+  card: 'Debit / credit card',
+  portal_checkout: 'Portal checkout',
+  cheque: 'Cheque',
+  cash: 'Cash (office receipt)',
+};
+
+export interface BankAccountDetails {
+  accountName: string;
+  sortCode: string;
+  accountNumber: string;
+  bankName: string;
+  reference?: string;
+}
+
+export interface OnboardingPaymentRequest {
+  id: string;
+  clientId: string;
+  matterId: string | null;
+  engagementDocumentId: string | null;
+  reference: string;
+  kind: OnboardingPaymentRequestKind;
+  description: string;
+  amountPence: string;
+  currency: string;
+  dueOn: string;
+  status: OnboardingPaymentRequestStatus;
+  paymentMethod: OnboardingPaymentMethod | null;
+  paidAt: string | null;
+  paidReference: string | null;
+  bankAccountDetails: Record<string, unknown> | null;
+  notes: string | null;
+  requestedBy: { accountId: string; displayName: string };
+  requestedAt: string;
+  updatedBy?: { accountId: string; displayName: string } | null;
+  updatedAt?: string | null;
+}
+
+export interface PortalPaymentRequest {
+  id: string;
+  reference: string;
+  kind: OnboardingPaymentRequestKind;
+  description: string;
+  amountPence: string;
+  currency: string;
+  dueOn: string;
+  status: OnboardingPaymentRequestStatus;
+  bankAccountDetails: Record<string, unknown> | null;
+  paidAt: string | null;
+  paidReference: string | null;
+}
+
+export function penceToPounds(pence: string | number | bigint): string {
+  const p = BigInt(pence);
+  const negative = p < 0n;
+  const abs = negative ? -p : p;
+  const whole = (abs / 100n).toString();
+  const fraction = (abs % 100n).toString().padStart(2, '0');
+  return `${negative ? '−' : ''}£${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`;
+}
+
+export function poundsToPence(poundsStr: string): bigint {
+  const clean = poundsStr.trim().replace(/^£/, '').replace(/,/g, '');
+  if (!clean) return 0n;
+  const parts = clean.split('.');
+  const whole = parts[0] || '0';
+  const fraction = parts[1] || '0';
+  const wholePence = BigInt(whole) * 100n;
+  const fracPence = BigInt(fraction.slice(0, 2).padEnd(2, '0'));
+  return wholePence + fracPence;
+}
+

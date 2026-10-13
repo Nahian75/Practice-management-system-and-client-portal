@@ -14,6 +14,7 @@ import { ElectronicChecks } from './electronic-checks';
 import { ConflictManagement } from './conflict-management';
 import { ActivationGatePanel } from './activation-gate';
 import { EngagementDocuments } from './engagement-documents';
+import { FeeEstimatesAndPayments } from './fee-estimates-and-payments';
 import type {
   ActivationException,
   ActivationGate,
@@ -25,6 +26,8 @@ import type {
   ElectronicCheck,
   EngagementDocument,
   EngagementTemplate,
+  MatterFeeEstimate,
+  OnboardingPaymentRequest,
 } from '@/lib/onboarding';
 import { TakeOverForm } from './take-over-form';
 
@@ -67,6 +70,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     activationExceptions,
     engagementDocs,
     engagementTemplates,
+    paymentRequests,
   ] = await Promise.all([
     apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`),
     apiGet<{ cases: CddSummary[]; next: string | null }>(`/clients/${encodeURIComponent(clientId)}/cdd`),
@@ -86,7 +90,14 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     apiGet<{ exceptions: ActivationException[] }>(`/clients/${encodeURIComponent(clientId)}/activation-exceptions`),
     apiGet<{ documents: EngagementDocument[] }>(`/clients/${encodeURIComponent(clientId)}/engagement-documents`),
     apiGet<{ templates: EngagementTemplate[] }>('/onboarding/engagement-templates'),
+    apiGet<{ requests: OnboardingPaymentRequest[] }>(`/clients/${encodeURIComponent(clientId)}/payment-requests`),
   ]);
+
+  const clientMatters = matters.body?.matters ?? [];
+  const estimates = clientMatters.length > 0
+    ? (await Promise.all(clientMatters.map((m) => apiGet<{ estimates: MatterFeeEstimate[] }>(`/matters/${encodeURIComponent(m.id)}/fee-estimates`))))
+        .flatMap((res) => res.body?.estimates ?? [])
+    : [];
   // Only for roles that manage portal access; for others the API refuses and the section is left out.
   const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
   const portalCandidates: PortalCandidate[] =
@@ -220,7 +231,14 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
         clientName={clientName(client)}
         documents={engagementDocs.body?.documents ?? []}
         templates={engagementTemplates.body?.templates ?? []}
-        matters={matters.body?.matters ?? []}
+        matters={clientMatters}
+      />
+
+      <FeeEstimatesAndPayments
+        clientId={client.id}
+        matters={clientMatters}
+        paymentRequests={paymentRequests.body?.requests ?? []}
+        feeEstimates={estimates}
       />
 
       {activationGate.body && (

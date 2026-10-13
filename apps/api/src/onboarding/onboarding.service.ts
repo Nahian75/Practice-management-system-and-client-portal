@@ -29,6 +29,12 @@ import type {
   EngagementTemplate,
   SignerRole,
   SignatureMethod,
+  MatterFeeEstimate,
+  MatterChargingBasis,
+  OnboardingPaymentRequest,
+  OnboardingPaymentRequestKind,
+  OnboardingPaymentMethod,
+  PortalPaymentRequest,
 } from './onboarding.js';
 import { OnboardingRepository } from './onboarding.repository.js';
 
@@ -872,6 +878,196 @@ export class OnboardingService {
       doc.viewedAt = new Date();
     }
     return doc;
+  }
+
+  async createMatterFeeEstimate(
+    matterId: string,
+    input: {
+      chargingBasis: MatterChargingBasis;
+      estimatedFeesPence: number | bigint | string;
+      estimatedDisbursementsPence?: number | bigint | string;
+      estimatedVatPence?: number | bigint | string;
+      budgetLimitPence?: number | bigint | string | null;
+      assumptions: string;
+      agreedWithClient?: boolean;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'created'; estimateId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      const estimateId = await this.records.transaction(async (trx) => {
+        const id = await this.records.createMatterFeeEstimate({
+          matterId,
+          chargingBasis: input.chargingBasis,
+          estimatedFeesPence: input.estimatedFeesPence,
+          estimatedDisbursementsPence: input.estimatedDisbursementsPence ?? 0,
+          estimatedVatPence: input.estimatedVatPence ?? 0,
+          budgetLimitPence: input.budgetLimitPence ?? null,
+          assumptions: input.assumptions,
+          agreedWithClient: input.agreedWithClient ?? true,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.fee_estimate_created',
+          outcome: 'success',
+          resource: { type: 'matter_fee_estimate', id },
+          metadata: {
+            matterId,
+            chargingBasis: input.chargingBasis,
+            estimatedFeesPence: String(input.estimatedFeesPence),
+          },
+          ...by.context,
+        }, trx);
+
+        return id;
+      });
+
+      return { outcome: 'created', estimateId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  listMatterFeeEstimates(matterId: string): Promise<MatterFeeEstimate[]> {
+    return this.records.listMatterFeeEstimates(matterId);
+  }
+
+  async createOnboardingPaymentRequest(
+    clientId: string,
+    input: {
+      matterId?: string | null;
+      engagementDocumentId?: string | null;
+      kind: OnboardingPaymentRequestKind;
+      description: string;
+      amountPence: number | bigint | string;
+      dueOn: string;
+      bankAccountDetails?: Record<string, unknown> | null;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'created'; requestId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      const requestId = await this.records.transaction(async (trx) => {
+        const id = await this.records.createOnboardingPaymentRequest({
+          clientId,
+          matterId: input.matterId ?? null,
+          engagementDocumentId: input.engagementDocumentId ?? null,
+          kind: input.kind,
+          description: input.description,
+          amountPence: input.amountPence,
+          dueOn: input.dueOn,
+          bankAccountDetails: input.bankAccountDetails ?? null,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.payment_request_created',
+          outcome: 'success',
+          resource: { type: 'onboarding_payment_request', id },
+          metadata: {
+            clientId,
+            matterId: input.matterId ?? null,
+            kind: input.kind,
+            amountPence: String(input.amountPence),
+          },
+          ...by.context,
+        }, trx);
+
+        return id;
+      });
+
+      return { outcome: 'created', requestId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  listClientPaymentRequests(clientId: string): Promise<OnboardingPaymentRequest[]> {
+    return this.records.listClientPaymentRequests(clientId);
+  }
+
+  listPortalPaymentRequests(accountId: string): Promise<PortalPaymentRequest[]> {
+    return this.records.listPortalPaymentRequests(accountId);
+  }
+
+  async recordOnboardingPaymentReceipt(
+    requestId: string,
+    input: {
+      paymentMethod: OnboardingPaymentMethod;
+      reference: string;
+      notes?: string | null;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded' } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      await this.records.transaction(async (trx) => {
+        await this.records.recordOnboardingPaymentReceipt({
+          requestId,
+          paymentMethod: input.paymentMethod,
+          reference: input.reference,
+          notes: input.notes ?? null,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.payment_receipt_recorded',
+          outcome: 'success',
+          resource: { type: 'onboarding_payment_request', id: requestId },
+          metadata: {
+            paymentMethod: input.paymentMethod,
+            reference: input.reference,
+          },
+          ...by.context,
+        }, trx);
+      });
+
+      return { outcome: 'recorded' };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async waiveOnboardingPaymentRequest(
+    requestId: string,
+    input: { reason: string },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'waived' } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      await this.records.transaction(async (trx) => {
+        await this.records.waiveOnboardingPaymentRequest({
+          requestId,
+          reason: input.reason,
+          actorId: by.accountId,
+        }, trx);
+
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.payment_request_waived',
+          outcome: 'success',
+          resource: { type: 'onboarding_payment_request', id: requestId },
+          metadata: { reason: input.reason },
+          ...by.context,
+        }, trx);
+      });
+
+      return { outcome: 'waived' };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
   }
 
   private verificationLink(token: string): string {

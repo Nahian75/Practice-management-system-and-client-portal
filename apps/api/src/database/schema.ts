@@ -380,6 +380,56 @@ export interface EngagementSignatureReviewsTable {
   reviewed_at: DatabaseSet<Date>;
 }
 
+export type MatterChargingBasis = 'fixed' | 'hourly' | 'contingency' | 'capped' | 'pro_bono';
+export type MatterFeeEstimateStatus = 'active' | 'superseded';
+
+export interface MatterFeeEstimatesTable {
+  id: DatabaseSet<string>;
+  matter_id: InsertOnly<string>;
+  client_id: InsertOnly<string>;
+  version: InsertOnly<number>;
+  charging_basis: InsertOnly<MatterChargingBasis>;
+  estimated_fees_pence: InsertOnly<string>;
+  estimated_disbursements_pence: InsertOnly<string>;
+  estimated_vat_pence: InsertOnly<string>;
+  total_estimate_pence: InsertOnly<string>;
+  budget_limit_pence: InsertOnly<string | null>;
+  currency: InsertOnly<string>;
+  assumptions: InsertOnly<string>;
+  status: Writable<MatterFeeEstimateStatus>;
+  agreed_with_client: InsertOnly<boolean>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export type OnboardingPaymentRequestKind = 'deposit_on_account' | 'initial_fixed_fee' | 'consultation';
+export type OnboardingPaymentRequestStatus = 'pending' | 'paid' | 'waived' | 'cancelled';
+export type OnboardingPaymentMethod = 'bank_transfer' | 'card' | 'portal_checkout' | 'cheque' | 'cash';
+
+export interface OnboardingPaymentRequestsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  matter_id: InsertOnly<string | null>;
+  engagement_document_id: InsertOnly<string | null>;
+  reference: InsertOnly<string>;
+  kind: InsertOnly<OnboardingPaymentRequestKind>;
+  description: InsertOnly<string>;
+  amount_pence: InsertOnly<string>;
+  currency: InsertOnly<string>;
+  due_on: InsertOnly<string | Date>;
+  status: Writable<OnboardingPaymentRequestStatus>;
+  payment_method: Writable<OnboardingPaymentMethod | null>;
+  paid_at: Writable<Date | null>;
+  paid_reference: Writable<string | null>;
+  bank_account_details: InsertOnly<Record<string, unknown> | null>;
+  notes: Writable<string | null>;
+  requested_by: InsertOnly<string>;
+  requested_at: DatabaseSet<Date>;
+  updated_by: Writable<string | null>;
+  updated_at: Writable<Date | null>;
+}
+
+
 interface ClientCorrespondenceColumns {
   email: Writable<string | null>;
   phone: Writable<string | null>;
@@ -1756,6 +1806,8 @@ export interface Database {
   engagement_documents: EngagementDocumentsTable;
   engagement_signatures: EngagementSignaturesTable;
   engagement_signature_reviews: EngagementSignatureReviewsTable;
+  matter_fee_estimates: MatterFeeEstimatesTable;
+  onboarding_payment_requests: OnboardingPaymentRequestsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

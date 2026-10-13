@@ -31,4 +31,4 @@ export interface PortalEvidenceRequest {
   submittedAt: string | null;
 }
 
-export type { EngagementDocument, EngagementSignature, SignerRole, SignatureMethod } from './onboarding';
+export type { EngagementDocument, EngagementSignature, SignerRole, SignatureMethod, PortalPaymentRequest } from './onboarding';

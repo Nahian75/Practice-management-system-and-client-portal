@@ -23,6 +23,8 @@ import type {
   EngagementDocument,
   EngagementSignature,
   EngagementTemplate,
+  MatterFeeEstimate,
+  OnboardingPaymentRequest,
 } from './onboarding.js';
 import { OnboardingService, type OnboardingActor } from './onboarding.service.js';
 
@@ -270,6 +272,112 @@ const serializeConflictAlias = (v: ConflictAlias) => ({ ...v, createdAt: v.creat
 const serializeConflictConnectedPerson = (v: ConflictConnectedPerson) => ({ ...v, createdAt: v.createdAt.toISOString() });
 const serializeConflictDecision = (v: ConflictDecision) => ({ ...v, decidedAt: v.decidedAt.toISOString() });
 const serializeActivationException = (v: ActivationException) => ({ ...v, expiresAt: v.expiresAt.toISOString(), grantedAt: v.grantedAt.toISOString() });
+
+const feeEstimateBody = z.strictObject({
+  chargingBasis: z.enum(['fixed', 'hourly', 'contingency', 'capped', 'pro_bono']),
+  estimatedFeesPence: z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/)]),
+  estimatedDisbursementsPence: z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/)]).optional(),
+  estimatedVatPence: z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/)]).optional(),
+  budgetLimitPence: z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/)]).nullable().optional(),
+  assumptions: text(5000, 3),
+  agreedWithClient: z.boolean().optional(),
+});
+
+const feeEstimate = z.object({
+  id: z.uuid(),
+  matterId: z.uuid(),
+  clientId: z.uuid(),
+  version: z.number().int().positive(),
+  chargingBasis: z.enum(['fixed', 'hourly', 'contingency', 'capped', 'pro_bono']),
+  estimatedFeesPence: z.string(),
+  estimatedDisbursementsPence: z.string(),
+  estimatedVatPence: z.string(),
+  totalEstimatePence: z.string(),
+  budgetLimitPence: z.string().nullable(),
+  currency: z.string(),
+  assumptions: z.string(),
+  status: z.enum(['active', 'superseded']),
+  agreedWithClient: z.boolean(),
+  createdBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  createdAt: z.iso.datetime(),
+});
+const feeEstimateResponse = z.object({ estimateId: z.uuid(), outcome: z.literal('created') });
+const feeEstimateListResponse = z.object({ estimates: z.array(feeEstimate) });
+
+const paymentRequestCreateBody = z.strictObject({
+  matterId: z.uuid().nullable().optional(),
+  engagementDocumentId: z.uuid().nullable().optional(),
+  kind: z.enum(['deposit_on_account', 'initial_fixed_fee', 'consultation']),
+  description: text(500, 3),
+  amountPence: z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d*$/)]),
+  dueOn: date,
+  bankAccountDetails: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+
+const paymentRequestCreateResponse = z.object({ requestId: z.uuid(), outcome: z.literal('created') });
+
+const onboardingPaymentRequest = z.object({
+  id: z.uuid(),
+  clientId: z.uuid(),
+  matterId: z.uuid().nullable(),
+  engagementDocumentId: z.uuid().nullable(),
+  reference: z.string(),
+  kind: z.enum(['deposit_on_account', 'initial_fixed_fee', 'consultation']),
+  description: z.string(),
+  amountPence: z.string(),
+  currency: z.string(),
+  dueOn: date,
+  status: z.enum(['pending', 'paid', 'waived', 'cancelled']),
+  paymentMethod: z.enum(['bank_transfer', 'card', 'portal_checkout', 'cheque', 'cash']).nullable(),
+  paidAt: z.iso.datetime().nullable(),
+  paidReference: z.string().nullable(),
+  bankAccountDetails: z.record(z.string(), z.unknown()).nullable(),
+  notes: z.string().nullable(),
+  requestedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  requestedAt: z.iso.datetime(),
+  updatedBy: z.object({ accountId: z.uuid(), displayName: z.string() }).nullable().optional(),
+  updatedAt: z.iso.datetime().nullable().optional(),
+});
+const onboardingPaymentRequestList = z.object({ requests: z.array(onboardingPaymentRequest) });
+
+const paymentReceiptBody = z.strictObject({
+  paymentMethod: z.enum(['bank_transfer', 'card', 'portal_checkout', 'cheque', 'cash']),
+  reference: text(100, 2),
+  notes: text(1000).nullable().optional(),
+});
+const paymentReceiptResponse = z.object({ outcome: z.literal('recorded') });
+
+const paymentWaiveBody = z.strictObject({
+  reason: text(1000, 3),
+});
+const paymentWaiveResponse = z.object({ outcome: z.literal('waived') });
+
+const portalPaymentRequest = z.object({
+  id: z.uuid(),
+  reference: z.string(),
+  kind: z.enum(['deposit_on_account', 'initial_fixed_fee', 'consultation']),
+  description: z.string(),
+  amountPence: z.string(),
+  currency: z.string(),
+  dueOn: date,
+  status: z.enum(['pending', 'paid', 'waived', 'cancelled']),
+  bankAccountDetails: z.record(z.string(), z.unknown()).nullable(),
+  paidAt: z.iso.datetime().nullable(),
+  paidReference: z.string().nullable(),
+});
+const portalPaymentRequestList = z.object({ requests: z.array(portalPaymentRequest) });
+
+const serializeFeeEstimate = (v: MatterFeeEstimate) => ({
+  ...v,
+  createdAt: v.createdAt.toISOString(),
+});
+
+const serializePaymentRequest = (v: OnboardingPaymentRequest) => ({
+  ...v,
+  requestedAt: v.requestedAt.toISOString(),
+  paidAt: v.paidAt ? v.paidAt.toISOString() : null,
+  updatedAt: v.updatedAt ? v.updatedAt.toISOString() : null,
+});
 
 const engagementTemplate = z.object({
   id: z.uuid(),
@@ -812,6 +920,102 @@ export class OnboardingController {
       case 'reviewed': return { reviewId: result.reviewId, outcome: 'reviewed' as const };
     }
   }
+
+  @Post('matters/:matterId/fee-estimates') @RequirePermission('clients.edit') @ResponseSchema(feeEstimateResponse)
+  async createMatterFeeEstimate(
+    @Param('matterId', { schema: z.uuid() }) matterId: string,
+    @Body({ schema: feeEstimateBody }) body: z.infer<typeof feeEstimateBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.createMatterFeeEstimate(matterId, {
+      chargingBasis: body.chargingBasis,
+      estimatedFeesPence: body.estimatedFeesPence,
+      estimatedDisbursementsPence: body.estimatedDisbursementsPence,
+      estimatedVatPence: body.estimatedVatPence,
+      budgetLimitPence: body.budgetLimitPence,
+      assumptions: body.assumptions,
+      agreedWithClient: body.agreedWithClient,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner, partner or accounts can record fee estimates');
+      case 'not_found': throw new NotFoundException('Matter not found');
+      case 'conflict': throw new ConflictException('Unable to record fee estimate');
+      case 'created': return { estimateId: result.estimateId, outcome: 'created' as const };
+    }
+  }
+
+  @Get('matters/:matterId/fee-estimates') @RequirePermission('clients.view') @ResponseSchema(feeEstimateListResponse)
+  async listMatterFeeEstimates(@Param('matterId', { schema: z.uuid() }) matterId: string) {
+    const estimates = await this.onboarding.listMatterFeeEstimates(matterId);
+    return { estimates: estimates.map(serializeFeeEstimate) };
+  }
+
+  @Post('clients/:clientId/payment-requests') @RequirePermission('clients.edit') @ResponseSchema(paymentRequestCreateResponse)
+  async createOnboardingPaymentRequest(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: paymentRequestCreateBody }) body: z.infer<typeof paymentRequestCreateBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.createOnboardingPaymentRequest(clientId, {
+      matterId: body.matterId,
+      engagementDocumentId: body.engagementDocumentId,
+      kind: body.kind,
+      description: body.description,
+      amountPence: body.amountPence,
+      dueOn: body.dueOn,
+      bankAccountDetails: body.bankAccountDetails,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner, partner or accounts can create payment requests');
+      case 'not_found': throw new NotFoundException('Client or matter not found');
+      case 'conflict': throw new ConflictException('Unable to create payment request');
+      case 'created': return { requestId: result.requestId, outcome: 'created' as const };
+    }
+  }
+
+  @Get('clients/:clientId/payment-requests') @RequirePermission('clients.view') @ResponseSchema(onboardingPaymentRequestList)
+  async listClientPaymentRequests(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const requests = await this.onboarding.listClientPaymentRequests(clientId);
+    return { requests: requests.map(serializePaymentRequest) };
+  }
+
+  @Post('clients/:clientId/payment-requests/:requestId/receipt') @RequirePermission('clients.edit') @ResponseSchema(paymentReceiptResponse)
+  async recordOnboardingPaymentReceipt(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('requestId', { schema: z.uuid() }) requestId: string,
+    @Body({ schema: paymentReceiptBody }) body: z.infer<typeof paymentReceiptBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.recordOnboardingPaymentReceipt(requestId, {
+      paymentMethod: body.paymentMethod,
+      reference: body.reference,
+      notes: body.notes,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only fee earner, partner or accounts can record payment receipts');
+      case 'not_found': throw new NotFoundException('Payment request not found');
+      case 'conflict': throw new ConflictException('Payment request is not pending');
+      case 'recorded': return { outcome: 'recorded' as const };
+    }
+  }
+
+  @Post('clients/:clientId/payment-requests/:requestId/waive') @RequirePermission('clients.edit') @ResponseSchema(paymentWaiveResponse)
+  async waiveOnboardingPaymentRequest(
+    @Param('clientId', { schema: z.uuid() }) _clientId: string,
+    @Param('requestId', { schema: z.uuid() }) requestId: string,
+    @Body({ schema: paymentWaiveBody }) body: z.infer<typeof paymentWaiveBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.waiveOnboardingPaymentRequest(requestId, {
+      reason: body.reason,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only partner or accounts can waive payment requests');
+      case 'not_found': throw new NotFoundException('Payment request not found');
+      case 'conflict': throw new ConflictException('Payment request is not pending');
+      case 'waived': return { outcome: 'waived' as const };
+    }
+  }
 }
 
 @Controller('portal/evidence-requests')
@@ -908,6 +1112,32 @@ export class PortalEngagementController {
       case 'conflict': throw new ConflictException('Document cannot be declined in its current state');
       case 'declined': return { outcome: 'declined' as const };
     }
+  }
+}
+
+@Controller('portal/payment-requests')
+@ClientOnly()
+export class PortalPaymentController {
+  constructor(private readonly onboarding: OnboardingService) {}
+
+  @Get() @ResponseSchema(portalPaymentRequestList)
+  async list(@CurrentSession() session: ResolvedSession) {
+    const requests = await this.onboarding.listPortalPaymentRequests(session.account.id);
+    return {
+      requests: requests.map((r) => ({
+        id: r.id,
+        reference: r.reference,
+        kind: r.kind,
+        description: r.description,
+        amountPence: r.amountPence,
+        currency: r.currency,
+        dueOn: r.dueOn,
+        status: r.status,
+        bankAccountDetails: r.bankAccountDetails,
+        paidAt: r.paidAt ? r.paidAt.toISOString() : null,
+        paidReference: r.paidReference,
+      })),
+    };
   }
 }
 

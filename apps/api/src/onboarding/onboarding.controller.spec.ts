@@ -486,6 +486,141 @@ describe('Contact verification API', () => {
     expect(verifiedDoc.state).toBe('verified');
     expect(verifiedDoc.signature.review.outcome).toBe('accepted');
   });
+
+  it('records matter fee estimates with versioning, budgets, and charging basis', async () => {
+    await grantTestRole(db, feeEarner.id, 'partner');
+    const matterId = await db.transaction().execute(async (trx) => {
+      const check = await trx.insertInto('conflict_checks').values({
+        client_id: clientId, requested_by: feeEarner.id, names: ['Matter client'],
+      }).returning('id').executeTakeFirstOrThrow();
+      const matter = await trx.insertInto('matters').values({
+        client_id: clientId, title: 'Commercial Contract Advice', matter_type: 'commercial_property',
+        opened_by: feeEarner.id, conflict_check_id: check.id,
+      }).returning('id').executeTakeFirstOrThrow();
+      await trx.insertInto('matter_team').values({
+        matter_id: matter.id, account_id: feeEarner.id, role: 'supervising_partner', added_by: feeEarner.id,
+      }).execute();
+      return matter.id;
+    });
+
+    const est1Res = await api(token).post(`/matters/${matterId}/fee-estimates`, {
+      chargingBasis: 'fixed',
+      estimatedFeesPence: 200000,
+      estimatedDisbursementsPence: 25000,
+      estimatedVatPence: 45000,
+      budgetLimitPence: 300000,
+      assumptions: 'Fixed fee for stage 1 drafting and initial negotiation rounds.',
+      agreedWithClient: true,
+    });
+    expect(est1Res.status, JSON.stringify(est1Res.body)).toBe(201);
+    expect(est1Res.body).toMatchObject({ outcome: 'created', estimateId: expect.any(String) });
+
+    const est2Res = await api(token).post(`/matters/${matterId}/fee-estimates`, {
+      chargingBasis: 'hourly',
+      estimatedFeesPence: 350000,
+      estimatedDisbursementsPence: 30000,
+      estimatedVatPence: 76000,
+      budgetLimitPence: 500000,
+      assumptions: 'Extended scope agreed with client including multi-jurisdiction clauses.',
+      agreedWithClient: true,
+    });
+    expect(est2Res.status, JSON.stringify(est2Res.body)).toBe(201);
+
+    const listRes = await api(token).get(`/matters/${matterId}/fee-estimates`);
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.estimates.length).toBe(2);
+
+    const v2 = listRes.body.estimates[0];
+    const v1 = listRes.body.estimates[1];
+    expect(v2.version).toBe(2);
+    expect(v2.status).toBe('active');
+    expect(v2.chargingBasis).toBe('hourly');
+    expect(v2.estimatedFeesPence).toBe('350000');
+    expect(v2.totalEstimatePence).toBe('456000');
+    expect(v2.budgetLimitPence).toBe('500000');
+
+    expect(v1.version).toBe(1);
+    expect(v1.status).toBe('superseded');
+    expect(v1.totalEstimatePence).toBe('270000');
+  });
+
+  it('manages onboarding payment requests, portal view, payment receipt and waiver', async () => {
+    const req1Res = await api(token).post(`/clients/${clientId}/payment-requests`, {
+      kind: 'deposit_on_account',
+      description: 'Initial deposit on account for disbursements and upcoming fee work.',
+      amountPence: 150000,
+      dueOn: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      bankAccountDetails: {
+        accountName: 'Stass Law Client Account',
+        sortCode: '20-00-00',
+        accountNumber: '55667788',
+        bankName: 'Barclays Bank UK',
+      },
+    });
+    expect(req1Res.status, JSON.stringify(req1Res.body)).toBe(201);
+    expect(req1Res.body).toMatchObject({ outcome: 'created', requestId: expect.any(String) });
+    const req1Id = req1Res.body.requestId;
+
+    const req2Res = await api(token).post(`/clients/${clientId}/payment-requests`, {
+      kind: 'consultation',
+      description: 'Consultation fee (pre-engagement).',
+      amountPence: 25000,
+      dueOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    });
+    expect(req2Res.status).toBe(201);
+    const req2Id = req2Res.body.requestId;
+
+    const portalAccount = await createTestAccount(db, 'client');
+    await db.updateTable('client_individuals').set({ email: portalAccount.email })
+      .where('client_id', '=', clientId).execute();
+    await db.insertInto('portal_links').values({
+      account_id: portalAccount.id,
+      client_id: clientId,
+      contact_id: null,
+      linked_by: feeEarner.id,
+    }).execute();
+    const portalToken = await sessions.start(portalAccount, 'authenticated', {});
+
+    const portalListRes = await api(portalToken).get('/portal/payment-requests');
+    expect(portalListRes.status).toBe(200);
+    expect(portalListRes.body.requests.length).toBeGreaterThanOrEqual(2);
+    const portalReq1 = portalListRes.body.requests.find((r: any) => r.id === req1Id);
+    expect(portalReq1).toBeDefined();
+    expect(portalReq1.status).toBe('pending');
+    expect(portalReq1.amountPence).toBe('150000');
+    expect(portalReq1.reference).toMatch(/^PAY-[A-F0-9]{6}-\d{3}$/);
+    expect(portalReq1.bankAccountDetails).toMatchObject({
+      accountName: 'Stass Law Client Account',
+      sortCode: '20-00-00',
+    });
+
+    const receiptRes = await api(token).post(`/clients/${clientId}/payment-requests/${req1Id}/receipt`, {
+      paymentMethod: 'bank_transfer',
+      reference: 'BACS-REF-998822',
+      notes: 'Received into client account and matched to bank statement.',
+    });
+    expect(receiptRes.status, JSON.stringify(receiptRes.body)).toBe(201);
+    expect(receiptRes.body.outcome).toBe('recorded');
+
+    await grantTestRole(db, feeEarner.id, 'partner');
+    const waiveRes = await api(token).post(`/clients/${clientId}/payment-requests/${req2Id}/waive`, {
+      reason: 'Waived as part of engagement agreement promotion.',
+    });
+    expect(waiveRes.status, JSON.stringify(waiveRes.body)).toBe(201);
+    expect(waiveRes.body.outcome).toBe('waived');
+
+    const listRes = await api(token).get(`/clients/${clientId}/payment-requests`);
+    expect(listRes.status).toBe(200);
+    const updatedReq1 = listRes.body.requests.find((r: any) => r.id === req1Id);
+    expect(updatedReq1.status).toBe('paid');
+    expect(updatedReq1.paymentMethod).toBe('bank_transfer');
+    expect(updatedReq1.paidReference).toBe('BACS-REF-998822');
+    expect(updatedReq1.paidAt).toBeDefined();
+
+    const updatedReq2 = listRes.body.requests.find((r: any) => r.id === req2Id);
+    expect(updatedReq2.status).toBe('waived');
+    expect(updatedReq2.notes).toBe('Waived as part of engagement agreement promotion.');
+  });
 });
 
 

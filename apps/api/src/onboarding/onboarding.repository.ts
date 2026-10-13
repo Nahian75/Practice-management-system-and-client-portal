@@ -21,6 +21,14 @@ import type {
   EngagementSignature,
   EngagementTemplate,
   EngagementTemplateKey,
+  MatterChargingBasis,
+  MatterFeeEstimate,
+  MatterFeeEstimateStatus,
+  OnboardingPaymentMethod,
+  OnboardingPaymentRequest,
+  OnboardingPaymentRequestKind,
+  OnboardingPaymentRequestStatus,
+  PortalPaymentRequest,
 } from './onboarding.js';
 
 interface VerificationRow {
@@ -772,6 +780,202 @@ export class OnboardingRepository {
       declinedAt: d.declined_at,
       declineReason: d.decline_reason,
       expiresAt: d.expires_at,
+    }));
+  }
+
+  async createMatterFeeEstimate(input: {
+    matterId: string;
+    chargingBasis: MatterChargingBasis;
+    estimatedFeesPence: number | bigint | string;
+    estimatedDisbursementsPence: number | bigint | string;
+    estimatedVatPence: number | bigint | string;
+    budgetLimitPence: number | bigint | string | null;
+    assumptions: string;
+    agreedWithClient: boolean;
+    actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_matter_fee_estimate(
+      ${input.matterId}::uuid,
+      ${input.chargingBasis},
+      ${String(input.estimatedFeesPence)}::bigint,
+      ${String(input.estimatedDisbursementsPence ?? 0)}::bigint,
+      ${String(input.estimatedVatPence ?? 0)}::bigint,
+      ${input.budgetLimitPence !== null && input.budgetLimitPence !== undefined ? String(input.budgetLimitPence) : null}::bigint,
+      ${input.assumptions},
+      ${input.agreedWithClient},
+      ${input.actorId}::uuid
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listMatterFeeEstimates(matterId: string): Promise<MatterFeeEstimate[]> {
+    const rows = await sql<{
+      id: string; matter_id: string; client_id: string; version: number;
+      charging_basis: MatterChargingBasis; estimated_fees_pence: string;
+      estimated_disbursements_pence: string; estimated_vat_pence: string;
+      total_estimate_pence: string; budget_limit_pence: string | null;
+      currency: string; assumptions: string; status: MatterFeeEstimateStatus;
+      agreed_with_client: boolean; created_at: Date;
+      creator_id: string; creator_name: string;
+    }>`
+      select est.id, est.matter_id, est.client_id, est.version, est.charging_basis,
+        est.estimated_fees_pence, est.estimated_disbursements_pence, est.estimated_vat_pence,
+        est.total_estimate_pence, est.budget_limit_pence, est.currency, est.assumptions,
+        est.status, est.agreed_with_client, est.created_at,
+        acc.id as creator_id, acc.display_name as creator_name
+      from app.matter_fee_estimates est
+      join app.accounts acc on acc.id = est.created_by
+      where est.matter_id = ${matterId}
+      order by est.version desc
+    `.execute(this.db);
+
+    return rows.rows.map((r) => ({
+      id: r.id,
+      matterId: r.matter_id,
+      clientId: r.client_id,
+      version: r.version,
+      chargingBasis: r.charging_basis,
+      estimatedFeesPence: r.estimated_fees_pence,
+      estimatedDisbursementsPence: r.estimated_disbursements_pence,
+      estimatedVatPence: r.estimated_vat_pence,
+      totalEstimatePence: r.total_estimate_pence,
+      budgetLimitPence: r.budget_limit_pence,
+      currency: r.currency,
+      assumptions: r.assumptions,
+      status: r.status,
+      agreedWithClient: r.agreed_with_client,
+      createdBy: { accountId: r.creator_id, displayName: r.creator_name },
+      createdAt: r.created_at,
+    }));
+  }
+
+  async createOnboardingPaymentRequest(input: {
+    clientId: string;
+    matterId: string | null;
+    engagementDocumentId: string | null;
+    kind: OnboardingPaymentRequestKind;
+    description: string;
+    amountPence: number | bigint | string;
+    dueOn: string;
+    bankAccountDetails: Record<string, unknown> | null;
+    actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.create_onboarding_payment_request(
+      ${input.clientId}::uuid,
+      ${input.matterId}::uuid,
+      ${input.engagementDocumentId}::uuid,
+      ${input.kind},
+      ${input.description},
+      ${String(input.amountPence)}::bigint,
+      ${input.dueOn}::date,
+      ${input.bankAccountDetails ? JSON.stringify(input.bankAccountDetails) : null}::jsonb,
+      ${input.actorId}::uuid
+    ) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async recordOnboardingPaymentReceipt(input: {
+    requestId: string;
+    paymentMethod: OnboardingPaymentMethod;
+    reference: string;
+    notes: string | null;
+    actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.record_onboarding_payment_receipt(
+      ${input.requestId}::uuid,
+      ${input.paymentMethod},
+      ${input.reference},
+      ${input.notes},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async waiveOnboardingPaymentRequest(input: {
+    requestId: string;
+    reason: string;
+    actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<void> {
+    await sql`select app.waive_onboarding_payment_request(
+      ${input.requestId}::uuid,
+      ${input.reason},
+      ${input.actorId}::uuid
+    )`.execute(trx);
+  }
+
+  async listClientPaymentRequests(clientId: string): Promise<OnboardingPaymentRequest[]> {
+    const rows = await sql<{
+      id: string; client_id: string; matter_id: string | null; engagement_document_id: string | null;
+      reference: string; kind: OnboardingPaymentRequestKind; description: string;
+      amount_pence: string; currency: string; due_on: string; status: OnboardingPaymentRequestStatus;
+      payment_method: OnboardingPaymentMethod | null; paid_at: Date | null; paid_reference: string | null;
+      bank_account_details: Record<string, unknown> | null; notes: string | null;
+      requested_at: Date; req_id: string; req_name: string;
+      updated_at: Date | null; upd_id: string | null; upd_name: string | null;
+    }>`
+      select req.id, req.client_id, req.matter_id, req.engagement_document_id,
+        req.reference, req.kind, req.description, req.amount_pence, req.currency,
+        req.due_on::text, req.status, req.payment_method, req.paid_at, req.paid_reference,
+        req.bank_account_details, req.notes, req.requested_at,
+        req_acc.id as req_id, req_acc.display_name as req_name,
+        req.updated_at, upd_acc.id as upd_id, upd_acc.display_name as upd_name
+      from app.onboarding_payment_requests req
+      join app.accounts req_acc on req_acc.id = req.requested_by
+      left join app.accounts upd_acc on upd_acc.id = req.updated_by
+      where req.client_id = ${clientId}
+      order by req.requested_at desc
+    `.execute(this.db);
+
+    return rows.rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      matterId: r.matter_id,
+      engagementDocumentId: r.engagement_document_id,
+      reference: r.reference,
+      kind: r.kind,
+      description: r.description,
+      amountPence: r.amount_pence,
+      currency: r.currency,
+      dueOn: r.due_on,
+      status: r.status,
+      paymentMethod: r.payment_method,
+      paidAt: r.paid_at,
+      paidReference: r.paid_reference,
+      bankAccountDetails: r.bank_account_details,
+      notes: r.notes,
+      requestedBy: { accountId: r.req_id, displayName: r.req_name },
+      requestedAt: r.requested_at,
+      updatedBy: r.upd_id ? { accountId: r.upd_id, displayName: r.upd_name! } : null,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  async listPortalPaymentRequests(accountId: string): Promise<PortalPaymentRequest[]> {
+    const rows = await sql<{
+      id: string; reference: string; kind: OnboardingPaymentRequestKind;
+      description: string; amount_pence: string; currency: string; due_on: string;
+      status: OnboardingPaymentRequestStatus; bank_account_details: Record<string, unknown> | null;
+      paid_at: Date | null; paid_reference: string | null;
+    }>`
+      select req.id, req.reference, req.kind, req.description, req.amount_pence,
+        req.currency, req.due_on::text, req.status, req.bank_account_details,
+        req.paid_at, req.paid_reference
+      from app.onboarding_payment_requests req
+      join app.portal_links link on link.client_id = req.client_id and link.account_id = ${accountId} and link.ended_at is null
+      order by req.requested_at desc limit 100
+    `.execute(this.db);
+
+    return rows.rows.map((r) => ({
+      id: r.id,
+      reference: r.reference,
+      kind: r.kind,
+      description: r.description,
+      amountPence: r.amount_pence,
+      currency: r.currency,
+      dueOn: r.due_on,
+      status: r.status,
+      bankAccountDetails: r.bank_account_details,
+      paidAt: r.paid_at,
+      paidReference: r.paid_reference,
     }));
   }
 }

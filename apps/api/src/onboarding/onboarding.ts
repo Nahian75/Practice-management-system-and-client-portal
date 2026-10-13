@@ -209,3 +209,74 @@ export interface EngagementDocument {
   signature?: EngagementSignature | null;
 }
 
+export type MatterChargingBasis = 'fixed' | 'hourly' | 'contingency' | 'capped' | 'pro_bono';
+export type MatterFeeEstimateStatus = 'active' | 'superseded';
+
+export interface MatterFeeEstimate {
+  id: string;
+  matterId: string;
+  clientId: string;
+  version: number;
+  chargingBasis: MatterChargingBasis;
+  estimatedFeesPence: string;
+  estimatedDisbursementsPence: string;
+  estimatedVatPence: string;
+  totalEstimatePence: string;
+  budgetLimitPence: string | null;
+  currency: string;
+  assumptions: string;
+  status: MatterFeeEstimateStatus;
+  agreedWithClient: boolean;
+  createdBy: { accountId: string; displayName: string };
+  createdAt: Date;
+}
+
+export type OnboardingPaymentRequestKind = 'deposit_on_account' | 'initial_fixed_fee' | 'consultation';
+export type OnboardingPaymentRequestStatus = 'pending' | 'paid' | 'waived' | 'cancelled';
+export type OnboardingPaymentMethod = 'bank_transfer' | 'card' | 'portal_checkout' | 'cheque' | 'cash';
+
+export interface BankAccountDetails {
+  accountName: string;
+  sortCode: string;
+  accountNumber: string;
+  bankName: string;
+  reference?: string;
+}
+
+export interface OnboardingPaymentRequest {
+  id: string;
+  clientId: string;
+  matterId: string | null;
+  engagementDocumentId: string | null;
+  reference: string;
+  kind: OnboardingPaymentRequestKind;
+  description: string;
+  amountPence: string;
+  currency: string;
+  dueOn: string;
+  status: OnboardingPaymentRequestStatus;
+  paymentMethod: OnboardingPaymentMethod | null;
+  paidAt: Date | null;
+  paidReference: string | null;
+  bankAccountDetails: Record<string, unknown> | null;
+  notes: string | null;
+  requestedBy: { accountId: string; displayName: string };
+  requestedAt: Date;
+  updatedBy?: { accountId: string; displayName: string } | null;
+  updatedAt?: Date | null;
+}
+
+export interface PortalPaymentRequest {
+  id: string;
+  reference: string;
+  kind: OnboardingPaymentRequestKind;
+  description: string;
+  amountPence: string;
+  currency: string;
+  dueOn: string;
+  status: OnboardingPaymentRequestStatus;
+  bankAccountDetails: Record<string, unknown> | null;
+  paidAt: Date | null;
+  paidReference: string | null;
+}
+
