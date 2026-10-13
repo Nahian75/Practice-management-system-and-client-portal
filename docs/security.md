@@ -71,7 +71,7 @@ refused outside the narrow protected disposal path. Step 16f keeps screens on
 filtered server-rendered responses, treats capability flags as presentation
 only, derives the manager list in PostgreSQL, requires typed disposal
 confirmation and prevents automatic prefetch of protected downloads. The HR
-module security review remains due.
+module security review is in [`reviews/2026-10-14-hr.md`](reviews/2026-10-14-hr.md).
 
 This file lists only the controls that are actually in place.
 
@@ -253,6 +253,9 @@ process before it accepts any request.
 | 2026-10-07 | Tasks module | [reviews/2026-10-07-tasks.md](reviews/2026-10-07-tasks.md) |
 | 2026-10-08 | Notifications module | [reviews/2026-10-08-notifications.md](reviews/2026-10-08-notifications.md) |
 | 2026-10-10 | Finance module | [reviews/2026-10-10-finance.md](reviews/2026-10-10-finance.md) |
+| 2026-10-11 | Compliance / AML module | [reviews/2026-10-11-compliance.md](reviews/2026-10-11-compliance.md) |
+| 2026-10-13 | Client onboarding module | [reviews/2026-10-13-onboarding.md](reviews/2026-10-13-onboarding.md) |
+| 2026-10-14 | People / HR module | [reviews/2026-10-14-hr.md](reviews/2026-10-14-hr.md) |
 
 Open items from reviews that must be closed before production: F2 (load
 balancer rate limiting), F3 (retention), C6 (encrypted storage and backups).

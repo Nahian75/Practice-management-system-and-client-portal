@@ -179,6 +179,21 @@ describe('People / HR lifecycle and vetting API',()=>{
     const blockers=await api(hrToken).get(`/hr/lifecycle/${created.body.id}/blockers`);
     expect(blockers.status,JSON.stringify(blockers.body)).toBe(200);
     expect(blockers.body.blockers).toContainEqual(expect.objectContaining({ kind:'account',resourceId:worker.id,status:'active' }));
+
+    const createdCase = await api(hrToken).post('/hr/cases', {
+      personId: managerPerson, kind: 'grievance', policyVersion: '2026-v1', issue: 'Staff grievance investigation.',
+    });
+    expect(createdCase.status, JSON.stringify(createdCase.body)).toBe(201);
+    const addedMember = await api(hrToken).post(`/hr/cases/${createdCase.body.id}/members`, {
+      accountId: worker.id, role: 'investigator',
+    });
+    expect(addedMember.status, JSON.stringify(addedMember.body)).toBe(201);
+
+    const updatedBlockers = await api(hrToken).get(`/hr/lifecycle/${created.body.id}/blockers`);
+    expect(updatedBlockers.body.blockers).toContainEqual(expect.objectContaining({
+      kind: 'case_membership', resourceId: createdCase.body.id, status: 'grievance',
+    }));
+
     const itemId=(await api(hrToken).get(`/hr/people/${workerPerson}/lifecycle`)).body.checklists[0].items[0].id;
     await api(hrToken).post(`/hr/lifecycle/items/${itemId}/events`,{ action:'completed',note:'Handover checked.' });
     expect((await api(hrToken).post(`/hr/lifecycle/${created.body.id}/events`,{

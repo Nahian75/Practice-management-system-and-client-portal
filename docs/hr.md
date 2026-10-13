@@ -1,13 +1,14 @@
 # People and HR
 
-**Current state (2026-10-13):** First-version design approved. Steps 16a to
-16f are built: separate HR authority, protected employment and lifecycle
-history, encrypted personnel files/data and right-to-work evidence, exact leave
-evidence, reason-free sickness administration, restricted health records,
-bounded manager projections, versioned professional checks, development cycles,
-required learning, objectives and appraisals, membership-scoped confidential
-cases, category retention/disposal, reviewed fixed exports, and least-privilege
-staff, manager and HR screens. The final HR security review remains.
+**Current state (2026-10-14):** First-version design approved. Steps 16a to
+16f and the final HR Security Review are built and verified: separate HR authority,
+protected employment and lifecycle history, encrypted personnel files/data and
+right-to-work evidence, exact leave evidence, reason-free sickness administration,
+restricted health records, bounded manager projections, versioned professional
+checks, development cycles, required learning, objectives and appraisals,
+membership-scoped confidential cases, category retention/disposal, reviewed
+fixed exports, least-privilege staff, manager and HR screens, former-manager access
+revocation fixes, leaver case blockers, and role share locks ([review](reviews/2026-10-14-hr.md)).
 
 How Stass will keep the firm's employment records, staff lifecycle, absence,
 professional-development and fair-process evidence without turning an ordinary
@@ -658,10 +659,12 @@ private self-service, 390-pixel layout and axe checks.
   controlled disposal and reviewable fixed exports.
 - **16f. Staff, manager and HR screens — built.** Complete People/self-service,
   My team and least-privilege HR workspaces with browser coverage.
-- **Security review.** Recheck the current law/guidance; threat-model insider and
-  former-manager access, health/case inference, ids, exports, files, concurrency,
-  notification leakage, key loss and disposal; deliberately break every control
-  and restore it before the module is complete.
+- **Security review — complete ([review](reviews/2026-10-14-hr.md)).** Rechecked
+  governing UK legislation and official guidance; threat-modeled insider access,
+  former-manager privilege persistence, role concurrency races, leaver blockers,
+  restricted health data isolation, confidential casework team boundaries, legal holds,
+  disposal tombstones, and fixed reviewed exports. Hardened database functions in
+  migration `0073` and added regression tests.
 
 Each step ships with database privilege/concurrency tests, positive and negative
 HTTP tests, type checks, production builds and updated documentation before the

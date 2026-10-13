@@ -180,6 +180,24 @@ describe('People / HR foundation API', () => {
     expect((await api(replacementToken).get(`/hr/reports/${workerId}`)).status).toBe(200);
   });
 
+  it('removes manager access when HR clears the line manager', async () => {
+    const workerId = await createPerson(worker);
+    const managerId = await createPerson(manager);
+    await engage(workerId);
+    await engage(managerId, 'Partner');
+
+    expect((await api(hrToken).post(`/hr/people/${workerId}/manager`, {
+      managerPersonId: managerId, effectiveOn: yesterday,
+    })).status).toBe(201);
+    expect((await api(managerToken).get(`/hr/reports/${workerId}`)).status).toBe(200);
+
+    expect((await api(hrToken).post(`/hr/people/${workerId}/manager`, {
+      managerPersonId: null, effectiveOn: today,
+    })).status).toBe(201);
+    expect((await api(managerToken).get(`/hr/reports/${workerId}`)).status).toBe(404);
+    expect(await api(managerToken).get('/hr/reports').then((response) => response.body.people)).toHaveLength(0);
+  });
+
   it('removes manager access when either current engagement has ended', async () => {
     const firstWorker = await createPerson(worker);
     const firstManager = await createPerson(manager);
