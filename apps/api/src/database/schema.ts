@@ -44,6 +44,7 @@ export type EmailKind =
   | 'account_invitation'
   | 'password_reset'
   | 'security_notice'
+  | 'contact_verification'
   | 'task_assignment'
   | 'task_reminder';
 export type EmailOutboxStatus = 'pending' | 'sent' | 'discarded' | 'failed';
@@ -211,6 +212,38 @@ export interface ClientResponsibilityChangesTable {
   to_account_id: InsertOnly<string>;
   reason: InsertOnly<string>;
   changed_at: DatabaseSet<Date>;
+}
+
+export interface ContactVerificationRequestsTable {
+  id: DatabaseSet<string>;
+  client_id: DatabaseSet<string>;
+  contact_id: DatabaseSet<string | null>;
+  channel: DatabaseSet<'email'>;
+  address: DatabaseSet<string>;
+  token_hash: DatabaseSet<Buffer>;
+  requested_by: DatabaseSet<string>;
+  requested_at: DatabaseSet<Date>;
+  expires_at: DatabaseSet<Date>;
+  verified_at: DatabaseSet<Date | null>;
+}
+
+export interface ContactVerificationAttemptsTable {
+  id: DatabaseSet<string>;
+  request_id: DatabaseSet<string>;
+  outcome: DatabaseSet<'verified' | 'expired' | 'superseded' | 'address_changed' | 'already_verified'>;
+  attempted_at: DatabaseSet<Date>;
+}
+
+export interface OnboardingEvidenceRequestsTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string>;
+  contact_id: DatabaseSet<string | null>; evidence_type: DatabaseSet<string>; instructions: DatabaseSet<string>;
+  country: DatabaseSet<string | null>; due_on: DatabaseSet<string>; requested_by: DatabaseSet<string>;
+  requested_at: DatabaseSet<Date>;
+}
+
+export interface OnboardingEvidenceSubmissionsTable {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; evidence_id: DatabaseSet<string>;
+  uploaded_by: DatabaseSet<string>; uploaded_at: DatabaseSet<Date>;
 }
 
 interface ClientCorrespondenceColumns {
@@ -830,6 +863,14 @@ export type AmlControlKind =
   | 'sanctions_risk_assessment'
   | 'aml_policy'
   | 'sanctions_policy'
+  | 'conflicts_policy'
+  | 'client_care_policy'
+  | 'complaints_policy'
+  | 'confidentiality_policy'
+  | 'data_protection_policy'
+  | 'retention_policy'
+  | 'information_security_policy'
+  | 'finance_policy'
   | 'training_material';
 
 export interface AmlOfficerAppointmentsTable {
@@ -853,6 +894,9 @@ export interface AmlControlVersionsTable {
   source: DatabaseSet<string>;
   effective_from: DatabaseSet<string>;
   review_due_on: DatabaseSet<string>;
+  owner_account_id: DatabaseSet<string | null>;
+  requires_acknowledgement: DatabaseSet<boolean>;
+  acknowledgement_due_days: DatabaseSet<number | null>;
   prepared_by: DatabaseSet<string>;
   prepared_at: DatabaseSet<Date>;
 }
@@ -873,6 +917,13 @@ export interface AmlTrainingCompletionsTable {
   evidence_reference: DatabaseSet<string>;
   recorded_by: DatabaseSet<string>;
   recorded_at: DatabaseSet<Date>;
+}
+
+export interface PolicyAcknowledgementsTable {
+  id: DatabaseSet<string>;
+  control_version_id: DatabaseSet<string>;
+  account_id: DatabaseSet<string>;
+  acknowledged_at: DatabaseSet<Date>;
 }
 
 export interface AmlIndependentReviewsTable {
@@ -1461,6 +1512,7 @@ export interface Database {
   aml_independent_reviews: AmlIndependentReviewsTable;
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;
+  policy_acknowledgements: PolicyAcknowledgementsTable;
   audit_events: AuditEventsTable;
   backup_codes: BackupCodesTable;
   bank_account_closures: BankAccountClosuresTable;
@@ -1472,6 +1524,8 @@ export interface Database {
   bill_draft_lines: BillDraftLinesTable;
   bill_drafts: BillDraftsTable;
   client_contacts: ClientContactsTable;
+  contact_verification_attempts: ContactVerificationAttemptsTable;
+  contact_verification_requests: ContactVerificationRequestsTable;
   client_individuals: ClientIndividualsTable;
   client_organisations: ClientOrganisationsTable;
   client_responsibility_changes: ClientResponsibilityChangesTable;
@@ -1554,6 +1608,8 @@ export interface Database {
   matters: MattersTable;
   notification_reads: NotificationReadsTable;
   notifications: NotificationsTable;
+  onboarding_evidence_requests: OnboardingEvidenceRequestsTable;
+  onboarding_evidence_submissions: OnboardingEvidenceSubmissionsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

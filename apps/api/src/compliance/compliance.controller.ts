@@ -14,7 +14,7 @@ import { text } from '../common/validation/safe-text.js';
 import { attachmentDisposition } from '../documents/content-disposition.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type {
-  AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, RiskAssessment, TrainingCompletion,
+  AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment, PolicyAcknowledgement, RiskAssessment, StaffPolicy, TrainingCompletion,
 } from './compliance.js';
 import { ComplianceService, type Change, type ComplianceActor } from './compliance.service.js';
 
@@ -23,7 +23,12 @@ const pageQuery = z.strictObject({ before: z.uuid().optional() });
 const person = z.object({ accountId: z.uuid(), displayName: z.string() });
 const officerKind = z.enum(['nominated_officer', 'deputy']);
 const controlKind = z.enum(['ml_tf_risk_assessment', 'proliferation_financing_risk_assessment',
-  'sanctions_risk_assessment', 'aml_policy', 'sanctions_policy', 'training_material']);
+  'sanctions_risk_assessment', 'aml_policy', 'sanctions_policy', 'conflicts_policy', 'client_care_policy',
+  'complaints_policy', 'confidentiality_policy', 'data_protection_policy', 'retention_policy',
+  'information_security_policy', 'finance_policy', 'training_material']);
+const acknowledgementPolicyKinds = new Set(['aml_policy', 'sanctions_policy', 'conflicts_policy',
+  'client_care_policy', 'complaints_policy', 'confidentiality_policy', 'data_protection_policy',
+  'retention_policy', 'information_security_policy', 'finance_policy']);
 const documentText = (max: number) => z.string().trim().min(1).max(max)
   .refine((value) => /[\p{L}\p{N}]/u.test(value), 'Must contain a letter or a digit')
   .refine((value) => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value), 'Contains unsafe control characters')
@@ -38,10 +43,32 @@ const endBody = z.strictObject({ reason: text(500) });
 const approval = z.object({ id: z.uuid(), approvedBy: person, approvedAt: z.iso.datetime() });
 const control = z.object({ id: z.uuid(), kind: controlKind, version: z.number().int().positive(), title: z.string(),
   content: z.string(), contentSha256: z.string().regex(/^[0-9a-f]{64}$/), source: z.string(), effectiveFrom: date,
-  reviewDueOn: date, preparedBy: person, preparedAt: z.iso.datetime(), approval: approval.nullable() });
+  reviewDueOn: date, owner: person, requiresAcknowledgement: z.boolean(),
+  acknowledgementDueDays: z.number().int().min(1).max(365).nullable(),
+  preparedBy: person, preparedAt: z.iso.datetime(), approval: approval.nullable() });
 const controlList = z.object({ controls: z.array(control), next: z.uuid().nullable() });
 const controlBody = z.strictObject({ kind: controlKind, title: text(200), content: documentText(200_000),
-  source: text(2_000), effectiveFrom: date, reviewDueOn: date });
+  source: text(2_000), effectiveFrom: date, reviewDueOn: date, ownerAccountId: z.uuid().optional(),
+  requiresAcknowledgement: z.boolean().default(false),
+  acknowledgementDueDays: z.number().int().min(1).max(365).nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.requiresAcknowledgement && !acknowledgementPolicyKinds.has(value.kind)) {
+    ctx.addIssue({ code: 'custom', path: ['kind'], message: 'Only a policy can require acknowledgement' });
+  }
+  if (value.requiresAcknowledgement && value.acknowledgementDueDays == null) {
+    ctx.addIssue({ code: 'custom', path: ['acknowledgementDueDays'], message: 'Set the acknowledgement deadline' });
+  }
+  if (!value.requiresAcknowledgement && value.acknowledgementDueDays != null) {
+    ctx.addIssue({ code: 'custom', path: ['acknowledgementDueDays'], message: 'A deadline requires acknowledgement' });
+  }
+});
+
+const policyAcknowledgement = z.object({ id: z.uuid(), controlVersionId: z.uuid(), account: person,
+  acknowledgedAt: z.iso.datetime() });
+const staffPolicy = control.extend({ acknowledgement: policyAcknowledgement.nullable(),
+  acknowledgementDueOn: date.nullable() });
+const staffPolicyList = z.object({ policies: z.array(staffPolicy) });
+const acknowledgementList = z.object({ acknowledgements: z.array(policyAcknowledgement), next: z.uuid().nullable() });
 
 const training = z.object({ id: z.uuid(), account: person,
   material: z.object({ id: z.uuid(), version: z.number().int().positive(), title: z.string() }),
@@ -271,6 +298,14 @@ const serializeControl = (value: ControlVersion) => ({
   ...value, preparedAt: value.preparedAt.toISOString(),
   approval: value.approval ? { ...value.approval, approvedAt: value.approval.approvedAt.toISOString() } : null,
 });
+const serializeAcknowledgement = (value: PolicyAcknowledgement) => ({
+  ...value, acknowledgedAt: value.acknowledgedAt.toISOString(),
+});
+const serializeStaffPolicy = (value: StaffPolicy) => ({
+  ...serializeControl(value), acknowledgement: value.acknowledgement
+    ? serializeAcknowledgement(value.acknowledgement) : null,
+  acknowledgementDueOn: value.acknowledgementDueOn,
+});
 const serializeTraining = (value: TrainingCompletion) => ({
   ...value, recordedAt: value.recordedAt.toISOString(),
 });
@@ -395,7 +430,10 @@ export class ComplianceController {
   @Post('compliance/controls') @RequirePermission('aml.firm_controls') @ResponseSchema(control)
   async createControl(@Body({ schema: controlBody }) body: z.infer<typeof controlBody>,
     @CurrentSession() session: ResolvedSession, @Req() request: Request) {
-    const result = await this.compliance.createControl(body, actorFor(session, request));
+    const result = await this.compliance.createControl({ ...body,
+      ownerAccountId: body.ownerAccountId ?? session.account.id,
+      acknowledgementDueDays: body.acknowledgementDueDays ?? null,
+    }, actorFor(session, request));
     if (result.outcome !== 'changed') throw new ConflictException('The firm-control version is not valid');
     return serializeControl(result.value);
   }
@@ -407,6 +445,29 @@ export class ComplianceController {
     if (result.outcome === 'not_found') throw new NotFoundException('No firm-control version with this id');
     if (result.outcome === 'conflict') throw new ConflictException('This version cannot be approved');
     return serializeControl(result.value);
+  }
+
+  @Get('compliance/policies/me') @StaffOnly() @ResponseSchema(staffPolicyList)
+  async ownPolicies(@CurrentSession() session: ResolvedSession) {
+    return { policies: (await this.compliance.listStaffPolicies(session.account.id)).map(serializeStaffPolicy) };
+  }
+
+  @Post('compliance/policies/:controlId/acknowledgement') @StaffOnly() @ResponseSchema(policyAcknowledgement)
+  async acknowledgePolicy(@Param('controlId', { schema: z.uuid() }) id: string,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request) {
+    const result = await this.compliance.acknowledgePolicy(id, actorFor(session, request));
+    if (result.outcome === 'not_found') throw new NotFoundException('No policy with this id');
+    if (result.outcome === 'conflict') throw new ConflictException('Only an approved policy can be acknowledged, and only once');
+    return serializeAcknowledgement(result.value);
+  }
+
+  @Get('compliance/policies/:controlId/acknowledgements')
+  @RequirePermission('aml.firm_controls') @ResponseSchema(acknowledgementList)
+  async policyAcknowledgements(@Param('controlId', { schema: z.uuid() }) id: string,
+    @Query({ schema: pageQuery }) query: z.infer<typeof pageQuery>) {
+    const page = await this.compliance.listPolicyAcknowledgements(id, query.before);
+    if (!page) throw new NotFoundException('No policy with this id');
+    return { acknowledgements: page.items.map(serializeAcknowledgement), next: page.next };
   }
 
   @Post('compliance/training') @StaffOnly() @ResponseSchema(training)

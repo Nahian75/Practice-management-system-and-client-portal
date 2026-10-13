@@ -31,6 +31,7 @@ export default async function CompliancePage() {
     <h1>Compliance</h1>
     <p className="secondary">Firm-wide AML and sanctions work. Stass records evidence and decisions; it does not make a legal or reporting decision.</p>
     <nav aria-label="Compliance sections" className="section-nav"><ul>
+      <li><Link href="/policies">Firm policies</Link></li>
       <li><Link href="/compliance/retention">Retention and disposal</Link></li>
       <li><Link href="/compliance/exports">Regulatory exports</Link></li>
       {access.body.canRestricted && <li><Link href="/compliance/restricted-reports">Nominated-officer records</Link></li>}

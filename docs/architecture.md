@@ -34,6 +34,11 @@ and a narrow Compliance-owned AML-training status projection; step 16e adds
 membership-scoped confidential cases, category retention/disposal and
 two-person reviewed fixed exports; step 16f adds the staff, current-manager and
 least-privilege HR screens over those filtered API boundaries.
+The client-onboarding addendum is now the approved target for step 17. Step 17a
+is in progress, beginning with the expanded central policy library and staff
+acknowledgements; contact verification, requested portal evidence, identity and
+company review, enhanced conflicts, engagement documents and initial-fee setup
+are not yet complete ([onboarding.md](onboarding.md)).
 
 This file describes the target shape. Sections are updated as each part is built.
 
@@ -81,5 +86,6 @@ authorization decisions.
 | Finance | Steps 14a to 14f built and security-reviewed: exact GBP strings, permissions, immutable rates/time corrections, billing snapshots, encrypted bank/payee details, balanced postings, receipts, allocations, running ledgers/cash books, client-payment reservations, four-eyes approval, bank outcomes, safe CSV statements, immutable matching/reversals, fixed client reconciliation with liability balances, Compliance sign-off, five-week status, numeric VAT documents, audited exports and role-sensitive staff screens (`apps/api/src/finance/`, `apps/web/src/app/(staff)/finance/`, [finance.md](finance.md), [review](reviews/2026-10-10-finance.md)) |
 | Compliance / AML | Steps 15a to 15f built and security-reviewed: firm controls and appointments, versioned CDD/evidence, matter risk and gate enforcement, sanctions screening/freezes/licences, separately encrypted internal disclosures with nominated-officer-only SAR/DAML records, controlled retention/disposal, separated regulatory exports and staff screens ([compliance.md](compliance.md), [review](reviews/2026-10-11-compliance.md)) |
 | People / HR | Steps 16a to 16f built: separate HR authority; protected employment/work-pattern and lifecycle history; encrypted personal data/files, right-to-work detail and competence/review narratives; safe self/manager views; exact minute leave ledger and serialized decisions; payroll-supplied holiday-pay evidence; reason-free sickness; restricted health and operational adjustment projections; leaver blockers; qualifications/professional checks; development, required learning, objectives, appraisals and worker responses; explicit confidential-case teams and role separation; category rules, legal holds, controlled disposal and reviewed fixed exports; complete People, My team and least-privilege HR screens ([hr.md](hr.md)) |
+| Client onboarding | Approved target; step 17a in progress. Provider-neutral/manual-first policy, contact, evidence, identity/company, conflicts, engagement and initial-fee workflow ([onboarding.md](onboarding.md)) |
 | AI | Not started |
 | Web app | Staff screens and the read-only client portal are built: set-up, security headers, API pass-through, account set-up and recovery, clients, matters, documents, tasks, notifications, Finance, Compliance and staff administration (`apps/web/`). The web foundation, portal and every implemented domain through Compliance are security-reviewed ([web.md](web.md)) |

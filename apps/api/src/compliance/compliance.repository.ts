@@ -9,7 +9,7 @@ import type {
 import { ComplianceDataCipher, type SealedComplianceData } from './compliance-data-cipher.js';
 import type {
   AssessmentWork, CddCase, Clearance, Gate, Hold, ReviewQueueItem, StartException, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
-  RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
+  PolicyAcknowledgement, RiskAssessment, RiskFactors, RiskNarrative, StaffPolicy, TrainingCompletion,
 } from './compliance.js';
 
 /** Must match app.is_enhanced_aml_measure in migration 0051. */
@@ -18,6 +18,13 @@ const ENHANCED_MEASURES = new Set<AmlMeasureKind>(['additional_sources', 'owners
 
 interface EvidenceMetadata { fileName: string; documentIdentifier: string | null; providerPayloadHash: string | null }
 interface VerificationDetails { documentIdentifier: string | null; providerResult: string | null; reliance: Record<string, unknown> | null }
+
+function acknowledgementDueOn(control: ControlVersion): string | null {
+  if (!control.requiresAcknowledgement || control.acknowledgementDueDays === null) return null;
+  const due = new Date(`${control.effectiveFrom}T00:00:00.000Z`);
+  due.setUTCDate(due.getUTCDate() + control.acknowledgementDueDays);
+  return due.toISOString().slice(0, 10);
+}
 
 @Injectable()
 export class ComplianceRepository {
@@ -67,11 +74,13 @@ export class ComplianceRepository {
 
   async createControl(input: {
     kind: AmlControlKind; title: string; content: string; hash: Buffer; source: string;
-    effectiveFrom: string; reviewDueOn: string; actorId: string;
+    effectiveFrom: string; reviewDueOn: string; ownerAccountId: string;
+    requiresAcknowledgement: boolean; acknowledgementDueDays: number | null; actorId: string;
   }, trx: Kysely<Database>): Promise<string> {
     const result = await sql<{ id: string }>`select app.create_aml_control_version(
       ${input.kind}, ${input.title}, ${input.content}, ${input.hash}, ${input.source},
-      ${input.effectiveFrom}::date, ${input.reviewDueOn}::date, ${input.actorId}
+      ${input.effectiveFrom}::date, ${input.reviewDueOn}::date, ${input.ownerAccountId},
+      ${input.requiresAcknowledgement}, ${input.acknowledgementDueDays}::smallint, ${input.actorId}
     ) as id`.execute(trx);
     return result.rows[0]!.id;
   }
@@ -83,18 +92,26 @@ export class ComplianceRepository {
   async findControl(id: string, executor: Kysely<Database> = this.db): Promise<ControlVersion | undefined> {
     const row = await executor.selectFrom('aml_control_versions as v')
       .innerJoin('accounts as preparer', 'preparer.id', 'v.prepared_by')
+      .leftJoin('accounts as owner', 'owner.id', 'v.owner_account_id')
       .leftJoin('aml_control_approvals as p', 'p.control_version_id', 'v.id')
       .leftJoin('accounts as approver', 'approver.id', 'p.approved_by')
       .select(['v.id', 'v.kind', 'v.version', 'v.title', 'v.content', 'v.content_sha256', 'v.source',
-        'v.effective_from', 'v.review_due_on', 'v.prepared_at', 'preparer.id as prepared_by_id',
+        'v.effective_from', 'v.review_due_on', 'v.requires_acknowledgement', 'v.acknowledgement_due_days',
+        'v.prepared_at', 'preparer.id as prepared_by_id',
         'preparer.display_name as prepared_by_name', 'p.id as approval_id', 'p.approved_at',
-        'approver.id as approved_by_id', 'approver.display_name as approved_by_name'])
+        'approver.id as approved_by_id', 'approver.display_name as approved_by_name',
+        'owner.id as owner_id', 'owner.display_name as owner_name'])
       .where('v.id', '=', id).executeTakeFirst();
     if (!row) return undefined;
     return {
       id: row.id, kind: row.kind, version: row.version, title: row.title, content: row.content,
       contentSha256: row.content_sha256.toString('hex'), source: row.source,
       effectiveFrom: row.effective_from, reviewDueOn: row.review_due_on,
+      owner: row.owner_id && row.owner_name
+        ? { accountId: row.owner_id, displayName: row.owner_name }
+        : { accountId: row.prepared_by_id, displayName: row.prepared_by_name },
+      requiresAcknowledgement: row.requires_acknowledgement,
+      acknowledgementDueDays: row.acknowledgement_due_days,
       preparedBy: { accountId: row.prepared_by_id, displayName: row.prepared_by_name }, preparedAt: row.prepared_at,
       approval: row.approval_id && row.approved_at && row.approved_by_id && row.approved_by_name
         ? { id: row.approval_id, approvedAt: row.approved_at,
@@ -109,6 +126,55 @@ export class ComplianceRepository {
     const rows = await query.orderBy('v.id', 'desc').limit(100).execute();
     return (await Promise.all(rows.map((row) => this.findControl(row.id))))
       .filter((row): row is ControlVersion => row !== undefined);
+  }
+
+  async acknowledgePolicy(controlId: string, accountId: string, trx: Kysely<Database>): Promise<string> {
+    const result = await sql<{ id: string }>`select app.acknowledge_policy(${controlId}, ${accountId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async findPolicyAcknowledgement(id: string,
+    executor: Kysely<Database> = this.db): Promise<PolicyAcknowledgement | undefined> {
+    const row = await executor.selectFrom('policy_acknowledgements as acknowledgement')
+      .innerJoin('accounts as account', 'account.id', 'acknowledgement.account_id')
+      .select(['acknowledgement.id', 'acknowledgement.control_version_id',
+        'acknowledgement.acknowledged_at', 'account.id as account_id', 'account.display_name'])
+      .where('acknowledgement.id', '=', id).executeTakeFirst();
+    return row ? { id: row.id, controlVersionId: row.control_version_id,
+      account: { accountId: row.account_id, displayName: row.display_name },
+      acknowledgedAt: row.acknowledged_at } : undefined;
+  }
+
+  async listPolicyAcknowledgements(controlId: string, before?: string): Promise<PolicyAcknowledgement[]> {
+    let query = this.db.selectFrom('policy_acknowledgements').select('id')
+      .where('control_version_id', '=', controlId);
+    if (before) query = query.where('id', '<', before);
+    const rows = await query.orderBy('id', 'desc').limit(100).execute();
+    return (await Promise.all(rows.map((row) => this.findPolicyAcknowledgement(row.id))))
+      .filter((row): row is PolicyAcknowledgement => row !== undefined);
+  }
+
+  async listStaffPolicies(accountId: string): Promise<StaffPolicy[]> {
+    const rows = await sql<{ id: string }>`
+      SELECT DISTINCT ON (control.kind) control.id
+      FROM app.aml_control_versions control
+      JOIN app.aml_control_approvals approval ON approval.control_version_id = control.id
+      WHERE control.kind IN ('aml_policy', 'sanctions_policy', 'conflicts_policy',
+        'client_care_policy', 'complaints_policy', 'confidentiality_policy',
+        'data_protection_policy', 'retention_policy', 'information_security_policy', 'finance_policy')
+        AND control.effective_from <= (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+      ORDER BY control.kind, control.version DESC`.execute(this.db);
+    return (await Promise.all(rows.rows.map(async ({ id }) => {
+      const [control, acknowledgement] = await Promise.all([
+        this.findControl(id),
+        this.db.selectFrom('policy_acknowledgements').select('id')
+          .where('control_version_id', '=', id).where('account_id', '=', accountId).executeTakeFirst(),
+      ]);
+      if (!control) return undefined;
+      const recorded = acknowledgement ? await this.findPolicyAcknowledgement(acknowledgement.id) : undefined;
+      return { ...control, acknowledgement: recorded ?? null,
+        acknowledgementDueOn: acknowledgementDueOn(control) };
+    }))).filter((row): row is StaffPolicy => row !== undefined);
   }
 
   async recordTraining(input: {

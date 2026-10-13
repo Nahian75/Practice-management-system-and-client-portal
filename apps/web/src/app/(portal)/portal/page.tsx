@@ -4,33 +4,41 @@ import { redirect } from 'next/navigation';
 import { apiGet } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { MATTER_STATUS_LABELS, MATTER_TYPE_LABELS, TEAM_ROLE_LABELS } from '@/lib/matters';
-import type { PortalMatter } from '@/lib/portal';
+import type { PortalEvidenceRequest, PortalMatter } from '@/lib/portal';
+import { EvidenceRequests } from './evidence-requests';
 
 export const metadata: Metadata = { title: 'Your matters' };
 
 export default async function PortalMattersPage({ searchParams }: { searchParams: Promise<{ before?: string | string[] }> }) {
   const { before } = await searchParams;
-  const result = await apiGet<{ matters: PortalMatter[]; next: string | null }>('/portal/matters', {
-    before: typeof before === 'string' ? before : undefined,
-  });
-  if (result.status === 401) {
+  const [mattersResult, evidenceResult] = await Promise.all([
+    apiGet<{ matters: PortalMatter[]; next: string | null }>('/portal/matters', {
+      before: typeof before === 'string' ? before : undefined,
+    }),
+    apiGet<{ requests: PortalEvidenceRequest[] }>('/portal/evidence-requests'),
+  ]);
+  if (mattersResult.status === 401 || evidenceResult.status === 401) {
     redirect('/sign-in');
   }
-  if (result.status === 403) {
+  if (mattersResult.status === 403 || evidenceResult.status === 403) {
     redirect('/');
   }
-  if (result.status === 400) {
+  if (mattersResult.status === 400) {
     redirect('/portal');
   }
-  if (!result.body) {
+  if (!mattersResult.body) {
     throw new Error('The client matter list could not be loaded');
   }
 
+  const requests = evidenceResult.body?.requests ?? [];
+
   return (
     <>
+      <EvidenceRequests requests={requests} />
+      <hr className="rule" />
       <h1>Your matters</h1>
       <p>Open and closed matters the firm has made available to you.</p>
-      {result.body.matters.length === 0 ? (
+      {mattersResult.body.matters.length === 0 ? (
         <p>You have no matters to view.</p>
       ) : (
         <table className="table">
@@ -46,7 +54,7 @@ export default async function PortalMattersPage({ searchParams }: { searchParams
             </tr>
           </thead>
           <tbody>
-            {result.body.matters.map((matter) => (
+            {mattersResult.body.matters.map((matter) => (
               <tr key={matter.id}>
                 <td>{matter.reference}</td>
                 <td>
@@ -68,9 +76,9 @@ export default async function PortalMattersPage({ searchParams }: { searchParams
           </tbody>
         </table>
       )}
-      {result.body.next && (
+      {mattersResult.body.next && (
         <p>
-          <Link href={`/portal?before=${encodeURIComponent(result.body.next)}`}>Older matters</Link>
+          <Link href={`/portal?before=${encodeURIComponent(mattersResult.body.next)}`}>Older matters</Link>
         </p>
       )}
     </>

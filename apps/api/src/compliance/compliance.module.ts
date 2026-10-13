@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { DocumentsModule } from '../documents/documents.module.js';
 import { AmlEvidenceVault } from './aml-evidence-vault.js';
+import { AmlEvidenceIntake } from './aml-evidence-intake.js';
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceController } from './compliance.controller.js';
 import { ComplianceRepository } from './compliance.repository.js';
@@ -25,9 +26,10 @@ import { RetentionService } from './retention.service.js';
   imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
   controllers: [ComplianceController, SanctionsController, MoneyStatusController, RestrictedReportsController,
     RetentionController, RestrictedExportsController],
-  providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, ComplianceDataCipher,
+  providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, AmlEvidenceIntake, ComplianceDataCipher,
     SanctionsRepository, SanctionsService, SanctionsRefresher, SanctionsScreeningService,
     RestrictedReportsRepository, RestrictedReportsService, SuspicionDataCipher, SuspicionEvidenceVault,
     RetentionRepository, RetentionService],
+  exports: [AmlEvidenceVault, AmlEvidenceIntake, ComplianceDataCipher],
 })
 export class ComplianceModule {}

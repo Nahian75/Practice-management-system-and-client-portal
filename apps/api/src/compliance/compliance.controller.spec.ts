@@ -153,6 +153,45 @@ describe('Compliance foundations API', () => {
     expect((await api(bothToken).post(`/compliance/controls/${own.body.id}/approval`, {})).status).toBe(409);
   });
 
+  it('publishes owned policies and records each staff acknowledgement once', async () => {
+    const policy = await api(complianceToken).post('/compliance/controls', {
+      ...controlBody('client_care_policy'), ownerAccountId: compliance.id,
+      requiresAcknowledgement: true, acknowledgementDueDays: 14,
+    });
+    expect(policy.status, JSON.stringify(policy.body)).toBe(201);
+    expect(policy.body).toMatchObject({ kind: 'client_care_policy', owner: { accountId: compliance.id },
+      requiresAcknowledgement: true, acknowledgementDueDays: 14, approval: null });
+
+    expect((await api(feeEarnerToken).post(`/compliance/policies/${policy.body.id}/acknowledgement`, {})).status).toBe(409);
+    expect((await api(partnerToken).post(`/compliance/controls/${policy.body.id}/approval`, {})).status).toBe(201);
+
+    const own = await api(feeEarnerToken).get('/compliance/policies/me');
+    expect(own.status).toBe(200);
+    expect(own.body.policies).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: policy.body.id, acknowledgement: null, acknowledgementDueOn: expect.any(String),
+    })]));
+
+    const acknowledged = await api(feeEarnerToken)
+      .post(`/compliance/policies/${policy.body.id}/acknowledgement`, {});
+    expect(acknowledged.status, JSON.stringify(acknowledged.body)).toBe(201);
+    expect(acknowledged.body).toMatchObject({ controlVersionId: policy.body.id,
+      account: { accountId: feeEarner.id } });
+    expect((await api(feeEarnerToken)
+      .post(`/compliance/policies/${policy.body.id}/acknowledgement`, {})).status).toBe(409);
+    expect((await api(feeEarnerToken)
+      .get(`/compliance/policies/${policy.body.id}/acknowledgements`)).status).toBe(403);
+
+    const report = await api(complianceToken)
+      .get(`/compliance/policies/${policy.body.id}/acknowledgements`);
+    expect(report.status).toBe(200);
+    expect(report.body.acknowledgements).toEqual([expect.objectContaining({
+      controlVersionId: policy.body.id, account: { accountId: feeEarner.id, displayName: expect.any(String) },
+    })]);
+    const refreshed = await api(feeEarnerToken).get('/compliance/policies/me');
+    expect(refreshed.body.policies.find((item: { id: string }) => item.id === policy.body.id).acknowledgement)
+      .toMatchObject({ account: { accountId: feeEarner.id } });
+  });
+
   it('rejects unknown fields, unsafe document characters, and unsupported dates', async () => {
     expect((await api(complianceToken).post('/compliance/controls', {
       ...controlBody(), unexpectedApproval: true,

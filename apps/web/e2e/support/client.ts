@@ -68,6 +68,7 @@ export async function clientWithMatter(request: APIRequestContext) {
 
 /** Signs a client in through the page and expects the portal to be their destination. */
 export async function signInClient(page: Page, client: TestClient): Promise<void> {
+  await page.context().clearCookies();
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(client.email);
   await page.getByLabel('Password').fill(client.password);

@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/clients', label: 'Clients' },
   { href: '/matters', label: 'Matters' },
   { href: '/people', label: 'People' },
+  { href: '/policies', label: 'Policies' },
   { href: '/hr', label: 'HR workspace' },
   { href: '/finance', label: 'Finance' },
   { href: '/compliance', label: 'Compliance' },

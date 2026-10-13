@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { PassThrough, type Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuditActor } from '../audit/audit-event.js';
@@ -7,18 +7,16 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { sql, type Kysely } from 'kysely';
 import { text } from '../common/validation/safe-text.js';
 import type {
-  AmlControlKind, AmlExpectedValue, AmlMeasureKind, AmlOfficerKind, AmlOutcome, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, Database, DocumentMediaType,
+  AmlControlKind, AmlExpectedValue, AmlMeasureKind, AmlOfficerKind, AmlOutcome, AmlRiskRating, AmlSubjectKind, AmlSubjectRelationship, Database,
 } from '../database/schema.js';
-import { FileInspection, FileRefusedError, type RefusalReason } from '../documents/file-inspection.js';
-import { UploadFormError } from '../documents/upload-request.js';
-import { isLimitsAlert, VirusScanner } from '../documents/virus-scanner.js';
-import { AmlEvidenceVault, type StoredAmlEvidence } from './aml-evidence-vault.js';
+import { AmlEvidenceVault } from './aml-evidence-vault.js';
+import { AmlEvidenceIntake, type AmlEvidenceRefusal } from './aml-evidence-intake.js';
 import { ComplianceDataCipher } from './compliance-data-cipher.js';
 import { ComplianceRepository } from './compliance.repository.js';
 import { SanctionsScreeningService } from './sanctions-screening.service.js';
 import type {
   AssessmentWork, CddCase, Clearance, Gate, Hold, StartException, CddSubjectDetails, ControlVersion, CountryListVersion, IndependentReview, OfficerAppointment,
-  RiskAssessment, RiskFactors, RiskNarrative, TrainingCompletion,
+  PolicyAcknowledgement, RiskAssessment, RiskFactors, RiskNarrative, StaffPolicy, TrainingCompletion,
 } from './compliance.js';
 
 export interface ComplianceActor { actor: AuditActor; accountId: string; context?: RequestContext }
@@ -32,15 +30,10 @@ const evidenceFileName = text(255);
 class AmlEvidenceAllowanceError extends Error {}
 class CddSubmittedError extends Error {}
 
-type ReceiveRefusal = RefusalReason | 'malware' | 'scanner_unavailable' | 'unscannable' | 'form' | 'interrupted';
 export type EvidenceOutcome =
   | { outcome: 'added'; value: CddCase }
   | { outcome: 'not_found' | 'conflict' }
-  | { outcome: 'refused'; reason: ReceiveRefusal | 'over_allowance' | 'file_name' };
-interface ReceivedEvidence {
-  inspected: { mediaType: DocumentMediaType; sizeBytes: number; sha256: Buffer };
-  stored: StoredAmlEvidence;
-}
+  | { outcome: 'refused'; reason: AmlEvidenceRefusal | 'over_allowance' | 'file_name' };
 
 export interface EvidenceInput {
   evidenceType: string; country: string | null; issuedOn: string | null; expiresOn: string | null;
@@ -67,7 +60,7 @@ function page<T extends { id: string }>(items: T[]): { items: T[]; next: string 
 export class ComplianceService {
   constructor(private readonly records: ComplianceRepository, private readonly audit: AuditService,
     private readonly cipher: ComplianceDataCipher, private readonly evidenceVault: AmlEvidenceVault,
-    private readonly scanner: VirusScanner, private readonly screening: SanctionsScreeningService) {}
+    private readonly intake: AmlEvidenceIntake, private readonly screening: SanctionsScreeningService) {}
 
   async listAppointments(before?: string) { return page(await this.records.listAppointments(before)); }
 
@@ -104,7 +97,8 @@ export class ComplianceService {
 
   async createControl(input: {
     kind: AmlControlKind; title: string; content: string; source: string;
-    effectiveFrom: string; reviewDueOn: string;
+    effectiveFrom: string; reviewDueOn: string; ownerAccountId: string;
+    requiresAcknowledgement: boolean; acknowledgementDueDays: number | null;
   }, by: ComplianceActor): Promise<Change<ControlVersion>> {
     try {
       const value = await this.records.transaction(async (trx) => {
@@ -118,6 +112,30 @@ export class ComplianceService {
       });
       return value ? { outcome: 'changed', value } : { outcome: 'conflict' };
     } catch (error) { return databaseOutcome(error); }
+  }
+
+  listStaffPolicies(accountId: string): Promise<StaffPolicy[]> {
+    return this.records.listStaffPolicies(accountId);
+  }
+
+  async acknowledgePolicy(controlId: string, by: ComplianceActor): Promise<Change<PolicyAcknowledgement>> {
+    try {
+      const value = await this.records.transaction(async (trx) => {
+        const id = await this.records.acknowledgePolicy(controlId, by.accountId, trx);
+        const acknowledgement = await this.records.findPolicyAcknowledgement(id, trx);
+        if (!acknowledgement) return undefined;
+        await this.audit.record({ actor: by.actor, action: 'compliance.policy_acknowledged', outcome: 'success',
+          resource: { type: 'policy_acknowledgement', id }, metadata: { controlId }, ...by.context }, trx);
+        return acknowledgement;
+      });
+      return value ? { outcome: 'changed', value } : { outcome: 'not_found' };
+    } catch (error) { return databaseOutcome(error); }
+  }
+
+  async listPolicyAcknowledgements(controlId: string, before?: string) {
+    const control = await this.records.findControl(controlId);
+    if (!control) return undefined;
+    return page(await this.records.listPolicyAcknowledgements(controlId, before));
   }
 
   async approveControl(id: string, by: ComplianceActor): Promise<Change<ControlVersion>> {
@@ -279,7 +297,7 @@ export class ComplianceService {
     const fileName = checkedName.data;
     if (!await this.withinEvidenceAllowance(by.accountId, 0)) return skip({ outcome: 'refused', reason: 'over_allowance' });
 
-    const received = await this.receiveEvidence(fileName, input.file);
+    const received = await this.intake.receive(fileName, input.file);
     if ('reason' in received) {
       await this.audit.record({ actor: by.actor, action: 'aml.evidence_refused', outcome: 'failure',
         resource: { type: 'aml_cdd_case', id: caseId }, metadata: { reason: received.reason }, ...by.context });
@@ -641,51 +659,6 @@ export class ComplianceService {
     } catch (error) { return protectedOutcome(error); }
   }
 
-  /**
-   * Streams one upload through inspection into the scanner and the vault at once.
-   * The first failure stops every branch, and a refused or failed file is removed from storage.
-   */
-  private async receiveEvidence(fileName: string, file: Readable): Promise<ReceivedEvidence | { reason: ReceiveRefusal }> {
-    const inspection = new FileInspection(fileName);
-    const toScanner = new PassThrough();
-    const toVault = new PassThrough();
-    let first: { origin: 'file' | 'inspection' | 'scanner' | 'storage'; error: unknown } | undefined;
-    const stop = (origin: NonNullable<typeof first>['origin']) => (error: unknown) => {
-      first ??= { origin, error };
-      const reason = error instanceof Error ? error : new Error('Upload stopped');
-      inspection.destroy(reason);
-      toScanner.destroy(reason);
-      toVault.destroy(reason);
-    };
-    file.on('error', stop('file'));
-    inspection.on('error', stop('inspection'));
-    toScanner.on('error', () => undefined);
-    toVault.on('error', () => undefined);
-    if (file.destroyed) stop('file')(file.errored ?? new Error('The upload was interrupted'));
-    file.pipe(inspection);
-    inspection.pipe(toScanner);
-    inspection.pipe(toVault);
-
-    const scanning = this.scanner.scan(toScanner);
-    const storing = this.evidenceVault.store(toVault);
-    scanning.catch(stop('scanner'));
-    storing.catch(stop('storage'));
-    const [scan, store] = await Promise.allSettled([scanning, storing]);
-
-    let reason: ReceiveRefusal | undefined;
-    if (first?.origin === 'inspection' && first.error instanceof FileRefusedError) reason = first.error.reason;
-    else if (first?.origin === 'scanner') reason = 'scanner_unavailable';
-    else if (first?.origin === 'file') reason = first.error instanceof UploadFormError ? 'form' : 'interrupted';
-    else if (!first && scan.status === 'fulfilled' && !scan.value.clean) reason = isLimitsAlert(scan.value.signature) ? 'unscannable' : 'malware';
-
-    if (reason || first) {
-      if (store.status === 'fulfilled') await this.evidenceVault.discard(store.value.storageKey);
-      if (reason) return { reason };
-      throw first!.error;
-    }
-    if (scan.status === 'rejected' || store.status === 'rejected') throw new Error('Evidence upload ended without an answer');
-    return { inspected: inspection.result(), stored: store.value };
-  }
 }
 
 /** An unknown client or matter and one the actor may not see both read as "not found". */

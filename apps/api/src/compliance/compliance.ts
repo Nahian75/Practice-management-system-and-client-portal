@@ -11,8 +11,18 @@ export interface OfficerAppointment {
 export interface ControlVersion {
   id: string; kind: AmlControlKind; version: number; title: string; content: string;
   contentSha256: string; source: string; effectiveFrom: string; reviewDueOn: string;
+  owner: Person; requiresAcknowledgement: boolean; acknowledgementDueDays: number | null;
   preparedBy: Person; preparedAt: Date;
   approval: { id: string; approvedBy: Person; approvedAt: Date } | null;
+}
+
+export interface PolicyAcknowledgement {
+  id: string; controlVersionId: string; account: Person; acknowledgedAt: Date;
+}
+
+export interface StaffPolicy extends ControlVersion {
+  acknowledgement: PolicyAcknowledgement | null;
+  acknowledgementDueOn: string | null;
 }
 
 export interface TrainingCompletion {

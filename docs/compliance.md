@@ -83,8 +83,8 @@ regulated sector.
 | External reports | NCA SAR/DAML and OFSI/OTSI reports remain in their official portals. Stass stores only the protected internal decision, dates, external reference, status and any licence/defence conditions | Avoids duplicating government submission services and limits highly sensitive material |
 | Suspicion confidentiality | Internal reports, decisions and attachments use a separate encryption key and nominated-officer access. Ordinary users see only a generic unavailable action; portals, email, normal matter history and exports reveal nothing about a suspicion or SAR | Reduces tipping-off and prejudicing-an-investigation risk |
 | Retention | Calculate disposal from the end of the relationship or transaction. A controlled job deletes AML personal data after the required period unless a documented legal-proceedings or statutory hold applies; a content-free disposal record remains | Compliance records cannot simply be kept forever, unlike financial postings |
-| Providers | Manual and certified digital verification evidence are both allowed. The provider, method, assurance result and raw response hash are recorded; the firm remains responsible | Avoids locking the design to one vendor or treating a provider result as the legal decision |
-| Client portal | No AML, sanctions, source-of-funds or suspicion pages, states, notifications or downloads | These are internal records and may expose sensitive checks or reporting |
+| Providers | Manual and certified digital verification evidence are both allowed. The provider, method, assurance result and raw response hash are recorded; the firm remains responsible. Step 17 adds optional approved adapters without making a vendor result the decision | Avoids locking the design to one vendor or treating a provider result as the legal decision |
+| Client portal | No internal AML, sanctions, source-of-funds conclusions, suspicion states, notifications or downloads. Step 17 may show a narrowly described evidence request and accept its protected upload, without revealing the internal reason, result or AML state | Lets a client supply requested evidence without exposing sensitive checks or reporting |
 
 ## Roles and permissions
 
@@ -150,6 +150,10 @@ unless a narrower confidentiality rule applies, so staff can wind down safely.
   private fixed document text with a SHA-256 digest. Step 15b adds the separate
   protected-file path used for CDD evidence. Published versions are immutable
   and a new version supersedes rather than edits one.
+- Step 17a expands the same library to conflicts, client care, complaints,
+  confidentiality, data protection, retention, information security and
+  Finance policies. New versions name an owner and may require each staff
+  member to acknowledge the exact approved version by a configured deadline.
 - Risk assessments cover customers, geographies, services, transactions and
   delivery channels, and separately identify ML, TF, PF and sanctions risk.
   The author records which SRA sectoral assessment, National Risk Assessment,

@@ -35,6 +35,15 @@ export function CddCaseActions({ clientId, caseId, subjects, evidence }:
     try { const response = await fetch(`${base}/evidence`, { method: 'POST', body: data }); if (!response.ok) { setErrors(await messagesOf(response)); return; } target.reset(); router.refresh(); }
     finally { setSending(false); }
   }
+  async function requestEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const target = event.currentTarget; const form = new FormData(target);
+    const country = String(form.get('country') ?? '').trim().toUpperCase() || null;
+    const contactId = String(form.get('contactId') ?? '').trim() || null;
+    if (await json('/evidence-requests', {
+      evidenceType: form.get('evidenceType'), instructions: form.get('instructions'),
+      dueOn: form.get('dueOn'), country, contactId,
+    })) target.reset();
+  }
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const nullable = (name: string) => String(form.get(name) ?? '').trim() || null;
     await json('/verifications', { subjectId: form.get('subjectId'), evidenceId: form.get('evidenceId'), sourceType: form.get('sourceType'), country: nullable('country'),
@@ -80,6 +89,13 @@ export function CddCaseActions({ clientId, caseId, subjects, evidence }:
       <div className="field"><label className="label" htmlFor="documentIdentifier">Document identifier</label><input className="input" id="documentIdentifier" name="documentIdentifier" maxLength={500} /></div>
       <div className="field"><label className="label" htmlFor="file">File</label><input className="input" id="file" name="file" type="file" required /></div>
       <button className="button" disabled={sending}>Upload evidence</button></form>
+
+    <form aria-label="Request evidence from client" onSubmit={requestEvidence}><h3>Request evidence from client</h3>
+      <div className="field"><label className="label" htmlFor="reqEvidenceType">Evidence type</label><input className="input" id="reqEvidenceType" name="evidenceType" required maxLength={100} /></div>
+      <div className="field"><label className="label" htmlFor="reqInstructions">Instructions</label><textarea className="input" id="reqInstructions" name="instructions" rows={3} required minLength={10} maxLength={2000} /></div>
+      <div className="form-grid"><div className="field"><label className="label" htmlFor="reqDueOn">Due date</label><input className="input input-date" id="reqDueOn" name="dueOn" type="date" required /></div>
+        <div className="field"><label className="label" htmlFor="reqCountry">Country (two letters)</label><input className="input input-short" id="reqCountry" name="country" maxLength={2} /></div></div>
+      <button className="button button-secondary" disabled={sending}>Send portal evidence request</button></form>
 
     {!!subjects.length && !!evidence.length && <form aria-label="Record verification" onSubmit={verify}><h3>Record verification</h3>
       <SubjectSelect id="subjectId" name="subjectId" label="Subject" subjects={subjects} /><EvidenceSelect id="evidenceId" name="evidenceId" label="Evidence" evidence={evidence} />

@@ -17,6 +17,7 @@ function nextBackupCode(staff: TestStaff): string {
 
 /** Signs this staff member in, in the browser, through the sign-in page. */
 export async function signIn(page: Page, staff: TestStaff): Promise<void> {
+  await page.context().clearCookies();
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(staff.email);
   await page.getByLabel('Password').fill(staff.password);
