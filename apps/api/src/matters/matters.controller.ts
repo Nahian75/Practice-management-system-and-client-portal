@@ -50,7 +50,7 @@ const MATTER_TYPES = [
 const MATTER_STATUSES = ['awaiting_clearance', 'open', 'closed'] as const;
 const PARTY_ROLES = ['opponent', 'opponent_solicitor', 'other'] as const;
 const KINDS = ['individual', 'organisation'] as const;
-const RELATIONS = ['client', 'contact', 'opponent', 'opponent_solicitor', 'other_party'] as const;
+const RELATIONS = ['client', 'former_client', 'contact', 'opponent', 'opponent_solicitor', 'other_party', 'counterparty', 'connected_person', 'alias'] as const;
 
 const conflictCheckRequestSchema = z.strictObject({
   clientId: z.uuid(),

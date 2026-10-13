@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode, HttpException, HttpStatus,
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, HttpException, HttpStatus,
   NotFoundException, Param, Post, Query, Req, ServiceUnavailableException } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -11,7 +11,11 @@ import { ResponseSchema } from '../common/serialization/response-schema.decorato
 import { text } from '../common/validation/safe-text.js';
 import { discardUpload, readUpload, UploadFormError } from '../documents/upload-request.js';
 import type {
+  ActivationException,
   CompanySnapshot,
+  ConflictAlias,
+  ConflictConnectedPerson,
+  ConflictDecision,
   ContactVerification,
   ElectronicCheck,
   EvidenceRequest,
@@ -128,6 +132,115 @@ const portalEvidenceRequest = z.object({ id: z.uuid(), evidenceType: z.string(),
   state: z.enum(['open','submitted']), submittedAt: z.iso.datetime().nullable() });
 const portalEvidenceRequestList = z.object({ requests: z.array(portalEvidenceRequest) });
 
+const conflictAliasBody = z.strictObject({
+  name: text(200, 1),
+  kind: z.enum(['alias', 'former_name', 'trading_name']),
+  notes: text(1000).nullable().optional(),
+});
+const conflictAlias = z.object({
+  id: z.uuid(),
+  clientId: z.uuid(),
+  name: z.string(),
+  kind: z.enum(['alias', 'former_name', 'trading_name']),
+  notes: z.string().nullable(),
+  createdBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  createdAt: z.iso.datetime(),
+});
+const conflictAliasList = z.object({ aliases: z.array(conflictAlias) });
+
+const conflictConnectedPersonBody = z.strictObject({
+  name: text(200, 1),
+  relationship: z.enum(['director', 'shareholder', 'beneficial_owner', 'connected_person', 'counterparty', 'officer', 'guarantor']),
+  companyName: text(200).nullable().optional(),
+  notes: text(1000).nullable().optional(),
+});
+const conflictConnectedPerson = z.object({
+  id: z.uuid(),
+  clientId: z.uuid(),
+  name: z.string(),
+  relationship: z.enum(['director', 'shareholder', 'beneficial_owner', 'connected_person', 'counterparty', 'officer', 'guarantor']),
+  companyName: z.string().nullable(),
+  notes: z.string().nullable(),
+  createdBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  createdAt: z.iso.datetime(),
+});
+const conflictConnectedPersonList = z.object({ connectedPersons: z.array(conflictConnectedPerson) });
+
+const conflictDecisionBody = z.strictObject({
+  outcome: z.enum(['clear', 'potential', 'escalated', 'approved_with_controls', 'cannot_act']),
+  rationale: text(2000, 10),
+  safeguards: z.array(text(500, 1)).optional().default([]),
+});
+const conflictDecision = z.object({
+  id: z.uuid(),
+  checkId: z.uuid(),
+  clientId: z.uuid(),
+  outcome: z.enum(['clear', 'potential', 'escalated', 'approved_with_controls', 'cannot_act']),
+  rationale: z.string(),
+  safeguards: z.array(z.string()),
+  decidedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  decidedAt: z.iso.datetime(),
+});
+const conflictDecisionList = z.object({ decisions: z.array(conflictDecision) });
+const conflictDecisionRecorded = z.object({ decisionId: z.uuid(), outcome: z.literal('recorded') });
+
+const activationRequirement = z.object({
+  key: z.string(),
+  title: z.string(),
+  status: z.enum(['satisfied', 'pending', 'blocked', 'exception']),
+  details: z.string(),
+  reviewer: z.string().nullable().optional(),
+  lastEventAt: z.string().nullable().optional(),
+});
+const activationGateResponse = z.object({
+  status: z.enum(['pending', 'ready', 'activated', 'blocked']),
+  canActivate: z.boolean(),
+  isActivated: z.boolean(),
+  activatedAt: z.string().nullable(),
+  activatedBy: z.string().nullable(),
+  notes: z.string().nullable(),
+  requirements: z.array(activationRequirement),
+});
+
+const activationExceptionBody = z.strictObject({
+  requirementKey: z.enum(['conflict_check', 'email_verification', 'id_verification', 'cdd_compliance']),
+  reason: text(2000, 10),
+  expiresAt: z.iso.datetime(),
+});
+const activationException = z.object({
+  id: z.uuid(),
+  clientId: z.uuid(),
+  requirementKey: z.enum(['conflict_check', 'email_verification', 'id_verification', 'cdd_compliance']),
+  reason: z.string(),
+  expiresAt: z.iso.datetime(),
+  grantedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+  grantedAt: z.iso.datetime(),
+});
+const activationExceptionList = z.object({ exceptions: z.array(activationException) });
+const activationExceptionRecorded = z.object({ exceptionId: z.uuid(), outcome: z.literal('recorded') });
+
+const activateClientBody = z.strictObject({
+  notes: text(1000).nullable().optional(),
+});
+const activateClientResponse = z.object({
+  activationId: z.uuid(),
+  outcome: z.literal('activated'),
+});
+
+const clientConflictCheckList = z.object({
+  checks: z.array(
+    z.object({
+      id: z.uuid(),
+      clientId: z.uuid(),
+      names: z.array(z.string()),
+      matchCount: z.number().int(),
+      matches: z.unknown(),
+      createdAt: z.iso.datetime(),
+      requestedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
+    }),
+  ),
+});
+
 function actorFor(session: ResolvedSession, request: Request): OnboardingActor {
   return { actor: auditActorFor(session.account), accountId: session.account.id, context: requestContext(request) };
 }
@@ -150,6 +263,10 @@ const serializeCompanySnapshot = (value: CompanySnapshot) => ({
   ...value,
   retrievedAt: value.retrievedAt.toISOString(),
 });
+const serializeConflictAlias = (v: ConflictAlias) => ({ ...v, createdAt: v.createdAt.toISOString() });
+const serializeConflictConnectedPerson = (v: ConflictConnectedPerson) => ({ ...v, createdAt: v.createdAt.toISOString() });
+const serializeConflictDecision = (v: ConflictDecision) => ({ ...v, decidedAt: v.decidedAt.toISOString() });
+const serializeActivationException = (v: ActivationException) => ({ ...v, expiresAt: v.expiresAt.toISOString(), grantedAt: v.grantedAt.toISOString() });
 
 @Controller()
 export class OnboardingController {
@@ -283,6 +400,141 @@ export class OnboardingController {
     const values = await this.onboarding.listCompanySnapshots(clientId, session.account.id);
     if (!values) throw new NotFoundException('No client with this id');
     return { snapshots: values.map(serializeCompanySnapshot) };
+  }
+
+  @Post('clients/:clientId/conflict-aliases') @RequirePermission('clients.edit') @ResponseSchema(conflictAlias)
+  async addConflictAlias(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: conflictAliasBody }) body: z.infer<typeof conflictAliasBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.addConflictAlias(clientId, {
+      name: body.name, kind: body.kind, notes: body.notes ?? null,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Client not found');
+      case 'conflict': throw new ConflictException('Unable to add conflict alias');
+      case 'recorded': return serializeConflictAlias(result.alias);
+    }
+  }
+
+  @Get('clients/:clientId/conflict-aliases') @RequirePermission('clients.view') @ResponseSchema(conflictAliasList)
+  async listConflictAliases(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const aliases = await this.onboarding.listConflictAliases(clientId);
+    return { aliases: aliases.map(serializeConflictAlias) };
+  }
+
+  @Post('clients/:clientId/conflict-connected-persons') @RequirePermission('clients.edit') @ResponseSchema(conflictConnectedPerson)
+  async addConflictConnectedPerson(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: conflictConnectedPersonBody }) body: z.infer<typeof conflictConnectedPersonBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.addConflictConnectedPerson(clientId, {
+      name: body.name, relationship: body.relationship, companyName: body.companyName ?? null, notes: body.notes ?? null,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found': throw new NotFoundException('Client not found');
+      case 'conflict': throw new ConflictException('Unable to add conflict connected person');
+      case 'recorded': return serializeConflictConnectedPerson(result.person);
+    }
+  }
+
+  @Get('clients/:clientId/conflict-connected-persons') @RequirePermission('clients.view') @ResponseSchema(conflictConnectedPersonList)
+  async listConflictConnectedPersons(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const persons = await this.onboarding.listConflictConnectedPersons(clientId);
+    return { connectedPersons: persons.map(serializeConflictConnectedPerson) };
+  }
+
+  @Post('clients/:clientId/conflict-checks/:checkId/decisions') @RequirePermission('aml.assess') @ResponseSchema(conflictDecisionRecorded)
+  async recordConflictDecision(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Param('checkId', { schema: z.uuid() }) checkId: string,
+    @Body({ schema: conflictDecisionBody }) body: z.infer<typeof conflictDecisionBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.recordConflictDecision(clientId, checkId, {
+      outcome: body.outcome, rationale: body.rationale, safeguards: body.safeguards,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only partner or compliance can record restricted conflict decisions');
+      case 'not_found': throw new NotFoundException('Client or conflict check not found');
+      case 'conflict': throw new ConflictException('Unable to record conflict decision');
+      case 'recorded': return { decisionId: result.decisionId, outcome: 'recorded' as const };
+    }
+  }
+
+  @Get('clients/:clientId/conflict-checks/:checkId/decisions') @RequirePermission('aml.assess') @ResponseSchema(conflictDecisionList)
+  async listConflictDecisions(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Param('checkId', { schema: z.uuid() }) checkId: string,
+  ) {
+    const decisions = await this.onboarding.listConflictDecisions(clientId, checkId);
+    return { decisions: decisions.map(serializeConflictDecision) };
+  }
+
+  @Get('clients/:clientId/conflict-decisions') @RequirePermission('aml.assess') @ResponseSchema(conflictDecisionList)
+  async listAllClientConflictDecisions(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const decisions = await this.onboarding.listConflictDecisions(clientId);
+    return { decisions: decisions.map(serializeConflictDecision) };
+  }
+
+  @Get('clients/:clientId/conflict-checks') @RequirePermission('clients.view') @ResponseSchema(clientConflictCheckList)
+  async listClientConflictChecks(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const checks = await this.onboarding.listClientConflictChecks(clientId);
+    return {
+      checks: checks.map((c) => ({
+        ...c,
+        createdAt: c.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  @Get('clients/:clientId/activation-gate') @RequirePermission('clients.view') @ResponseSchema(activationGateResponse)
+  async getActivationGate(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const gate = await this.onboarding.getActivationGate(clientId);
+    if (!gate) throw new NotFoundException('Client not found');
+    return gate;
+  }
+
+  @Post('clients/:clientId/activation-exceptions') @RequirePermission('aml.assess') @ResponseSchema(activationExceptionRecorded)
+  async grantActivationException(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: activationExceptionBody }) body: z.infer<typeof activationExceptionBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.grantActivationException(clientId, {
+      requirementKey: body.requirementKey, reason: body.reason, expiresAt: new Date(body.expiresAt),
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only partner or compliance can grant exceptions');
+      case 'not_found': throw new NotFoundException('Client not found');
+      case 'conflict': throw new ConflictException('Unable to grant exception');
+      case 'recorded': return { exceptionId: result.exceptionId, outcome: 'recorded' as const };
+    }
+  }
+
+  @Get('clients/:clientId/activation-exceptions') @RequirePermission('clients.view') @ResponseSchema(activationExceptionList)
+  async listActivationExceptions(@Param('clientId', { schema: z.uuid() }) clientId: string) {
+    const exceptions = await this.onboarding.listActivationExceptions(clientId);
+    return { exceptions: exceptions.map(serializeActivationException) };
+  }
+
+  @Post('clients/:clientId/activate') @RequirePermission('aml.assess') @ResponseSchema(activateClientResponse)
+  async activateClient(
+    @Param('clientId', { schema: z.uuid() }) clientId: string,
+    @Body({ schema: activateClientBody }) body: z.infer<typeof activateClientBody>,
+    @CurrentSession() session: ResolvedSession, @Req() request: Request,
+  ) {
+    const result = await this.onboarding.activateClient(clientId, {
+      notes: body.notes ?? null,
+    }, actorFor(session, request));
+    switch (result.outcome) {
+      case 'forbidden': throw new ForbiddenException('Only partner or compliance can formally activate client');
+      case 'not_found': throw new NotFoundException('Client not found');
+      case 'blocked': throw new ConflictException('Client onboarding requirements are not satisfied');
+      case 'activated': return { activationId: result.activationId, outcome: 'activated' as const };
+    }
   }
 }
 

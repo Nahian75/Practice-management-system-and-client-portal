@@ -272,6 +272,56 @@ export interface OnboardingCompanySnapshotsTable {
   raw_payload_hash: DatabaseSet<Buffer>; retrieved_at: DatabaseSet<Date>; recorded_by: DatabaseSet<string>;
 }
 
+export interface ConflictAliasesTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  name: InsertOnly<string>;
+  kind: InsertOnly<'alias' | 'former_name' | 'trading_name'>;
+  notes: InsertOnly<string | null>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface ConflictConnectedPersonsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  name: InsertOnly<string>;
+  relationship: InsertOnly<'director' | 'shareholder' | 'beneficial_owner' | 'connected_person' | 'counterparty' | 'officer' | 'guarantor'>;
+  company_name: InsertOnly<string | null>;
+  notes: InsertOnly<string | null>;
+  created_by: InsertOnly<string>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface ConflictDecisionsTable {
+  id: DatabaseSet<string>;
+  check_id: InsertOnly<string>;
+  client_id: InsertOnly<string>;
+  outcome: InsertOnly<'clear' | 'potential' | 'escalated' | 'approved_with_controls' | 'cannot_act'>;
+  rationale: InsertOnly<string>;
+  safeguards: InsertOnly<string[]>;
+  decided_by: InsertOnly<string>;
+  decided_at: DatabaseSet<Date>;
+}
+
+export interface OnboardingActivationExceptionsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  requirement_key: InsertOnly<'conflict_check' | 'email_verification' | 'id_verification' | 'cdd_compliance'>;
+  reason: InsertOnly<string>;
+  expires_at: InsertOnly<Date>;
+  granted_by: InsertOnly<string>;
+  granted_at: DatabaseSet<Date>;
+}
+
+export interface ClientOnboardingActivationsTable {
+  id: DatabaseSet<string>;
+  client_id: InsertOnly<string>;
+  activated_by: InsertOnly<string>;
+  activated_at: DatabaseSet<Date>;
+  notes: InsertOnly<string | null>;
+}
+
 interface ClientCorrespondenceColumns {
   email: Writable<string | null>;
   phone: Writable<string | null>;
@@ -1639,6 +1689,11 @@ export interface Database {
   onboarding_evidence_reviews: OnboardingEvidenceReviewsTable;
   onboarding_electronic_checks: OnboardingElectronicChecksTable;
   onboarding_company_snapshots: OnboardingCompanySnapshotsTable;
+  conflict_aliases: ConflictAliasesTable;
+  conflict_connected_persons: ConflictConnectedPersonsTable;
+  conflict_decisions: ConflictDecisionsTable;
+  onboarding_activation_exceptions: OnboardingActivationExceptionsTable;
+  client_onboarding_activations: ClientOnboardingActivationsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

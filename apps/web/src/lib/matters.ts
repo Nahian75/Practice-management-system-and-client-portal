@@ -19,10 +19,14 @@ export const PARTY_ROLE_LABELS = { opponent: 'Opponent', opponent_solicitor: "Op
 
 export const RELATION_LABELS = {
   client: 'Client',
+  former_client: 'Former client',
   contact: 'Contact at a client',
   opponent: 'Opponent',
   opponent_solicitor: "Opponent's solicitor",
   other_party: 'Other party',
+  counterparty: 'Counterparty',
+  connected_person: 'Connected person',
+  alias: 'Alias / Former name',
 } as const;
 
 export const TEAM_ROLE_LABELS = { supervising_partner: 'Supervising partner', fee_earner: 'Fee earner' } as const;

@@ -164,3 +164,101 @@ test('records electronic verification checks and displays company verification s
   await noAxeViolations(page);
 });
 
+test('manages wider conflict subjects, records conflict decision, and activates client through onboarding gate with exception', async ({ page, request }) => {
+  await signedInStaff(page, request, ['compliance', 'partner']);
+  const email = `onboarding-gate-${randomUUID()}@example.com`;
+  const created = await page.request.post('/api/clients', {
+    data: {
+      kind: 'individual',
+      givenNames: 'Arthur',
+      familyName: randomName(),
+      email,
+    },
+  });
+  expect(created.status()).toBe(201);
+  const client = (await created.json()) as { id: string };
+
+  await page.goto(`/clients/${client.id}`);
+  await expect(page.getByRole('heading', { name: 'Conflict search and wider subjects' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Onboarding activation gate' })).toBeVisible();
+
+  // 1. Add alias
+  await page.getByRole('button', { name: 'Add alias / former name' }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Artie Pendleton');
+  await page.getByLabel('Kind').selectOption('trading_name');
+  await page.getByLabel('Notes (optional)').fill('Client trading moniker');
+  await page.getByRole('button', { name: 'Record alias' }).click();
+
+  await expect(page.getByRole('cell', { name: 'Artie Pendleton' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Trading name' })).toBeVisible();
+
+  // 2. Add connected person
+  await page.getByRole('button', { name: 'Add connected person' }).click();
+  await page.getByLabel('Full name').fill('Pendleton Holdings Ltd');
+  await page.getByLabel('Relationship').selectOption('counterparty');
+  await page.getByLabel('Company (optional)').fill('Pendleton UK Ltd');
+  await page.getByRole('button', { name: 'Record connected person' }).click();
+
+  await expect(page.getByRole('cell', { name: 'Pendleton Holdings Ltd' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Counterparty' })).toBeVisible();
+
+  // 3. Run wider conflict check
+  await page.getByRole('button', { name: 'Run conflict check' }).click();
+  await page.getByLabel(/Names to check/).fill('Artie Pendleton');
+  await page.getByRole('button', { name: 'Execute search' }).click();
+
+  await expect(page.getByText(/Names checked: .*Artie Pendleton/)).toBeVisible();
+  await expect(page.getByText('1 potential match')).toBeVisible();
+
+  // 4. Record conflict decision with rationale & safeguards
+  await page.getByRole('button', { name: 'Record conflict decision' }).click();
+  await page.getByLabel('Outcome').selectOption('approved_with_controls');
+  await page.getByLabel('Rationale').fill('Alias match is self-referential; verified client trading name.');
+  await page.getByLabel(/Safeguards/).fill('Fee earner confirmed sole trading activity');
+  await page.getByRole('button', { name: 'Record decision' }).click();
+
+  await expect(page.getByText('Approved with controls', { exact: true })).toBeVisible();
+  await expect(page.getByText('Alias match is self-referential; verified client trading name.').first()).toBeVisible();
+  await expect(page.getByText('Fee earner confirmed sole trading activity')).toBeVisible();
+
+  // 5. Activation gate initially pending - grant time-limited exceptions for remaining requirements
+  await expect(page.getByText('Pending requirements')).toBeVisible();
+
+  // Exception for email verification
+  await page.getByRole('button', { name: 'Grant activation exception' }).click();
+  await page.getByLabel('Requirement to except').selectOption('email_verification');
+  await page.getByLabel('Reason for exception').fill('Urgent court injunction filing; email channel verification to follow within 7 days.');
+  await page.getByLabel('Duration').selectOption('14');
+  await page.getByRole('button', { name: 'Confirm exception' }).click();
+  await expect(page.getByText(/Urgent court injunction filing/).first()).toBeVisible();
+
+  // Exception for identity verification
+  await page.getByRole('button', { name: 'Grant activation exception' }).click();
+  await page.getByLabel('Requirement to except').selectOption('id_verification');
+  await page.getByLabel('Reason for exception').fill('Passport inspected in person at reception; digital scan queue pending.');
+  await page.getByLabel('Duration').selectOption('14');
+  await page.getByRole('button', { name: 'Confirm exception' }).click();
+  await expect(page.getByText(/Passport inspected in person at reception/).first()).toBeVisible();
+
+  // Exception for CDD compliance
+  await page.getByRole('button', { name: 'Grant activation exception' }).click();
+  await page.getByLabel('Requirement to except').selectOption('cdd_compliance');
+  await page.getByLabel('Reason for exception').fill('Low risk individual matter; CDD file under formal MLRO review.');
+  await page.getByLabel('Duration').selectOption('7');
+  await page.getByRole('button', { name: 'Confirm exception' }).click();
+  await expect(page.getByText(/Low risk individual matter/).first()).toBeVisible();
+
+  await expect(page.getByRole('heading', { name: 'Granted onboarding exceptions' })).toBeVisible();
+  await expect(page.getByText('Ready for activation')).toBeVisible();
+
+  // 6. Formally activate client onboarding
+  await page.getByRole('button', { name: 'Activate client' }).click();
+  await page.getByLabel(/Activation notes/).fill('Formal partner sign-off under time-limited onboarding exceptions.');
+  await page.getByRole('button', { name: 'Activate client now' }).click();
+
+  await expect(page.getByText('Activated', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Client activated: Activated on/)).toBeVisible();
+
+  await noAxeViolations(page);
+});
+

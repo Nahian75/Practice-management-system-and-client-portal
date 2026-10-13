@@ -84,3 +84,65 @@ export interface CompanySnapshot {
   retrievedAt: Date;
   recordedBy: { accountId: string; displayName: string };
 }
+
+export interface ConflictAlias {
+  id: string;
+  clientId: string;
+  name: string;
+  kind: 'alias' | 'former_name' | 'trading_name';
+  notes: string | null;
+  createdBy: { accountId: string; displayName: string };
+  createdAt: Date;
+}
+
+export interface ConflictConnectedPerson {
+  id: string;
+  clientId: string;
+  name: string;
+  relationship: 'director' | 'shareholder' | 'beneficial_owner' | 'connected_person' | 'counterparty' | 'officer' | 'guarantor';
+  companyName: string | null;
+  notes: string | null;
+  createdBy: { accountId: string; displayName: string };
+  createdAt: Date;
+}
+
+export interface ConflictDecision {
+  id: string;
+  checkId: string;
+  clientId: string;
+  outcome: 'clear' | 'potential' | 'escalated' | 'approved_with_controls' | 'cannot_act';
+  rationale: string;
+  safeguards: string[];
+  decidedBy: { accountId: string; displayName: string };
+  decidedAt: Date;
+}
+
+export interface ActivationRequirement {
+  key: string;
+  title: string;
+  status: 'satisfied' | 'pending' | 'blocked' | 'exception';
+  details: string;
+  reviewer?: string | null;
+  lastEventAt?: string | null;
+}
+
+export interface ActivationException {
+  id: string;
+  clientId: string;
+  requirementKey: 'conflict_check' | 'email_verification' | 'id_verification' | 'cdd_compliance';
+  reason: string;
+  expiresAt: Date;
+  grantedBy: { accountId: string; displayName: string };
+  grantedAt: Date;
+}
+
+export interface ActivationGate {
+  status: 'pending' | 'ready' | 'activated' | 'blocked';
+  canActivate: boolean;
+  isActivated: boolean;
+  activatedAt: string | null;
+  activatedBy: string | null;
+  notes: string | null;
+  requirements: ActivationRequirement[];
+}
+

@@ -309,5 +309,96 @@ describe('Contact verification API', () => {
       }),
     ]);
   });
+
+  it('records conflict aliases, connected persons, decisions, and activates through the onboarding gate', async () => {
+    const aliasRes = await api(token).post(`/clients/${clientId}/conflict-aliases`, {
+      name: 'Johnny Test',
+      kind: 'alias',
+      notes: 'Also known as Johnny',
+    });
+    expect(aliasRes.status).toBe(201);
+    expect(aliasRes.body.name).toBe('Johnny Test');
+
+    const cpRes = await api(token).post(`/clients/${clientId}/conflict-connected-persons`, {
+      name: 'Sarah Test',
+      relationship: 'connected_person',
+      notes: 'Spouse of client',
+    });
+    expect(cpRes.status).toBe(201);
+    expect(cpRes.body.name).toBe('Sarah Test');
+
+    const aliases = await api(token).get(`/clients/${clientId}/conflict-aliases`);
+    expect(aliases.status).toBe(200);
+    expect(aliases.body.aliases).toHaveLength(1);
+
+    const connected = await api(token).get(`/clients/${clientId}/conflict-connected-persons`);
+    expect(connected.status).toBe(200);
+    expect(connected.body.connectedPersons).toHaveLength(1);
+
+    const otherClient = await db.transaction().execute(async (trx) => {
+      const client = await trx.insertInto('clients').values({ kind: 'individual', created_by: feeEarner.id })
+        .returning('id').executeTakeFirstOrThrow();
+      await trx.insertInto('client_individuals').values({ client_id: client.id,
+        given_names: 'Another', family_name: 'Person' }).execute();
+      return client.id;
+    });
+
+    const check = await db.insertInto('conflict_checks').values({
+      client_id: otherClient,
+      requested_by: feeEarner.id,
+      names: ['Johnny Test'],
+    }).returningAll().executeTakeFirstOrThrow();
+    expect(check.match_count).toBeGreaterThan(0);
+    expect(check.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ matchedName: 'Johnny Test', relation: 'alias' }),
+      ]),
+    );
+
+    await grantTestRole(db, feeEarner.id, 'partner');
+    const decisionRes = await api(token).post(`/clients/${otherClient}/conflict-checks/${check.id}/decisions`, {
+      outcome: 'approved_with_controls',
+      rationale: 'Information barrier established between teams',
+      safeguards: ['Separate matter team', 'Restricted folder access'],
+    });
+    expect(decisionRes.status).toBe(201);
+    expect(decisionRes.body).toMatchObject({ outcome: 'recorded', decisionId: expect.any(String) });
+
+    const decisions = await api(token).get(`/clients/${otherClient}/conflict-decisions`);
+    expect(decisions.status).toBe(200);
+    expect(decisions.body.decisions).toHaveLength(1);
+    expect(decisions.body.decisions[0].outcome).toBe('approved_with_controls');
+
+    const gateRes = await api(token).get(`/clients/${clientId}/activation-gate`);
+    expect(gateRes.status).toBe(200);
+    expect(gateRes.body.status).toBe('pending');
+    expect(gateRes.body.canActivate).toBe(false);
+
+    const inTwoWeeks = new Date(Date.now() + 14 * 86400000).toISOString();
+    for (const reqKey of ['conflict_check', 'email_verification', 'id_verification', 'cdd_compliance'] as const) {
+      const exRes = await api(token).post(`/clients/${clientId}/activation-exceptions`, {
+        requirementKey: reqKey,
+        reason: 'Temporary onboarding exception approved by partner',
+        expiresAt: inTwoWeeks,
+      });
+      expect(exRes.status, JSON.stringify(exRes.body)).toBe(201);
+    }
+
+    const gateAfterEx = await api(token).get(`/clients/${clientId}/activation-gate`);
+    expect(gateAfterEx.status).toBe(200);
+    expect(gateAfterEx.body.status).toBe('ready');
+    expect(gateAfterEx.body.canActivate).toBe(true);
+
+    const activateRes = await api(token).post(`/clients/${clientId}/activate`, {
+      notes: 'Activated under partner supervision',
+    });
+    expect(activateRes.status).toBe(201);
+    expect(activateRes.body).toMatchObject({ outcome: 'activated', activationId: expect.any(String) });
+
+    const gateFinal = await api(token).get(`/clients/${clientId}/activation-gate`);
+    expect(gateFinal.body.status).toBe('activated');
+    expect(gateFinal.body.isActivated).toBe(true);
+  });
 });
+
 

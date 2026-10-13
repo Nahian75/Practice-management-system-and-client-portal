@@ -5,7 +5,12 @@ import type { Database } from '../database/schema.js';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import type { SealedComplianceData } from '../compliance/compliance-data-cipher.js';
 import type {
+  ActivationException,
+  ActivationGate,
   CompanySnapshot,
+  ConflictAlias,
+  ConflictConnectedPerson,
+  ConflictDecision,
   ContactVerification,
   ContactVerificationState,
   ElectronicCheck,
@@ -272,6 +277,202 @@ export class OnboardingRepository {
       .selectAll()
       .where('client_id', '=', clientId)
       .executeTakeFirst();
+  }
+
+  async recordConflictAlias(input: {
+    clientId: string; name: string; kind: 'alias' | 'former_name' | 'trading_name'; notes: string | null; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<ConflictAlias> {
+    const row = await trx.insertInto('conflict_aliases')
+      .values({
+        client_id: input.clientId,
+        name: input.name,
+        kind: input.kind,
+        notes: input.notes,
+        created_by: input.actorId,
+      })
+      .returning(['id', 'client_id', 'name', 'kind', 'notes', 'created_by', 'created_at'])
+      .executeTakeFirstOrThrow();
+    const creator = await this.db.selectFrom('accounts').select(['id', 'display_name']).where('id', '=', input.actorId).executeTakeFirstOrThrow();
+    return {
+      id: row.id,
+      clientId: row.client_id,
+      name: row.name,
+      kind: row.kind,
+      notes: row.notes,
+      createdBy: { accountId: creator.id, displayName: creator.display_name },
+      createdAt: row.created_at,
+    };
+  }
+
+  async listConflictAliases(clientId: string): Promise<ConflictAlias[]> {
+    const rows = await this.db.selectFrom('conflict_aliases as alias')
+      .innerJoin('accounts as creator', 'creator.id', 'alias.created_by')
+      .select([
+        'alias.id', 'alias.client_id', 'alias.name', 'alias.kind', 'alias.notes', 'alias.created_at',
+        'creator.id as creator_id', 'creator.display_name as creator_name',
+      ])
+      .where('alias.client_id', '=', clientId)
+      .orderBy('alias.created_at', 'desc')
+      .execute();
+    return rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      name: r.name,
+      kind: r.kind,
+      notes: r.notes,
+      createdBy: { accountId: r.creator_id, displayName: r.creator_name },
+      createdAt: r.created_at,
+    }));
+  }
+
+  async recordConflictConnectedPerson(input: {
+    clientId: string; name: string;
+    relationship: 'director' | 'shareholder' | 'beneficial_owner' | 'connected_person' | 'counterparty' | 'officer' | 'guarantor';
+    companyName: string | null; notes: string | null; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<ConflictConnectedPerson> {
+    const row = await trx.insertInto('conflict_connected_persons')
+      .values({
+        client_id: input.clientId,
+        name: input.name,
+        relationship: input.relationship,
+        company_name: input.companyName,
+        notes: input.notes,
+        created_by: input.actorId,
+      })
+      .returning(['id', 'client_id', 'name', 'relationship', 'company_name', 'notes', 'created_by', 'created_at'])
+      .executeTakeFirstOrThrow();
+    const creator = await this.db.selectFrom('accounts').select(['id', 'display_name']).where('id', '=', input.actorId).executeTakeFirstOrThrow();
+    return {
+      id: row.id,
+      clientId: row.client_id,
+      name: row.name,
+      relationship: row.relationship,
+      companyName: row.company_name,
+      notes: row.notes,
+      createdBy: { accountId: creator.id, displayName: creator.display_name },
+      createdAt: row.created_at,
+    };
+  }
+
+  async listConflictConnectedPersons(clientId: string): Promise<ConflictConnectedPerson[]> {
+    const rows = await this.db.selectFrom('conflict_connected_persons as cp')
+      .innerJoin('accounts as creator', 'creator.id', 'cp.created_by')
+      .select([
+        'cp.id', 'cp.client_id', 'cp.name', 'cp.relationship', 'cp.company_name', 'cp.notes', 'cp.created_at',
+        'creator.id as creator_id', 'creator.display_name as creator_name',
+      ])
+      .where('cp.client_id', '=', clientId)
+      .orderBy('cp.created_at', 'desc')
+      .execute();
+    return rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      name: r.name,
+      relationship: r.relationship,
+      companyName: r.company_name,
+      notes: r.notes,
+      createdBy: { accountId: r.creator_id, displayName: r.creator_name },
+      createdAt: r.created_at,
+    }));
+  }
+
+  async recordConflictDecision(input: {
+    checkId: string; clientId: string;
+    outcome: 'clear' | 'potential' | 'escalated' | 'approved_with_controls' | 'cannot_act';
+    rationale: string; safeguards: string[]; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_conflict_decision(
+      ${input.checkId}, ${input.clientId}, ${input.outcome}, ${input.rationale},
+      ${input.safeguards}::text[], ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listConflictDecisions(clientId: string, checkId?: string): Promise<ConflictDecision[]> {
+    let query = this.db.selectFrom('conflict_decisions as d')
+      .innerJoin('accounts as decider', 'decider.id', 'd.decided_by')
+      .select([
+        'd.id', 'd.check_id', 'd.client_id', 'd.outcome', 'd.rationale', 'd.safeguards', 'd.decided_at',
+        'decider.id as decider_id', 'decider.display_name as decider_name',
+      ])
+      .where('d.client_id', '=', clientId);
+    if (checkId) {
+      query = query.where('d.check_id', '=', checkId);
+    }
+    const rows = await query.orderBy('d.decided_at', 'desc').execute();
+    return rows.map((r) => ({
+      id: r.id,
+      checkId: r.check_id,
+      clientId: r.client_id,
+      outcome: r.outcome,
+      rationale: r.rationale,
+      safeguards: r.safeguards ?? [],
+      decidedBy: { accountId: r.decider_id, displayName: r.decider_name },
+      decidedAt: r.decided_at,
+    }));
+  }
+
+  async listConflictChecksForClient(clientId: string) {
+    const rows = await this.db.selectFrom('conflict_checks as c')
+      .innerJoin('accounts as r', 'r.id', 'c.requested_by')
+      .select([
+        'c.id', 'c.client_id', 'c.names', 'c.matches', 'c.match_count', 'c.created_at',
+        'r.id as requested_by_id', 'r.display_name as requested_by_name',
+      ])
+      .where('c.client_id', '=', clientId)
+      .orderBy('c.created_at', 'desc')
+      .limit(20)
+      .execute();
+    return rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      names: r.names,
+      matchCount: r.match_count,
+      matches: r.matches,
+      createdAt: r.created_at,
+      requestedBy: { accountId: r.requested_by_id, displayName: r.requested_by_name },
+    }));
+  }
+
+  async grantActivationException(input: {
+    clientId: string; requirementKey: 'conflict_check' | 'email_verification' | 'id_verification' | 'cdd_compliance';
+    reason: string; expiresAt: Date; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.grant_activation_exception(
+      ${input.clientId}, ${input.requirementKey}, ${input.reason},
+      ${input.expiresAt.toISOString()}::timestamptz, ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listActivationExceptions(clientId: string): Promise<ActivationException[]> {
+    const rows = await this.db.selectFrom('onboarding_activation_exceptions as ex')
+      .innerJoin('accounts as granter', 'granter.id', 'ex.granted_by')
+      .select([
+        'ex.id', 'ex.client_id', 'ex.requirement_key', 'ex.reason', 'ex.expires_at', 'ex.granted_at',
+        'granter.id as granter_id', 'granter.display_name as granter_name',
+      ])
+      .where('ex.client_id', '=', clientId)
+      .orderBy('ex.granted_at', 'desc')
+      .execute();
+    return rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      requirementKey: r.requirement_key,
+      reason: r.reason,
+      expiresAt: r.expires_at,
+      grantedBy: { accountId: r.granter_id, displayName: r.granter_name },
+      grantedAt: r.granted_at,
+    }));
+  }
+
+  async evaluateActivationGate(clientId: string): Promise<ActivationGate | null> {
+    const result = await sql<{ gate: ActivationGate | null }>`select app.evaluate_client_activation_gate(${clientId}) as gate`.execute(this.db);
+    return result.rows[0]?.gate ?? null;
+  }
+
+  async activateClient(input: { clientId: string; notes: string | null; actorId: string }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.activate_client_onboarding(
+      ${input.clientId}, ${input.notes}, ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
   }
 }
 

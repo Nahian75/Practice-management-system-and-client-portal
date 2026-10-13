@@ -14,8 +14,13 @@ import { ComplianceDataCipher } from '../compliance/compliance-data-cipher.js';
 import { text } from '../common/validation/safe-text.js';
 import { sql } from 'kysely';
 import type {
+  ActivationException,
+  ActivationGate,
   CompanyDiscrepancy,
   CompanySnapshot,
+  ConflictAlias,
+  ConflictConnectedPerson,
+  ConflictDecision,
   ContactVerification,
   ElectronicCheck,
   EvidenceRequest,
@@ -406,6 +411,194 @@ export class OnboardingService {
       return await this.records.listCompanySnapshots(clientId, actorId);
     } catch (error) {
       if (hasCode(error, '42501') || hasCode(error, 'P0002')) return undefined;
+      throw error;
+    }
+  }
+
+  async addConflictAlias(
+    clientId: string,
+    input: { name: string; kind: 'alias' | 'former_name' | 'trading_name'; notes: string | null },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded'; alias: ConflictAlias } | { outcome: 'conflict' | 'not_found' }> {
+    try {
+      const alias = await this.records.transaction(async (trx) => {
+        const created = await this.records.recordConflictAlias({ clientId, ...input, actorId: by.accountId }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.conflict_alias_added',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { aliasId: created.id, name: input.name, kind: input.kind },
+          ...by.context,
+        }, trx);
+        return created;
+      });
+      return { outcome: 'recorded', alias };
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listConflictAliases(clientId: string): Promise<ConflictAlias[]> {
+    return this.records.listConflictAliases(clientId);
+  }
+
+  async addConflictConnectedPerson(
+    clientId: string,
+    input: {
+      name: string;
+      relationship: 'director' | 'shareholder' | 'beneficial_owner' | 'connected_person' | 'counterparty' | 'officer' | 'guarantor';
+      companyName: string | null;
+      notes: string | null;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded'; person: ConflictConnectedPerson } | { outcome: 'conflict' | 'not_found' }> {
+    try {
+      const person = await this.records.transaction(async (trx) => {
+        const created = await this.records.recordConflictConnectedPerson({ clientId, ...input, actorId: by.accountId }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.conflict_connected_person_added',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { personId: created.id, name: input.name, relationship: input.relationship },
+          ...by.context,
+        }, trx);
+        return created;
+      });
+      return { outcome: 'recorded', person };
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listConflictConnectedPersons(clientId: string): Promise<ConflictConnectedPerson[]> {
+    return this.records.listConflictConnectedPersons(clientId);
+  }
+
+  async recordConflictDecision(
+    clientId: string,
+    checkId: string,
+    input: {
+      outcome: 'clear' | 'potential' | 'escalated' | 'approved_with_controls' | 'cannot_act';
+      rationale: string;
+      safeguards: string[];
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded'; decisionId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      const decisionId = await this.records.transaction(async (trx) => {
+        const id = await this.records.recordConflictDecision({
+          clientId,
+          checkId,
+          outcome: input.outcome,
+          rationale: input.rationale,
+          safeguards: input.safeguards,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.conflict_decision_recorded',
+          outcome: 'success',
+          resource: { type: 'conflict_decision', id },
+          metadata: { clientId, checkId, outcome: input.outcome, safeguardsCount: input.safeguards.length },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', decisionId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002') || hasCode(error, '23503')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listConflictDecisions(clientId: string, checkId?: string): Promise<ConflictDecision[]> {
+    return this.records.listConflictDecisions(clientId, checkId);
+  }
+
+  async listClientConflictChecks(clientId: string) {
+    return this.records.listConflictChecksForClient(clientId);
+  }
+
+  async grantActivationException(
+    clientId: string,
+    input: {
+      requirementKey: 'conflict_check' | 'email_verification' | 'id_verification' | 'cdd_compliance';
+      reason: string;
+      expiresAt: Date;
+    },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'recorded'; exceptionId: string } | { outcome: 'forbidden' | 'not_found' | 'conflict' }> {
+    try {
+      const exceptionId = await this.records.transaction(async (trx) => {
+        const id = await this.records.grantActivationException({
+          clientId,
+          requirementKey: input.requirementKey,
+          reason: input.reason,
+          expiresAt: input.expiresAt,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.activation_exception_granted',
+          outcome: 'success',
+          resource: { type: 'activation_exception', id },
+          metadata: { clientId, requirementKey: input.requirementKey, expiresAt: input.expiresAt.toISOString() },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', exceptionId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002') || hasCode(error, '23503')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listActivationExceptions(clientId: string): Promise<ActivationException[]> {
+    return this.records.listActivationExceptions(clientId);
+  }
+
+  async getActivationGate(clientId: string): Promise<ActivationGate | null> {
+    return this.records.evaluateActivationGate(clientId);
+  }
+
+  async activateClient(
+    clientId: string,
+    input: { notes: string | null },
+    by: OnboardingActor,
+  ): Promise<{ outcome: 'activated'; activationId: string } | { outcome: 'forbidden' | 'not_found' | 'blocked' }> {
+    try {
+      const activationId = await this.records.transaction(async (trx) => {
+        const id = await this.records.activateClient({
+          clientId,
+          notes: input.notes,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.client_activated',
+          outcome: 'success',
+          resource: { type: 'client', id: clientId },
+          metadata: { activationId: id, notes: input.notes },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'activated', activationId };
+    } catch (error) {
+      if (hasCode(error, '42501')) return { outcome: 'forbidden' };
+      if (hasCode(error, 'P0002') || hasCode(error, '23503')) return { outcome: 'not_found' };
+      if (hasCode(error, '23514')) return { outcome: 'blocked' };
       throw error;
     }
   }

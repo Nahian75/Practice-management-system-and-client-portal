@@ -11,7 +11,18 @@ import { PortalAccess, type PortalCandidate, type PortalPerson } from './portal-
 import { ContactVerification, type ContactVerificationRecord } from './contact-verification';
 import { CompanyVerification } from './company-verification';
 import { ElectronicChecks } from './electronic-checks';
-import type { CompanySnapshot, ElectronicCheck } from '@/lib/onboarding';
+import { ConflictManagement } from './conflict-management';
+import { ActivationGatePanel } from './activation-gate';
+import type {
+  ActivationException,
+  ActivationGate,
+  ClientConflictCheck,
+  CompanySnapshot,
+  ConflictAlias,
+  ConflictConnectedPerson,
+  ConflictDecision,
+  ElectronicCheck,
+} from '@/lib/onboarding';
 import { TakeOverForm } from './take-over-form';
 
 export const metadata: Metadata = { title: 'Client' };
@@ -38,7 +49,20 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     );
   }
 
-  const [matters, cdd, contactVerifications, electronicChecks, chStatus, companySnapshots] = await Promise.all([
+  const [
+    matters,
+    cdd,
+    contactVerifications,
+    electronicChecks,
+    chStatus,
+    companySnapshots,
+    conflictAliases,
+    conflictConnectedPersons,
+    conflictChecks,
+    conflictDecisions,
+    activationGate,
+    activationExceptions,
+  ] = await Promise.all([
     apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`),
     apiGet<{ cases: CddSummary[]; next: string | null }>(`/clients/${encodeURIComponent(clientId)}/cdd`),
     apiGet<{ verifications: ContactVerificationRecord[] }>(`/clients/${encodeURIComponent(clientId)}/contact-verifications`),
@@ -49,6 +73,12 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     client.kind === 'organisation'
       ? apiGet<{ snapshots: CompanySnapshot[] }>(`/clients/${encodeURIComponent(clientId)}/company-snapshots`)
       : Promise.resolve({ status: 200, body: { snapshots: [] } }),
+    apiGet<{ aliases: ConflictAlias[] }>(`/clients/${encodeURIComponent(clientId)}/conflict-aliases`),
+    apiGet<{ connectedPersons: ConflictConnectedPerson[] }>(`/clients/${encodeURIComponent(clientId)}/conflict-connected-persons`),
+    apiGet<{ checks: ClientConflictCheck[] }>(`/clients/${encodeURIComponent(clientId)}/conflict-checks`),
+    apiGet<{ decisions: ConflictDecision[] }>(`/clients/${encodeURIComponent(clientId)}/conflict-decisions`),
+    apiGet<ActivationGate>(`/clients/${encodeURIComponent(clientId)}/activation-gate`),
+    apiGet<{ exceptions: ActivationException[] }>(`/clients/${encodeURIComponent(clientId)}/activation-exceptions`),
   ]);
   // Only for roles that manage portal access; for others the API refuses and the section is left out.
   const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
@@ -169,6 +199,22 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
         <p>{cdd.body.cases.length ? `Latest case: version ${cdd.body.cases[0]!.version}, ${cdd.body.cases[0]!.status}.` : 'No CDD case has been started.'}</p>
         <p><Link href={`/clients/${client.id}/compliance`}>Open client AML record</Link></p>
       </section>}
+
+      <ConflictManagement
+        clientId={client.id}
+        aliases={conflictAliases.body?.aliases ?? []}
+        connectedPersons={conflictConnectedPersons.body?.connectedPersons ?? []}
+        checks={conflictChecks.body?.checks ?? []}
+        decisions={conflictDecisions.body?.decisions ?? []}
+      />
+
+      {activationGate.body && (
+        <ActivationGatePanel
+          clientId={client.id}
+          gate={activationGate.body}
+          exceptions={activationExceptions.body?.exceptions ?? []}
+        />
+      )}
 
       <h2>Matters</h2>
       {matters.status !== 200 || !matters.body || matters.body.matters.length === 0 ? (
