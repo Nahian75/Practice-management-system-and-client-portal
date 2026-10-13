@@ -57,6 +57,9 @@ export const PERMISSIONS = [
   'hr.cases',
   'hr.retention',
   'hr.export',
+  'ai.use',
+  'ai.manage_config',
+  'ai.audit',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -107,6 +110,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.view_evidence',
     'aml.internal_report',
     'hr.directory',
+    'ai.use',
+    'ai.manage_config',
+    'ai.audit',
   ],
   fee_earner: [
     'clients.create',
@@ -130,6 +136,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.view_evidence',
     'aml.internal_report',
     'hr.directory',
+    'ai.use',
   ],
   accounts: [
     'finance.matter.view', 'finance.view_all', 'rates.manage', 'bills.manage',
@@ -150,6 +157,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<StaffRole, readonly Permission[]>
     'aml.retention',
     'aml.export',
     'hr.directory',
+    'ai.audit',
   ],
   hr: ['aml.internal_report', 'hr.directory', 'hr.manage', 'hr.leave', 'hr.health', 'hr.vetting', 'hr.competence',
     'hr.cases', 'hr.retention', 'hr.export'],

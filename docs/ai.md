@@ -1,10 +1,10 @@
 # Artificial Intelligence and Legal Drafting Assistant
 
-**Current state (2026-10-14):** First-version design approved. Steps 18a to
-18f are specified: provider-neutral architecture, strict human-in-the-loop
-review, legal professional privilege and confidentiality boundaries, mandatory
-citation grounding, prompt-injection defense, ethical wall enforcement,
-immutable audit trails, and zero-data-retention enterprise guarantees.
+**Current state (2026-10-14):** Step 18a is built: provider-neutral architecture,
+governance schema (`app.ai_*`), permissions (`ai.use`, `ai.manage_config`, `ai.audit`),
+immutability triggers, matter access enforcement (`app.assert_matter_ai_access`),
+token budget accounting, and deterministic offline mock provider (`OfflineMockAiProvider`).
+Steps 18b to 18f remain in progress.
 
 How Stass enables fee earners and partners to leverage generative AI for
 matter document summarisation, chronology extraction, and first-draft legal
@@ -256,7 +256,7 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
 
 ## Delivery stages
 
-- **18a. Foundation, governance and provider-neutral boundary:**
+- **18a. Foundation, governance and provider-neutral boundary — built.**
   Database tables (`ai_configurations`, `ai_requests`, `ai_drafts`, `ai_reviews`),
   immutability triggers, permissions (`ai.use`, `ai.manage_config`, `ai.audit`),
   provider-neutral `AiProvider` interface, and `OfflineMockAiProvider`.

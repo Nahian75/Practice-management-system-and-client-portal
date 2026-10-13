@@ -1644,7 +1644,68 @@ export interface HrExportAccessLogTable {
   id: DatabaseSet<string>; export_id: DatabaseSet<string>; accessed_by: DatabaseSet<string>; accessed_at: DatabaseSet<Date>;
 }
 
+export type AiProviderType = 'offline_mock' | 'azure_openai' | 'aws_bedrock' | 'custom';
+export type AiFeatureType = 'summarise_document' | 'draft_correspondence' | 'extract_chronology' | 'review_clauses';
+export type AiDraftType = 'document_summary' | 'correspondence_draft' | 'chronology' | 'clause_notes';
+export type AiReviewDecision = 'accepted' | 'modified' | 'rejected';
+
+export interface AiConfigurationsTable {
+  id: DatabaseSet<string>;
+  provider: Writable<AiProviderType>;
+  model_name: Writable<string>;
+  endpoint_url: Writable<string | null>;
+  max_tokens_per_request: Writable<number>;
+  monthly_token_budget: Writable<number>;
+  tokens_used_this_month: Writable<number>;
+  budget_reset_on: Writable<Date>;
+  enabled: Writable<boolean>;
+  updated_at: DatabaseSet<Date>;
+  updated_by: Writable<string | null>;
+}
+
+export interface AiRequestsTable {
+  id: DatabaseSet<string>;
+  actor_id: InsertOnly<string>;
+  matter_id: InsertOnly<string>;
+  feature: InsertOnly<AiFeatureType>;
+  model_name: InsertOnly<string>;
+  prompt_tokens: InsertOnly<number>;
+  completion_tokens: InsertOnly<number>;
+  latency_ms: InsertOnly<number>;
+  prompt_hash: InsertOnly<Buffer>;
+  status: InsertOnly<'succeeded' | 'refused' | 'error'>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface AiDraftsTable {
+  id: DatabaseSet<string>;
+  request_id: InsertOnly<string>;
+  matter_id: InsertOnly<string>;
+  draft_type: InsertOnly<AiDraftType>;
+  title: InsertOnly<string>;
+  generated_text: InsertOnly<string>;
+  structured_citations: InsertOnly<unknown>;
+  confidence_notes: InsertOnly<string | null>;
+  created_at: DatabaseSet<Date>;
+}
+
+export interface AiReviewsTable {
+  id: DatabaseSet<string>;
+  draft_id: InsertOnly<string>;
+  reviewer_id: InsertOnly<string>;
+  decision: InsertOnly<AiReviewDecision>;
+  final_text: InsertOnly<string | null>;
+  feedback_reason: InsertOnly<string | null>;
+  promoted_to_document_id: InsertOnly<string | null>;
+  promoted_to_task_id: InsertOnly<string | null>;
+  reviewed_at: DatabaseSet<Date>;
+}
+
 export interface Database {
+  ai_configurations: AiConfigurationsTable;
+  ai_requests: AiRequestsTable;
+  ai_drafts: AiDraftsTable;
+  ai_reviews: AiReviewsTable;
   account_roles: AccountRolesTable;
   accounts: AccountsTable;
   aml_control_approvals: AmlControlApprovalsTable;
