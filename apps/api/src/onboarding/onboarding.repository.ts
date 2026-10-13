@@ -4,7 +4,14 @@ import { DATABASE } from '../database/database.module.js';
 import type { Database } from '../database/schema.js';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import type { SealedComplianceData } from '../compliance/compliance-data-cipher.js';
-import type { ContactVerification, ContactVerificationState, EvidenceRequest, PortalEvidenceRequest } from './onboarding.js';
+import type {
+  CompanySnapshot,
+  ContactVerification,
+  ContactVerificationState,
+  ElectronicCheck,
+  EvidenceRequest,
+  PortalEvidenceRequest,
+} from './onboarding.js';
 
 interface VerificationRow {
   id: string; client_id: string; contact_id: string | null; channel: 'email'; address: string;
@@ -81,18 +88,33 @@ export class OnboardingRepository {
       .innerJoin('accounts as requester', 'requester.id', 'request.requested_by')
       .leftJoin('onboarding_evidence_submissions as submission', 'submission.request_id', 'request.id')
       .leftJoin('accounts as uploader', 'uploader.id', 'submission.uploaded_by')
-      .select(['request.id','request.client_id','request.cdd_case_id','request.contact_id','request.evidence_type',
+      .leftJoin('onboarding_evidence_reviews as review', 'review.request_id', 'request.id')
+      .leftJoin('accounts as reviewer', 'reviewer.id', 'review.reviewed_by')
+      .select([
+        'request.id','request.client_id','request.cdd_case_id','request.contact_id','request.evidence_type',
         'request.instructions','request.country','request.due_on','request.requested_at',
-        'requester.id as requester_id','requester.display_name as requester_name','submission.id as submission_id',
-        'submission.evidence_id','submission.uploaded_at','uploader.id as uploader_id','uploader.display_name as uploader_name'])
+        'requester.id as requester_id','requester.display_name as requester_name',
+        'submission.id as submission_id','submission.evidence_id','submission.uploaded_at',
+        'uploader.id as uploader_id','uploader.display_name as uploader_name',
+        'review.id as review_id','review.outcome as review_outcome','review.reason as review_reason',
+        'review.exception_note as review_exception_note','review.reviewed_at as review_reviewed_at',
+        'reviewer.id as reviewer_id','reviewer.display_name as reviewer_name',
+      ])
       .where('request.id','=',id).executeTakeFirst();
     if (!row) return undefined;
-    return { id: row.id, clientId: row.client_id, cddCaseId: row.cdd_case_id, contactId: row.contact_id,
+    const submission = row.submission_id && row.evidence_id && row.uploaded_at && row.uploader_id && row.uploader_name
+      ? { id: row.submission_id, evidenceId: row.evidence_id, uploadedAt: row.uploaded_at,
+        uploadedBy: { accountId: row.uploader_id, displayName: row.uploader_name } } : null;
+    const review = row.review_id && row.review_outcome && row.review_reason && row.review_reviewed_at && row.reviewer_id && row.reviewer_name && row.evidence_id
+      ? { id: row.review_id, requestId: row.id, evidenceId: row.evidence_id, outcome: row.review_outcome,
+        reason: row.review_reason, exceptionNote: row.review_exception_note, reviewedAt: row.review_reviewed_at,
+        reviewedBy: { accountId: row.reviewer_id, displayName: row.reviewer_name } } : null;
+    return {
+      id: row.id, clientId: row.client_id, cddCaseId: row.cdd_case_id, contactId: row.contact_id,
       evidenceType: row.evidence_type, instructions: row.instructions, country: row.country, dueOn: row.due_on,
       requestedBy: { accountId: row.requester_id, displayName: row.requester_name }, requestedAt: row.requested_at,
-      submission: row.submission_id && row.evidence_id && row.uploaded_at && row.uploader_id && row.uploader_name
-        ? { id: row.submission_id, evidenceId: row.evidence_id, uploadedAt: row.uploaded_at,
-          uploadedBy: { accountId: row.uploader_id, displayName: row.uploader_name } } : null };
+      submission, review,
+    };
   }
 
   async listEvidenceRequests(clientId: string, caseId: string, actorId: string): Promise<EvidenceRequest[]> {
@@ -132,6 +154,124 @@ export class OnboardingRepository {
       ${metadata.keyVersion}::smallint,${metadata.nonce},${metadata.ciphertext},${metadata.authTag},
       ${input.mediaType},${input.sizeBytes},${input.sha256},${input.storageKey},${fileKey.keyVersion}::smallint,
       ${fileKey.nonce},${fileKey.ciphertext},${fileKey.authTag},${input.actorId})`.execute(trx);
+  }
+
+  async reviewEvidence(input: {
+    requestId: string; evidenceId: string; outcome: 'accepted' | 'rejected';
+    reason: string; exceptionNote: string | null; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.review_onboarding_evidence(
+      ${input.requestId}, ${input.evidenceId}, ${input.outcome}, ${input.reason},
+      ${input.exceptionNote}, ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async recordElectronicCheck(input: {
+    clientId: string; cddCaseId: string | null; provider: string; service: string;
+    providerReference: string; documentType: string; checkDate: string;
+    result: 'pass' | 'refer' | 'fail'; livenessResult: 'pass' | 'refer' | 'fail' | 'not_checked' | null;
+    evidenceMatch: string | null; exceptionNote: string | null; rawResponseHash: Buffer;
+    actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_onboarding_electronic_check(
+      ${input.clientId}, ${input.cddCaseId}, ${input.provider}, ${input.service},
+      ${input.providerReference}, ${input.documentType}, ${input.checkDate}::date,
+      ${input.result}, ${input.livenessResult}, ${input.evidenceMatch}, ${input.exceptionNote},
+      ${input.rawResponseHash}, ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listElectronicChecks(clientId: string, actorId: string): Promise<ElectronicCheck[]> {
+    await sql`select app.assert_aml_client_access(${actorId}, ${clientId})`.execute(this.db);
+    const rows = await this.db.selectFrom('onboarding_electronic_checks as check')
+      .innerJoin('accounts as recorder', 'recorder.id', 'check.recorded_by')
+      .select([
+        'check.id', 'check.client_id', 'check.cdd_case_id', 'check.provider', 'check.service',
+        'check.provider_reference', 'check.document_type', 'check.check_date', 'check.result',
+        'check.liveness_result', 'check.evidence_match', 'check.exception_note', 'check.raw_response_hash',
+        'check.recorded_at', 'recorder.id as recorder_id', 'recorder.display_name as recorder_name',
+      ])
+      .where('check.client_id', '=', clientId)
+      .orderBy('check.recorded_at', 'desc')
+      .limit(100)
+      .execute();
+    return rows.map((row) => ({
+      id: row.id,
+      clientId: row.client_id,
+      cddCaseId: row.cdd_case_id,
+      provider: row.provider,
+      service: row.service,
+      providerReference: row.provider_reference,
+      documentType: row.document_type,
+      checkDate: row.check_date,
+      result: row.result,
+      livenessResult: row.liveness_result,
+      evidenceMatch: row.evidence_match,
+      exceptionNote: row.exception_note,
+      rawResponseHash: row.raw_response_hash.toString('hex'),
+      recordedBy: { accountId: row.recorder_id, displayName: row.recorder_name },
+      recordedAt: row.recorded_at,
+    }));
+  }
+
+  async recordCompanySnapshot(input: {
+    clientId: string; cddCaseId: string | null; source: 'companies_house' | 'overseas_registry' | 'manual_evidence';
+    companyNumber: string; companyName: string; companyStatus: string; companyType: string | null;
+    jurisdiction: string | null; incorporationDate: string | null; registeredOffice: Record<string, unknown>;
+    officers: unknown[]; discrepancies: unknown[]; rawPayloadHash: Buffer; actorId: string;
+  }, trx: Kysely<Database> = this.db): Promise<string> {
+    const result = await sql<{ id: string }>`select app.record_onboarding_company_snapshot(
+      ${input.clientId}, ${input.cddCaseId}, ${input.source}, ${input.companyNumber},
+      ${input.companyName}, ${input.companyStatus}, ${input.companyType}, ${input.jurisdiction},
+      ${input.incorporationDate ? sql`${input.incorporationDate}::date` : null},
+      ${JSON.stringify(input.registeredOffice)}::jsonb,
+      ${JSON.stringify(input.officers)}::jsonb,
+      ${JSON.stringify(input.discrepancies)}::jsonb,
+      ${input.rawPayloadHash}, ${input.actorId}) as id`.execute(trx);
+    return result.rows[0]!.id;
+  }
+
+  async listCompanySnapshots(clientId: string, actorId: string): Promise<CompanySnapshot[]> {
+    await sql`select app.assert_aml_client_access(${actorId}, ${clientId})`.execute(this.db);
+    const rows = await this.db.selectFrom('onboarding_company_snapshots as snapshot')
+      .innerJoin('accounts as recorder', 'recorder.id', 'snapshot.recorded_by')
+      .select([
+        'snapshot.id', 'snapshot.client_id', 'snapshot.cdd_case_id', 'snapshot.source',
+        'snapshot.company_number', 'snapshot.company_name', 'snapshot.company_status',
+        'snapshot.company_type', 'snapshot.jurisdiction', 'snapshot.incorporation_date',
+        'snapshot.registered_office', 'snapshot.officers', 'snapshot.discrepancies',
+        'snapshot.raw_payload_hash', 'snapshot.retrieved_at',
+        'recorder.id as recorder_id', 'recorder.display_name as recorder_name',
+      ])
+      .where('snapshot.client_id', '=', clientId)
+      .orderBy('snapshot.retrieved_at', 'desc')
+      .limit(100)
+      .execute();
+    return rows.map((row) => ({
+      id: row.id,
+      clientId: row.client_id,
+      cddCaseId: row.cdd_case_id,
+      source: row.source,
+      companyNumber: row.company_number,
+      companyName: row.company_name,
+      companyStatus: row.company_status,
+      companyType: row.company_type,
+      jurisdiction: row.jurisdiction,
+      incorporationDate: row.incorporation_date,
+      registeredOffice: row.registered_office,
+      officers: row.officers,
+      discrepancies: (row.discrepancies ?? []) as any[],
+      rawPayloadHash: row.raw_payload_hash.toString('hex'),
+      retrievedAt: row.retrieved_at,
+      recordedBy: { accountId: row.recorder_id, displayName: row.recorder_name },
+    }));
+  }
+
+  async findClientOrganisation(clientId: string) {
+    return this.db.selectFrom('client_organisations')
+      .selectAll()
+      .where('client_id', '=', clientId)
+      .executeTakeFirst();
   }
 }
 

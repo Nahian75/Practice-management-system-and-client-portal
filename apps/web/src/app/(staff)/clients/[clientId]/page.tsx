@@ -9,6 +9,9 @@ import { CLIENT_KIND_LABELS, countryName, formatCalendarDate, formatDate, ORGANI
 import { MATTER_STATUS_LABELS, type MatterSummary } from '@/lib/matters';
 import { PortalAccess, type PortalCandidate, type PortalPerson } from './portal-access';
 import { ContactVerification, type ContactVerificationRecord } from './contact-verification';
+import { CompanyVerification } from './company-verification';
+import { ElectronicChecks } from './electronic-checks';
+import type { CompanySnapshot, ElectronicCheck } from '@/lib/onboarding';
 import { TakeOverForm } from './take-over-form';
 
 export const metadata: Metadata = { title: 'Client' };
@@ -35,10 +38,17 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
     );
   }
 
-  const [matters, cdd, contactVerifications] = await Promise.all([
+  const [matters, cdd, contactVerifications, electronicChecks, chStatus, companySnapshots] = await Promise.all([
     apiGet<{ matters: MatterSummary[] }>(`/clients/${encodeURIComponent(clientId)}/matters`),
     apiGet<{ cases: CddSummary[]; next: string | null }>(`/clients/${encodeURIComponent(clientId)}/cdd`),
     apiGet<{ verifications: ContactVerificationRecord[] }>(`/clients/${encodeURIComponent(clientId)}/contact-verifications`),
+    apiGet<{ checks: ElectronicCheck[] }>(`/clients/${encodeURIComponent(clientId)}/electronic-checks`),
+    client.kind === 'organisation'
+      ? apiGet<{ configured: boolean }>(`/clients/${encodeURIComponent(clientId)}/companies-house/status`)
+      : Promise.resolve({ status: 200, body: { configured: false } }),
+    client.kind === 'organisation'
+      ? apiGet<{ snapshots: CompanySnapshot[] }>(`/clients/${encodeURIComponent(clientId)}/company-snapshots`)
+      : Promise.resolve({ status: 200, body: { snapshots: [] } }),
   ]);
   // Only for roles that manage portal access; for others the API refuses and the section is left out.
   const portal = await apiGet<{ people: PortalPerson[] }>(`/clients/${encodeURIComponent(clientId)}/portal-access`);
@@ -138,6 +148,22 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
 
       {contactVerifications.body && <ContactVerification clientId={client.id}
         records={contactVerifications.body.verifications} candidates={portalCandidates} />}
+
+      {client.kind === 'organisation' && (
+        <CompanyVerification
+          clientId={client.id}
+          defaultCompanyNumber={client.registrationNumber}
+          isConfigured={Boolean(chStatus.body?.configured)}
+          snapshots={companySnapshots.body?.snapshots ?? []}
+        />
+      )}
+
+      {electronicChecks.body && (
+        <ElectronicChecks
+          clientId={client.id}
+          checks={electronicChecks.body.checks}
+        />
+      )}
 
       {cdd.body && <section aria-labelledby="aml-heading"><h2 id="aml-heading">Identity and due diligence</h2>
         <p>{cdd.body.cases.length ? `Latest case: version ${cdd.body.cases[0]!.version}, ${cdd.body.cases[0]!.status}.` : 'No CDD case has been started.'}</p>

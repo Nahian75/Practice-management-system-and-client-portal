@@ -6,19 +6,15 @@ import type { CddCase } from '@/lib/compliance';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
 import { CddCaseActions } from './cdd-case-actions';
 
-export const metadata: Metadata = { title: 'CDD case' };
+import type { EvidenceRequest } from '@/lib/onboarding';
 
-interface EvidenceRequestItem {
-  id: string; evidenceType: string; instructions: string; dueOn: string; country: string | null;
-  requestedBy: { accountId: string; displayName: string }; requestedAt: string;
-  submission: { id: string; evidenceId: string; uploadedAt: string; uploadedBy: { accountId: string; displayName: string } } | null;
-}
+export const metadata: Metadata = { title: 'CDD case' };
 
 export default async function CddCasePage({ params }: { params: Promise<{ clientId: string; caseId: string }> }) {
   const { clientId, caseId } = await params;
   const [result, requestsResult] = await Promise.all([
     apiGet<CddCase>(`/clients/${encodeURIComponent(clientId)}/cdd/${encodeURIComponent(caseId)}`),
-    apiGet<{ requests: EvidenceRequestItem[] }>(`/clients/${encodeURIComponent(clientId)}/cdd/${encodeURIComponent(caseId)}/evidence-requests`),
+    apiGet<{ requests: EvidenceRequest[] }>(`/clients/${encodeURIComponent(clientId)}/cdd/${encodeURIComponent(caseId)}/evidence-requests`),
   ]);
   if (!result.body) notFound();
   const item = result.body;
@@ -39,13 +35,25 @@ export default async function CddCasePage({ params }: { params: Promise<{ client
         <tbody>{item.evidence.map((evidence) => <tr key={evidence.id}><td><a href={`/api/clients/${clientId}/cdd/${caseId}/evidence/${evidence.id}/content`}>{evidence.fileName}</a></td><td>{evidence.evidenceType}</td><td>{evidence.expiresOn ? formatCalendarDate(evidence.expiresOn) : 'Not set'}</td><td>{formatDateTime(evidence.uploadedAt)}</td></tr>)}</tbody></table>}
     </section>
     <section aria-labelledby="requests-heading"><h2 id="requests-heading">Portal evidence requests</h2>
-      {!requests.length ? <p>No evidence requested from the client portal.</p> : <table className="table"><thead><tr><th scope="col">Type</th><th scope="col">Instructions</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
-        <tbody>{requests.map((req) => <tr key={req.id}><td>{req.evidenceType}</td><td>{req.instructions}</td><td>{formatCalendarDate(req.dueOn)}</td><td>{req.submission ? `Submitted ${formatDateTime(req.submission.uploadedAt)}` : 'Awaiting client upload'}</td></tr>)}</tbody></table>}
+      {!requests.length ? <p>No evidence requested from the client portal.</p> : <table className="table"><thead><tr><th scope="col">Type</th><th scope="col">Instructions</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col">Review</th></tr></thead>
+        <tbody>{requests.map((req) => <tr key={req.id}>
+          <td>{req.evidenceType}</td>
+          <td>{req.instructions}</td>
+          <td>{formatCalendarDate(req.dueOn)}</td>
+          <td>{req.submission ? `Submitted ${formatDateTime(req.submission.uploadedAt)}` : 'Awaiting client upload'}</td>
+          <td>{req.review ? (
+            <span className={`tag ${req.review.outcome === 'accepted' ? 'tag-success' : 'tag-danger'}`}>
+              {req.review.outcome === 'accepted' ? 'Accepted' : 'Rejected'}: {req.review.reason}
+            </span>
+          ) : req.submission ? (
+            <span className="tag tag-warning">Awaiting review</span>
+          ) : '—'}</td>
+        </tr>)}</tbody></table>}
     </section>
     {!!item.verifications.length && <section aria-labelledby="verification-heading"><h2 id="verification-heading">Verification results</h2><table className="table"><thead><tr><th scope="col">Subject</th><th scope="col">Evidence</th><th scope="col">Method</th><th scope="col">Outcome</th><th scope="col">Checked</th></tr></thead><tbody>{item.verifications.map((record) => <tr key={record.id}><td>{subjectName(record.subjectId)}</td><td>{evidenceName(record.evidenceId)}</td><td>{record.method.replace('_', ' ')}</td><td>{record.outcome.replace('_', ' ')}</td><td>{formatCalendarDate(record.checkedOn)}</td></tr>)}</tbody></table></section>}
     {!!item.ownership.length && <section aria-labelledby="ownership-heading"><h2 id="ownership-heading">Ownership and control</h2><ul>{item.ownership.map((record) => <li key={record.id}>{subjectName(record.controllerSubjectId)} controls {subjectName(record.ownedSubjectId)}{record.ownershipPercent ? ` (${record.ownershipPercent}%)` : ''}: {record.details}</li>)}</ul></section>}
     {!!item.authorities.length && <section aria-labelledby="authority-heading"><h2 id="authority-heading">Authority to act</h2><ul>{item.authorities.map((record) => <li key={record.id}>{subjectName(record.representativeSubjectId)} represents {subjectName(record.representedSubjectId)}: {record.authorityType}; verified {formatCalendarDate(record.verifiedOn)}</li>)}</ul></section>}
     {item.abandonment && <p className="notice"><strong>Abandoned:</strong> {item.abandonment.reason}</p>}
-    {item.status === 'draft' && <CddCaseActions clientId={clientId} caseId={caseId} subjects={item.subjects} evidence={item.evidence} />}
+    {item.status === 'draft' && <CddCaseActions clientId={clientId} caseId={caseId} subjects={item.subjects} evidence={item.evidence} requests={requests} />}
   </>;
 }

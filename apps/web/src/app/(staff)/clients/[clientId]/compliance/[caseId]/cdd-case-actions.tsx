@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ErrorSummary } from '@/components/error-summary';
 import type { CddEvidence, CddSubject } from '@/lib/compliance';
+import type { EvidenceRequest } from '@/lib/onboarding';
 import { messagesOf, postJson } from '@/lib/requests';
 
 const RELATIONSHIPS = ['client', 'authorised_representative', 'director_senior_manager', 'beneficial_owner',
   'trustee', 'settlor', 'beneficiary', 'protector', 'funder', 'other_controller'] as const;
 
-export function CddCaseActions({ clientId, caseId, subjects, evidence }:
-  { clientId: string; caseId: string; subjects: CddSubject[]; evidence: CddEvidence[] }) {
+export function CddCaseActions({ clientId, caseId, subjects, evidence, requests = [] }:
+  { clientId: string; caseId: string; subjects: CddSubject[]; evidence: CddEvidence[]; requests?: EvidenceRequest[] }) {
   const router = useRouter();
   const [errors, setErrors] = useState<string[]>();
   const [sending, setSending] = useState(false);
@@ -42,6 +43,19 @@ export function CddCaseActions({ clientId, caseId, subjects, evidence }:
     if (await json('/evidence-requests', {
       evidenceType: form.get('evidenceType'), instructions: form.get('instructions'),
       dueOn: form.get('dueOn'), country, contactId,
+    })) target.reset();
+  }
+  async function reviewEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const target = event.currentTarget; const form = new FormData(target);
+    const selected = requests.find((r) => r.id === form.get('requestId'));
+    if (!selected?.submission) return;
+    const exceptionNote = String(form.get('exceptionNote') ?? '').trim() || null;
+    if (await json('/evidence-reviews', {
+      requestId: selected.id,
+      evidenceId: selected.submission.evidenceId,
+      outcome: form.get('outcome'),
+      reason: form.get('reason'),
+      exceptionNote,
     })) target.reset();
   }
   async function verify(event: FormEvent<HTMLFormElement>) {
@@ -96,6 +110,38 @@ export function CddCaseActions({ clientId, caseId, subjects, evidence }:
       <div className="form-grid"><div className="field"><label className="label" htmlFor="reqDueOn">Due date</label><input className="input input-date" id="reqDueOn" name="dueOn" type="date" required /></div>
         <div className="field"><label className="label" htmlFor="reqCountry">Country (two letters)</label><input className="input input-short" id="reqCountry" name="country" maxLength={2} /></div></div>
       <button className="button button-secondary" disabled={sending}>Send portal evidence request</button></form>
+
+    {requests.filter((r) => r.submission && !r.review).length > 0 && <form aria-label="Review client evidence submission" onSubmit={reviewEvidence}>
+      <h3>Review submitted client evidence</h3>
+      <div className="field">
+        <label className="label" htmlFor="reviewRequestId">Submitted evidence</label>
+        <select className="select" id="reviewRequestId" name="requestId" required>
+          {requests.filter((r) => r.submission && !r.review).map((req) => (
+            <option key={req.id} value={req.id}>
+              {req.evidenceType} (submitted by {req.submission!.uploadedBy.displayName})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="form-grid">
+        <div className="field">
+          <label className="label" htmlFor="reviewOutcome">Review decision</label>
+          <select className="select" id="reviewOutcome" name="outcome" required>
+            <option value="accepted">Accepted (Satisfies requirement)</option>
+            <option value="rejected">Rejected (Does not satisfy requirement)</option>
+          </select>
+        </div>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="reviewReason">Review reason and findings</label>
+        <textarea className="input" id="reviewReason" name="reason" rows={3} required minLength={5} maxLength={2000} />
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="reviewExceptionNote">Exception note (if applicable)</label>
+        <input className="input" id="reviewExceptionNote" name="exceptionNote" maxLength={2000} />
+      </div>
+      <button className="button" disabled={sending}>Record review decision</button>
+    </form>}
 
     {!!subjects.length && !!evidence.length && <form aria-label="Record verification" onSubmit={verify}><h3>Record verification</h3>
       <SubjectSelect id="subjectId" name="subjectId" label="Subject" subjects={subjects} /><EvidenceSelect id="evidenceId" name="evidenceId" label="Evidence" evidence={evidence} />

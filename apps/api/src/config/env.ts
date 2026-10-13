@@ -88,6 +88,9 @@ const envSchema = z
     HR_ENCRYPTION_KEY: encryptionKeySchema,
     /** The official UK Sanctions List CSV, checked every six hours. Unset: lists are only uploaded by hand. */
     SANCTIONS_LIST_URL: z.url({ protocol: /^https$/ }).optional(),
+    /** Official UK Companies House API credentials. Unset: registry verification is manual-only. */
+    COMPANIES_HOUSE_API_KEY: z.string().min(1).optional(),
+    COMPANIES_HOUSE_API_URL: z.url({ protocol: /^https?$/ }).optional(),
     TRUSTED_PROXIES: trustedProxiesSchema,
     /** S3-compatible storage for documents: SeaweedFS locally (docs/documents.md). */
     DOCUMENTS_S3_ENDPOINT: z.url({ protocol: /^https?$/ }),

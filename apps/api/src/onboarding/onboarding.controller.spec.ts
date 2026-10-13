@@ -179,5 +179,135 @@ describe('Contact verification API', () => {
       .where('id','=',staffView.body.requests[0].submission.evidenceId).executeTakeFirstOrThrow();
     expect(evidence.uploaded_by).toBe(portalAccount.id);
     expect(evidence.storage_key).toMatch(/^compliance\//);
+
+    // Review evidence submission
+    const reviewRes = await api(token).post(`/clients/${clientId}/cdd/${cdd}/evidence-reviews`, {
+      requestId: created.body.id,
+      evidenceId: staffView.body.requests[0].submission.evidenceId,
+      outcome: 'accepted',
+      reason: 'Passport photograph page is legible and current',
+    });
+    expect(reviewRes.status, JSON.stringify(reviewRes.body)).toBe(201);
+    expect(reviewRes.body).toMatchObject({ reviewId: expect.any(String), outcome: 'recorded' });
+
+    // Duplicate review is rejected
+    const dupReview = await api(token).post(`/clients/${clientId}/cdd/${cdd}/evidence-reviews`, {
+      requestId: created.body.id,
+      evidenceId: staffView.body.requests[0].submission.evidenceId,
+      outcome: 'accepted',
+      reason: 'Trying duplicate review',
+    });
+    expect(dupReview.status).toBe(409);
+
+    const updatedStaffView = await api(token).get(`/clients/${clientId}/cdd/${cdd}/evidence-requests`);
+    expect(updatedStaffView.body.requests[0].review).toMatchObject({
+      outcome: 'accepted',
+      reason: 'Passport photograph page is legible and current',
+      reviewedBy: { accountId: feeEarner.id },
+    });
+  });
+
+  it('records electronic checks and refuses future check dates', async () => {
+    const rawVendorPayload = JSON.stringify({ check_id: 'chk_12345', status: 'clear' });
+    const checkRes = await api(token).post(`/clients/${clientId}/electronic-checks`, {
+      provider: 'LexisNexis',
+      service: 'IDV_and_Sanctions',
+      providerReference: 'LN-REF-9988',
+      documentType: 'passport',
+      checkDate: '2026-10-01',
+      result: 'pass',
+      livenessResult: 'pass',
+      evidenceMatch: 'Name and DOB match client record',
+      rawResponseJson: rawVendorPayload,
+    });
+    expect(checkRes.status, JSON.stringify(checkRes.body)).toBe(201);
+    expect(checkRes.body).toMatchObject({ checkId: expect.any(String), outcome: 'recorded' });
+
+    const checksList = await api(token).get(`/clients/${clientId}/electronic-checks`);
+    expect(checksList.status).toBe(200);
+    expect(checksList.body.checks).toEqual([
+      expect.objectContaining({
+        id: checkRes.body.checkId,
+        provider: 'LexisNexis',
+        service: 'IDV_and_Sanctions',
+        result: 'pass',
+        livenessResult: 'pass',
+        documentType: 'passport',
+        recordedBy: expect.objectContaining({ accountId: feeEarner.id }),
+      }),
+    ]);
+
+    // Refuses future check date
+    const futureCheck = await api(token).post(`/clients/${clientId}/electronic-checks`, {
+      provider: 'LexisNexis',
+      service: 'IDV_and_Sanctions',
+      providerReference: 'LN-REF-9989',
+      documentType: 'passport',
+      checkDate: '2099-01-01',
+      result: 'pass',
+      rawResponseJson: rawVendorPayload,
+    });
+    expect(futureCheck.status).toBe(409);
+  });
+
+  it('reports Companies House status and records immutable company snapshots with discrepancies', async () => {
+    const statusRes = await api(token).get(`/clients/${clientId}/companies-house/status`);
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.body).toHaveProperty('configured');
+
+    const orgClient = await db.transaction().execute(async (trx) => {
+      const client = await trx.insertInto('clients').values({ kind: 'organisation', created_by: feeEarner.id })
+        .returning('id').executeTakeFirstOrThrow();
+      await trx.insertInto('client_organisations').values({
+        client_id: client.id,
+        legal_name: 'Acme Advisory Ltd',
+        organisation_type: 'company',
+        registration_number: '12345678',
+      }).execute();
+      return client.id;
+    });
+
+    const snapshotPayload = JSON.stringify({
+      company_name: 'ACME ADVISORY HOLDINGS LIMITED',
+      company_number: '12345678',
+      company_status: 'active',
+    });
+
+    const recordRes = await api(token).post(`/clients/${orgClient}/company-snapshots`, {
+      source: 'companies_house',
+      companyNumber: '12345678',
+      companyName: 'ACME ADVISORY HOLDINGS LIMITED',
+      companyStatus: 'active',
+      companyType: 'ltd',
+      jurisdiction: 'england-wales',
+      incorporationDate: '2020-05-15',
+      registeredOffice: { address_line_1: '10 High Street', postal_code: 'EC1A 1BB' },
+      officers: [{ name: 'Smith, John', officer_role: 'director' }],
+      discrepancies: [{
+        field: 'legal_name',
+        clientValue: 'Acme Advisory Ltd',
+        companiesHouseValue: 'ACME ADVISORY HOLDINGS LIMITED',
+        description: 'Client registered name differs from Companies House',
+      }],
+      rawPayloadJson: snapshotPayload,
+    });
+    expect(recordRes.status, JSON.stringify(recordRes.body)).toBe(201);
+    expect(recordRes.body).toMatchObject({ snapshotId: expect.any(String), outcome: 'recorded' });
+
+    const snapshots = await api(token).get(`/clients/${orgClient}/company-snapshots`);
+    expect(snapshots.status).toBe(200);
+    expect(snapshots.body.snapshots).toEqual([
+      expect.objectContaining({
+        id: recordRes.body.snapshotId,
+        companyNumber: '12345678',
+        companyName: 'ACME ADVISORY HOLDINGS LIMITED',
+        companyStatus: 'active',
+        discrepancies: [
+          expect.objectContaining({ field: 'legal_name' }),
+        ],
+        recordedBy: expect.objectContaining({ accountId: feeEarner.id }),
+      }),
+    ]);
   });
 });
+

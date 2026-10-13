@@ -115,4 +115,52 @@ test('requests client evidence, client uploads via portal, and staff reviews sub
   await signIn(page, feeEarner.staff);
   await page.goto(`/clients/${clientId}/compliance/${cddCase.id}`);
   await expect(page.getByRole('cell', { name: /Submitted/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Awaiting review' })).toBeVisible();
+
+  const reviewForm = page.getByRole('form', { name: 'Review client evidence submission' });
+  await reviewForm.getByLabel('Review decision').selectOption('accepted');
+  await reviewForm.getByLabel('Review reason and findings').fill('Utility bill dated within 2 months with matching address');
+  await reviewForm.getByRole('button', { name: 'Record review decision' }).click();
+
+  await expect(page.getByRole('cell', { name: /Accepted: Utility bill dated within 2 months/ })).toBeVisible();
+  await noAxeViolations(page);
 });
+
+test('records electronic verification checks and displays company verification status', async ({ page, request }) => {
+  await signedInStaff(page, request, ['fee_earner']);
+  const companyNumber = '09876543';
+  const orgCreated = await page.request.post('/api/clients', {
+    data: {
+      kind: 'organisation',
+      legalName: 'Apex Advisory Group Ltd',
+      organisationType: 'company',
+      registrationNumber: companyNumber,
+    },
+  });
+  expect(orgCreated.status()).toBe(201);
+  const org = (await orgCreated.json()) as { id: string };
+
+  await page.goto(`/clients/${org.id}`);
+  await expect(page.getByRole('heading', { name: 'Company verification' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Electronic verification checks' })).toBeVisible();
+
+  // Record an electronic verification check
+  await page.getByRole('button', { name: 'Record electronic check' }).click();
+  const checkForm = page.getByRole('form', { name: 'Record electronic verification check' });
+  await checkForm.getByLabel('Provider', { exact: true }).fill('Credas IDV');
+  await checkForm.getByLabel('Service').fill('NFC biometric passport check');
+  await checkForm.getByLabel('Provider reference').fill('CRD-88224');
+  await checkForm.getByLabel('Document type').fill('Passport');
+  await checkForm.getByLabel('Check date').fill('2026-10-01');
+  await checkForm.getByLabel('Overall result').selectOption('pass');
+  await checkForm.getByLabel('Liveness result').selectOption('pass');
+  await checkForm.getByLabel('Evidence match notes').fill('Chip and photo verified');
+  await checkForm.getByRole('button', { name: 'Save electronic check' }).click();
+
+  await expect(page.getByRole('cell', { name: 'Credas IDV (NFC biometric passport check)' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'CRD-88224' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'PASS', exact: true })).toBeVisible();
+
+  await noAxeViolations(page);
+});
+

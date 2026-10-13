@@ -246,6 +246,32 @@ export interface OnboardingEvidenceSubmissionsTable {
   uploaded_by: DatabaseSet<string>; uploaded_at: DatabaseSet<Date>;
 }
 
+export interface OnboardingEvidenceReviewsTable {
+  id: DatabaseSet<string>; request_id: DatabaseSet<string>; evidence_id: DatabaseSet<string>;
+  outcome: DatabaseSet<'accepted' | 'rejected'>; reason: DatabaseSet<string>;
+  exception_note: DatabaseSet<string | null>; reviewed_by: DatabaseSet<string>; reviewed_at: DatabaseSet<Date>;
+}
+
+export interface OnboardingElectronicChecksTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string | null>;
+  provider: DatabaseSet<string>; service: DatabaseSet<string>; provider_reference: DatabaseSet<string>;
+  document_type: DatabaseSet<string>; check_date: DatabaseSet<string>;
+  result: DatabaseSet<'pass' | 'refer' | 'fail'>;
+  liveness_result: DatabaseSet<'pass' | 'refer' | 'fail' | 'not_checked' | null>;
+  evidence_match: DatabaseSet<string | null>; exception_note: DatabaseSet<string | null>;
+  raw_response_hash: DatabaseSet<Buffer>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>;
+}
+
+export interface OnboardingCompanySnapshotsTable {
+  id: DatabaseSet<string>; client_id: DatabaseSet<string>; cdd_case_id: DatabaseSet<string | null>;
+  source: DatabaseSet<'companies_house' | 'overseas_registry' | 'manual_evidence'>;
+  company_number: DatabaseSet<string>; company_name: DatabaseSet<string>; company_status: DatabaseSet<string>;
+  company_type: DatabaseSet<string | null>; jurisdiction: DatabaseSet<string | null>;
+  incorporation_date: DatabaseSet<string | null>; registered_office: DatabaseSet<Record<string, unknown>>;
+  officers: DatabaseSet<unknown[]>; discrepancies: DatabaseSet<unknown[]>;
+  raw_payload_hash: DatabaseSet<Buffer>; retrieved_at: DatabaseSet<Date>; recorded_by: DatabaseSet<string>;
+}
+
 interface ClientCorrespondenceColumns {
   email: Writable<string | null>;
   phone: Writable<string | null>;
@@ -1610,6 +1636,9 @@ export interface Database {
   notifications: NotificationsTable;
   onboarding_evidence_requests: OnboardingEvidenceRequestsTable;
   onboarding_evidence_submissions: OnboardingEvidenceSubmissionsTable;
+  onboarding_evidence_reviews: OnboardingEvidenceReviewsTable;
+  onboarding_electronic_checks: OnboardingElectronicChecksTable;
+  onboarding_company_snapshots: OnboardingCompanySnapshotsTable;
   password_resets: PasswordResetsTable;
   portal_links: PortalLinksTable;
   sessions: SessionsTable;

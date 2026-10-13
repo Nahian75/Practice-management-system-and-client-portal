@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuditActor } from '../audit/audit-event.js';
@@ -12,7 +13,14 @@ import { AmlEvidenceVault } from '../compliance/aml-evidence-vault.js';
 import { ComplianceDataCipher } from '../compliance/compliance-data-cipher.js';
 import { text } from '../common/validation/safe-text.js';
 import { sql } from 'kysely';
-import type { ContactVerification, EvidenceRequest, PortalEvidenceRequest } from './onboarding.js';
+import type {
+  CompanyDiscrepancy,
+  CompanySnapshot,
+  ContactVerification,
+  ElectronicCheck,
+  EvidenceRequest,
+  PortalEvidenceRequest,
+} from './onboarding.js';
 import { OnboardingRepository } from './onboarding.repository.js';
 
 export interface OnboardingActor { actor: AuditActor; accountId: string; context?: RequestContext }
@@ -137,6 +145,267 @@ export class OnboardingService {
       await this.vault.discard(received.stored.storageKey);
       if (hasCode(error,'42501') || hasCode(error,'P0002')) return { outcome: 'not_found' };
       if (hasCode(error,'23505') || hasCode(error,'23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async reviewEvidence(input: {
+    clientId: string; caseId: string; requestId: string; evidenceId: string;
+    outcome: 'accepted' | 'rejected'; reason: string; exceptionNote?: string;
+  }, by: OnboardingActor): Promise<{ outcome: 'recorded'; reviewId: string } | { outcome: 'not_found' | 'conflict' }> {
+    try {
+      const reviewId = await this.records.transaction(async (trx) => {
+        const id = await this.records.reviewEvidence({
+          requestId: input.requestId,
+          evidenceId: input.evidenceId,
+          outcome: input.outcome,
+          reason: input.reason,
+          exceptionNote: input.exceptionNote ?? null,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.evidence_reviewed',
+          outcome: 'success',
+          resource: { type: 'onboarding_evidence_review', id },
+          metadata: {
+            clientId: input.clientId,
+            caseId: input.caseId,
+            requestId: input.requestId,
+            evidenceId: input.evidenceId,
+            reviewOutcome: input.outcome,
+          },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', reviewId };
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async recordElectronicCheck(input: {
+    clientId: string; cddCaseId?: string; provider: string; service: string;
+    providerReference: string; documentType: string; checkDate: string;
+    result: 'pass' | 'refer' | 'fail'; livenessResult?: 'pass' | 'refer' | 'fail' | 'not_checked';
+    evidenceMatch?: string; exceptionNote?: string; rawResponseJson: string;
+  }, by: OnboardingActor): Promise<{ outcome: 'recorded'; checkId: string } | { outcome: 'not_found' | 'conflict' }> {
+    const rawHash = createHash('sha256').update(input.rawResponseJson).digest();
+    try {
+      const checkId = await this.records.transaction(async (trx) => {
+        const id = await this.records.recordElectronicCheck({
+          clientId: input.clientId,
+          cddCaseId: input.cddCaseId ?? null,
+          provider: input.provider,
+          service: input.service,
+          providerReference: input.providerReference,
+          documentType: input.documentType,
+          checkDate: input.checkDate,
+          result: input.result,
+          livenessResult: input.livenessResult ?? null,
+          evidenceMatch: input.evidenceMatch ?? null,
+          exceptionNote: input.exceptionNote ?? null,
+          rawResponseHash: rawHash,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.electronic_check_recorded',
+          outcome: 'success',
+          resource: { type: 'onboarding_electronic_check', id },
+          metadata: {
+            clientId: input.clientId,
+            provider: input.provider,
+            service: input.service,
+            result: input.result,
+          },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', checkId };
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listElectronicChecks(clientId: string, actorId: string): Promise<ElectronicCheck[] | undefined> {
+    try {
+      return await this.records.listElectronicChecks(clientId, actorId);
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return undefined;
+      throw error;
+    }
+  }
+
+  isCompaniesHouseConfigured(): boolean {
+    return Boolean(this.env.COMPANIES_HOUSE_API_KEY);
+  }
+
+  async lookupCompaniesHouse(clientId: string, companyNumber: string): Promise<{
+    available: boolean;
+    snapshot?: {
+      companyNumber: string;
+      companyName: string;
+      companyStatus: string;
+      companyType: string | null;
+      jurisdiction: string | null;
+      incorporationDate: string | null;
+      registeredOffice: Record<string, unknown>;
+      officers: unknown[];
+      rawPayloadJson: string;
+    };
+    discrepancies?: CompanyDiscrepancy[];
+    error?: string;
+  }> {
+    if (!this.env.COMPANIES_HOUSE_API_KEY) {
+      return { available: false, error: 'Companies House integration is not configured' };
+    }
+    const org = await this.records.findClientOrganisation(clientId);
+    const baseUrl = this.env.COMPANIES_HOUSE_API_URL ?? 'https://api.company-information.service.gov.uk';
+    const authHeader = `Basic ${Buffer.from(`${this.env.COMPANIES_HOUSE_API_KEY}:`).toString('base64')}`;
+
+    const profileRes = await fetch(`${baseUrl}/company/${encodeURIComponent(companyNumber)}`, {
+      headers: { Authorization: authHeader, Accept: 'application/json' },
+    });
+    if (profileRes.status === 404) {
+      return { available: true, error: 'Company not found on Companies House register' };
+    }
+    if (!profileRes.ok) {
+      return { available: true, error: `Companies House API returned status ${profileRes.status}` };
+    }
+    const profile = await profileRes.json() as any;
+
+    let officers: any[] = [];
+    try {
+      const officersRes = await fetch(`${baseUrl}/company/${encodeURIComponent(companyNumber)}/officers`, {
+        headers: { Authorization: authHeader, Accept: 'application/json' },
+      });
+      if (officersRes.ok) {
+        const officersData = await officersRes.json() as any;
+        officers = officersData.items ?? [];
+      }
+    } catch {
+      // Officer fetch non-fatal
+    }
+
+    const rawPayload = JSON.stringify({ profile, officers });
+    const discrepancies: CompanyDiscrepancy[] = [];
+
+    if (org) {
+      if (org.legal_name && profile.company_name &&
+          org.legal_name.trim().toLowerCase() !== profile.company_name.trim().toLowerCase()) {
+        discrepancies.push({
+          field: 'legal_name',
+          clientValue: org.legal_name,
+          companiesHouseValue: profile.company_name,
+          description: `Client registered name ("${org.legal_name}") differs from Companies House ("${profile.company_name}")`,
+        });
+      }
+      if (org.registration_number && profile.company_number &&
+          org.registration_number.trim().toUpperCase() !== profile.company_number.trim().toUpperCase()) {
+        discrepancies.push({
+          field: 'registration_number',
+          clientValue: org.registration_number,
+          companiesHouseValue: profile.company_number,
+          description: `Client registration number ("${org.registration_number}") differs from Companies House ("${profile.company_number}")`,
+        });
+      }
+      if (profile.company_status && profile.company_status !== 'active') {
+        discrepancies.push({
+          field: 'company_status',
+          companiesHouseValue: profile.company_status,
+          description: `Company status on register is "${profile.company_status}" (not active)`,
+        });
+      }
+      const profilePostcode = profile.registered_office_address?.postal_code;
+      if (org.postcode && profilePostcode &&
+          org.postcode.replace(/\s+/g, '').toUpperCase() !== profilePostcode.replace(/\s+/g, '').toUpperCase()) {
+        discrepancies.push({
+          field: 'registered_office_postcode',
+          clientValue: org.postcode,
+          companiesHouseValue: profilePostcode,
+          description: `Client postal code ("${org.postcode}") differs from Companies House registered office ("${profilePostcode}")`,
+        });
+      }
+    }
+
+    return {
+      available: true,
+      snapshot: {
+        companyNumber: profile.company_number ?? companyNumber,
+        companyName: profile.company_name ?? '',
+        companyStatus: profile.company_status ?? 'unknown',
+        companyType: profile.type ?? null,
+        jurisdiction: profile.jurisdiction ?? null,
+        incorporationDate: profile.date_of_creation ?? null,
+        registeredOffice: profile.registered_office_address ?? {},
+        officers,
+        rawPayloadJson: rawPayload,
+      },
+      discrepancies,
+    };
+  }
+
+  async recordCompanySnapshot(input: {
+    clientId: string; cddCaseId?: string; source: 'companies_house' | 'overseas_registry' | 'manual_evidence';
+    companyNumber: string; companyName: string; companyStatus: string; companyType?: string;
+    jurisdiction?: string; incorporationDate?: string; registeredOffice: Record<string, unknown>;
+    officers: unknown[]; discrepancies: CompanyDiscrepancy[]; rawPayloadJson: string;
+  }, by: OnboardingActor): Promise<{ outcome: 'recorded'; snapshotId: string } | { outcome: 'not_found' | 'conflict' }> {
+    const rawHash = createHash('sha256').update(input.rawPayloadJson).digest();
+    try {
+      const snapshotId = await this.records.transaction(async (trx) => {
+        const id = await this.records.recordCompanySnapshot({
+          clientId: input.clientId,
+          cddCaseId: input.cddCaseId ?? null,
+          source: input.source,
+          companyNumber: input.companyNumber,
+          companyName: input.companyName,
+          companyStatus: input.companyStatus,
+          companyType: input.companyType ?? null,
+          jurisdiction: input.jurisdiction ?? null,
+          incorporationDate: input.incorporationDate ?? null,
+          registeredOffice: input.registeredOffice,
+          officers: input.officers,
+          discrepancies: input.discrepancies,
+          rawPayloadHash: rawHash,
+          actorId: by.accountId,
+        }, trx);
+        await this.audit.record({
+          actor: by.actor,
+          action: 'onboarding.company_snapshot_recorded',
+          outcome: 'success',
+          resource: { type: 'onboarding_company_snapshot', id },
+          metadata: {
+            clientId: input.clientId,
+            source: input.source,
+            companyNumber: input.companyNumber,
+            companyStatus: input.companyStatus,
+            discrepancyCount: input.discrepancies.length,
+          },
+          ...by.context,
+        }, trx);
+        return id;
+      });
+      return { outcome: 'recorded', snapshotId };
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return { outcome: 'not_found' };
+      if (hasCode(error, '23505') || hasCode(error, '23514')) return { outcome: 'conflict' };
+      throw error;
+    }
+  }
+
+  async listCompanySnapshots(clientId: string, actorId: string): Promise<CompanySnapshot[] | undefined> {
+    try {
+      return await this.records.listCompanySnapshots(clientId, actorId);
+    } catch (error) {
+      if (hasCode(error, '42501') || hasCode(error, 'P0002')) return undefined;
       throw error;
     }
   }
