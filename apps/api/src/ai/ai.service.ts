@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
 import { AI_PROVIDER_TOKEN, type AiProvider } from './ai-provider.interface.js';
 import {
   AiRepository,
@@ -8,6 +9,8 @@ import {
   type AiDraftDetail,
   type AiDraftSummary,
 } from './ai.repository.js';
+import { RedactionService } from './redaction.service.js';
+import { PromptBuilderService } from './prompt-builder.service.js';
 import type {
   AiDraftType,
   AiFeature,
@@ -37,6 +40,9 @@ export class AiService {
   constructor(
     private readonly repository: AiRepository,
     @Inject(AI_PROVIDER_TOKEN) private readonly aiProvider: AiProvider,
+    private readonly redaction: RedactionService,
+    private readonly promptBuilder: PromptBuilderService,
+    private readonly audit: AuditService,
   ) {}
 
   async readConfiguration(): Promise<AiConfigRecord> {
@@ -67,6 +73,20 @@ export class AiService {
       params.monthlyTokenBudget,
       params.enabled,
     );
+
+    await this.audit.record({
+      actor: { type: 'user', id: actorId },
+      action: 'ai.configuration_updated',
+      outcome: 'success',
+      metadata: {
+        provider: params.provider,
+        modelName: params.modelName,
+        maxTokens: params.maxTokensPerRequest,
+        monthlyBudget: params.monthlyTokenBudget,
+        enabled: params.enabled,
+      },
+    });
+
     return this.readConfiguration();
   }
 
@@ -81,30 +101,66 @@ export class AiService {
     structuredCitations: StructuredCitation[];
     confidenceNotes?: string;
   }> {
-    // Assert matter access early
+    // 1. Assert matter access early
     await this.repository.assertMatterAccess(actorId, matterId);
 
+    // 2. Enforce matter document ownership (ethical wall / domain isolation)
     const contextDocuments = input.contextDocuments ?? [];
+    const docIds = contextDocuments.map((d) => d.id).filter(Boolean);
+    const validOwnership = await this.repository.validateMatterDocumentOwnership(matterId, docIds);
+    if (!validOwnership) {
+      throw new ForbiddenException('One or more referenced documents do not belong to this matter');
+    }
 
+    // 3. Pre-prompt redaction pipeline (data minimisation)
+    const redactedInstruction = this.redaction.redact(input.instruction);
+    let totalRedactions = redactedInstruction.stats.totalRedactions;
+
+    const sanitizedDocs = contextDocuments.map((doc) => {
+      const redactedDoc = this.redaction.redact(doc.content);
+      totalRedactions += redactedDoc.stats.totalRedactions;
+      return {
+        id: doc.id,
+        title: doc.title,
+        content: redactedDoc.redactedText,
+      };
+    });
+
+    // 4. Prompt assembly and indirect prompt-injection detection
     const promptRequest: AiPromptRequest = {
       feature: input.feature,
       matterId,
       title: input.title,
-      instruction: input.instruction,
+      instruction: redactedInstruction.redactedText,
       draftType: input.draftType,
-      contextDocuments,
+      contextDocuments: sanitizedDocs,
     };
 
+    const promptAssembly = this.promptBuilder.buildUserPrompt(promptRequest, sanitizedDocs);
+
+    if (promptAssembly.isPotentialInjection) {
+      await this.audit.record({
+        actor: { type: 'user', id: actorId },
+        action: 'ai.prompt_injection_detected',
+        outcome: 'denied',
+        resource: { type: 'matter', id: matterId },
+        metadata: {
+          feature: input.feature,
+          reason: promptAssembly.injectionReason ?? 'Suspicious instruction pattern detected',
+        },
+      });
+    }
+
     const assembledPromptText = JSON.stringify({
-      feature: promptRequest.feature,
-      title: promptRequest.title,
-      instruction: promptRequest.instruction,
-      docs: promptRequest.contextDocuments.map((d) => ({ id: d.id, len: d.content.length })),
+      system: promptAssembly.systemPrompt,
+      user: promptAssembly.userPrompt,
     });
     const promptHash = createHash('sha256').update(assembledPromptText).digest();
 
+    // 5. Dispatch to provider (offline mock or private cloud)
     const result = await this.aiProvider.generate(promptRequest);
 
+    // 6. Record generation in PostgreSQL
     const { requestId, draftId } = await this.repository.recordGeneration(
       actorId,
       matterId,
@@ -120,6 +176,23 @@ export class AiService {
       result.structuredCitations,
       result.confidenceNotes,
     );
+
+    // 7. Record transactional audit event
+    await this.audit.record({
+      actor: { type: 'user', id: actorId },
+      action: 'ai.draft_generated',
+      outcome: 'success',
+      resource: { type: 'matter', id: matterId },
+      metadata: {
+        requestId,
+        draftId,
+        feature: input.feature,
+        draftType: input.draftType,
+        totalTokens: result.promptTokens + result.completionTokens,
+        redactionsCount: totalRedactions,
+        isPotentialInjection: promptAssembly.isPotentialInjection,
+      },
+    });
 
     return {
       requestId,
@@ -147,6 +220,21 @@ export class AiService {
       input.promotedToDocumentId,
       input.promotedToTaskId,
     );
+
+    await this.audit.record({
+      actor: { type: 'user', id: actorId },
+      action: 'ai.draft_reviewed',
+      outcome: 'success',
+      resource: { type: 'matter', id: matterId },
+      metadata: {
+        draftId,
+        reviewId,
+        decision: input.decision,
+        promotedToDocumentId: input.promotedToDocumentId ?? null,
+        promotedToTaskId: input.promotedToTaskId ?? null,
+      },
+    });
+
     return { reviewId };
   }
 

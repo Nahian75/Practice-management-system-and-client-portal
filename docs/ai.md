@@ -260,9 +260,9 @@ Append-only log of human-in-the-loop decisions. Prohibited from `UPDATE` and `DE
   Database tables (`ai_configurations`, `ai_requests`, `ai_drafts`, `ai_reviews`),
   immutability triggers, permissions (`ai.use`, `ai.manage_config`, `ai.audit`),
   provider-neutral `AiProvider` interface, and `OfflineMockAiProvider`.
-- **18b. Matter boundary enforcement, redaction pipeline and prompt injection defense:**
-  Matter team access validation, system prompt hardening, delimiter isolation,
-  and automated financial/personal data masking prior to dispatch.
+- **18b. Matter boundary enforcement, redaction pipeline and prompt injection defense — built.**
+  Matter team access validation, system prompt hardening, XML delimiter isolation,
+  matter document ownership verification, automated UK financial/PII masking, and prompt injection detection.
 - **18c. Document summarisation and chronology extraction:**
   Text extraction and chunking pipeline for matter documents; structured extraction
   of key obligations, dates, deadlines, counterparties, and verifiable citations.

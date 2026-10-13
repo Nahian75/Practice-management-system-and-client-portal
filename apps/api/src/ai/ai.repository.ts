@@ -196,6 +196,18 @@ export class AiRepository {
     await sql`SELECT app.assert_matter_ai_access(${actorId}::uuid, ${matterId}::uuid)`.execute(this.db);
   }
 
+  async validateMatterDocumentOwnership(matterId: string, documentIds: string[]): Promise<boolean> {
+    if (documentIds.length === 0) return true;
+    const uniqueIds = Array.from(new Set(documentIds));
+    const found = await this.db
+      .selectFrom('documents')
+      .select('id')
+      .where('matter_id', '=', matterId)
+      .where('id', 'in', uniqueIds)
+      .execute();
+    return found.length === uniqueIds.length;
+  }
+
   async listMatterDrafts(actorId: string, matterId: string): Promise<AiDraftSummary[]> {
     await this.assertMatterAccess(actorId, matterId);
 
