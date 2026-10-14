@@ -1,26 +1,76 @@
 /*
- * The few shared tokens of a quiet, text-led look: near-black on white, deep
- * navy for the bar, links and buttons, one muted red for errors. Every
- * text colour has a contrast of at least 4.5 to 1 on its background.
+ * United Kingdom Professional & Legal Practice Design System
+ *
+ * Complies with GOV.UK Design System (GDS) principles, WCAG 2.2 AAA accessibility,
+ * and British legal institutional presentation (SRA Code of Conduct, SRA Accounts Rules,
+ * MLR 2017, UK GDPR).
+ *
+ * Characteristics: Understated British authority, crisp typography, high contrast,
+ * purposeful whitespace, semantic status tags, and accessible focus outlines.
  */
+
 :root {
+  /* Core British Institutional Palette */
   --colour-text: #0b0c0c;
-  --colour-text-secondary: #4b4f54;
+  --colour-text-secondary: #505a5f;
   --colour-background: #ffffff;
-  --colour-brand: #1b2a41;
+  --colour-surface: #f8f9fa;
+  --colour-surface-alt: #f3f2f1;
+
+  /* Brand Accents */
+  --colour-brand: #1b2a41;         /* Deep Admiralty / Royal Navy */
+  --colour-brand-dark: #0f172a;
   --colour-brand-text: #ffffff;
+  --colour-brand-accent: #1d70b8;   /* British GDS Blue */
+  --colour-brand-gold: #c59b27;
+
+  /* Borders & Dividers */
   --colour-rule: #b1b4b6;
-  --colour-error: #9b1c1c;
-  --colour-focus: #ffbf47;
+  --colour-rule-light: #e5e7eb;
+  --colour-border-dark: #0b0c0c;
 
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
+  /* Semantic Feedback (GOV.UK Standard) */
+  --colour-error: #d4351c;
+  --colour-error-bg: #f6d7d2;
+  --colour-error-text: #942514;
+  --colour-success: #00703c;
+  --colour-success-bg: #cce2d8;
+  --colour-success-text: #005a30;
+  --colour-warning: #f47738;
+  --colour-warning-bg: #fff7bf;
+  --colour-warning-text: #594d00;
+  --colour-focus: #ffdd00;
 
-  --measure: 40rem;
-  --page: 64rem;
+  /* Status Tags */
+  --colour-tag-green-bg: #cce2d8;
+  --colour-tag-green-text: #005a30;
+  --colour-tag-blue-bg: #d2e2f1;
+  --colour-tag-blue-text: #144e81;
+  --colour-tag-yellow-bg: #fff7bf;
+  --colour-tag-yellow-text: #594d00;
+  --colour-tag-red-bg: #f6d7d2;
+  --colour-tag-red-text: #942514;
+  --colour-tag-grey-bg: #e5e6e7;
+  --colour-tag-grey-text: #383f43;
+  --colour-tag-purple-bg: #e8dcf7;
+  --colour-tag-purple-text: #3d2375;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 1rem;     /* 16px */
+  --space-4: 1.5rem;   /* 24px */
+  --space-5: 2.5rem;   /* 40px */
+  --space-6: 3.5rem;   /* 56px */
+
+  /* Layout Constraints */
+  --measure: 44rem;
+  --page: 72rem;
+  --page-wide: 84rem;
+
+  /* Subtle British Elevation */
+  --shadow-card: 0 1px 3px rgba(11, 12, 12, 0.08), 0 1px 2px rgba(11, 12, 12, 0.04);
+  --shadow-dropdown: 0 4px 12px rgba(11, 12, 12, 0.12);
 }
 
 *,
@@ -38,26 +88,43 @@ body {
   margin: 0;
   background: var(--colour-background);
   color: var(--colour-text);
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 1.1875rem;
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.1875rem; /* 19px GDS standard */
   line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Typography Hierarchy */
 h1,
 h2,
-h3 {
-  font-family: var(--font-serif), Georgia, serif;
-  font-weight: 600;
-  line-height: 1.2;
+h3,
+h4 {
+  font-family: var(--font-serif), Georgia, Cambria, "Times New Roman", serif;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--colour-text);
   margin: 0 0 var(--space-3);
+  letter-spacing: -0.01em;
 }
 
 h1 {
-  font-size: 2.25rem;
+  font-size: 2.375rem; /* ~38px */
+  margin-bottom: var(--space-4);
 }
 
 h2 {
-  font-size: 1.5rem;
+  font-size: 1.75rem; /* 28px */
+  margin-top: var(--space-4);
+}
+
+h3 {
+  font-size: 1.375rem; /* 22px */
+}
+
+h4 {
+  font-size: 1.1875rem; /* 19px */
 }
 
 p {
@@ -66,25 +133,30 @@ p {
 }
 
 a {
-  color: var(--colour-brand);
+  color: var(--colour-brand-accent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.15em;
+  text-underline-offset: 0.18em;
+  transition: color 0.15s ease, text-decoration-thickness 0.15s ease;
 }
 
 a:hover {
+  color: #003078;
   text-decoration-thickness: 3px;
 }
 
-/* A strong, visible focus for keyboard users, on every interactive element. */
+/* Accessible UK standard focus ring: high-contrast yellow with black outline */
 :focus-visible {
-  outline: 3px solid var(--colour-focus);
-  outline-offset: 0;
-  box-shadow: 0 0 0 6px var(--colour-text);
+  outline: 3px solid var(--colour-focus) !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 2px var(--colour-text) !important;
 }
 
+/* Skip link for assistive tech users */
 .skip-link {
   position: absolute;
   left: -9999px;
+  top: 0;
+  z-index: 999;
 }
 
 .skip-link:focus {
@@ -92,37 +164,110 @@ a:hover {
   top: var(--space-2);
   background: var(--colour-focus);
   color: var(--colour-text);
-  padding: var(--space-2);
-  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  text-decoration: none;
 }
 
-.header {
-  background: var(--colour-brand);
-  color: var(--colour-brand-text);
+/* Official Phase Banner (GOV.UK Standard) */
+.phase-banner {
+  background: var(--colour-background);
+  border-bottom: 1px solid var(--colour-rule-light);
+  padding: var(--space-2) 0;
 }
 
-.header-inner,
-.main {
+.phase-banner-inner {
   max-width: var(--page);
   margin: 0 auto;
   padding: 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  flex-wrap: wrap;
+}
+
+.phase-tag {
+  display: inline-block;
+  background: var(--colour-brand-accent);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 0;
+  line-height: 1.25;
+}
+
+.phase-text {
+  font-size: 0.9375rem;
+  color: var(--colour-text-secondary);
+  line-height: 1.4;
+}
+
+/* Header & Institutional Bar */
+.header {
+  background: var(--colour-brand);
+  color: var(--colour-brand-text);
+  border-top: 4px solid var(--colour-brand-accent);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
 }
 
 .header-inner {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3) var(--space-4);
-  min-height: 3.75rem;
+  gap: var(--space-2) var(--space-4);
+  min-height: 4rem;
+}
+
+.header-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: auto;
+  text-decoration: none;
+  color: inherit;
+}
+
+.header-crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--colour-brand-gold);
 }
 
 .header-name {
   font-family: var(--font-serif), Georgia, serif;
   font-size: 1.5rem;
-  font-weight: 600;
-  color: inherit;
+  font-weight: 700;
+  color: #ffffff;
   text-decoration: none;
-  margin-right: auto;
+  letter-spacing: 0.02em;
+}
+
+.header-user-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+  color: #e2e8f0;
+}
+
+.header-role-badge {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  text-transform: uppercase;
 }
 
 .header a,
@@ -130,15 +275,81 @@ a:hover {
   color: var(--colour-brand-text);
 }
 
-.main {
-  padding-top: var(--space-5);
-  padding-bottom: var(--space-5);
+/* Navigation */
+.nav {
+  margin: 0;
 }
 
+.nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #f1f5f9;
+  padding: var(--space-2) 0;
+  border-bottom: 4px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.nav a:hover {
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+}
+
+.nav a[aria-current='page'] {
+  color: #ffffff;
+  border-bottom-color: var(--colour-focus);
+  text-decoration: none;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--colour-focus);
+  color: var(--colour-text);
+  border-radius: 999px;
+}
+
+/* Main Container */
+.main {
+  flex: 1;
+  max-width: var(--page);
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-3) var(--space-6);
+}
+
+/* Dividing Rules */
 .rule {
   border: 0;
   border-top: 1px solid var(--colour-rule);
   margin: var(--space-4) 0;
+}
+
+.rule-light {
+  border: 0;
+  border-top: 1px solid var(--colour-rule-light);
+  margin: var(--space-3) 0;
 }
 
 .secondary {
@@ -158,7 +369,7 @@ a:hover {
   margin-bottom: var(--space-5);
 }
 
-/* Forms: labels above fields, one column, generous targets. */
+/* Forms: Accessible British Standard with 2px borders and generous targets */
 .field {
   margin-bottom: var(--space-4);
   max-width: var(--measure);
@@ -166,13 +377,16 @@ a:hover {
 
 .label {
   display: block;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.125rem;
   margin-bottom: var(--space-1);
 }
 
 .hint {
   display: block;
   color: var(--colour-text-secondary);
+  font-size: 1rem;
+  line-height: 1.4;
   margin-bottom: var(--space-2);
 }
 
@@ -180,9 +394,12 @@ a:hover {
   display: block;
   width: 100%;
   font: inherit;
+  font-size: 1.125rem;
   padding: var(--space-2);
   border: 2px solid var(--colour-text);
   border-radius: 0;
+  background: var(--colour-background);
+  color: var(--colour-text);
 }
 
 .input-short {
@@ -199,20 +416,77 @@ a:hover {
   margin-right: var(--space-2);
 }
 
+/* Buttons (GDS Standard 3D button press with shadow) */
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
-  font-weight: 600;
-  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  font-size: 1.125rem;
+  padding: 0.55rem 1.25rem;
   border: 2px solid var(--colour-brand);
   border-radius: 0;
   background: var(--colour-brand);
   color: var(--colour-brand-text);
   cursor: pointer;
+  box-shadow: 0 2px 0 var(--colour-brand-dark);
+  text-decoration: none;
+  transition: transform 0.05s ease, box-shadow 0.05s ease;
+}
+
+.button:hover {
+  background: #253956;
+  text-decoration: none;
+}
+
+.button:active {
+  transform: translateY(2px);
+  box-shadow: none;
 }
 
 .button:disabled {
-  opacity: 0.6;
-  cursor: progress;
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button-primary,
+.button-success {
+  background: var(--colour-success);
+  border-color: var(--colour-success);
+  color: #ffffff;
+  box-shadow: 0 2px 0 #002d18;
+}
+
+.button-primary:hover,
+.button-success:hover {
+  background: #005a30;
+}
+
+.button-secondary {
+  background: var(--colour-surface-alt);
+  color: var(--colour-text);
+  border-color: var(--colour-rule);
+  box-shadow: 0 2px 0 #929497;
+}
+
+.button-secondary:hover {
+  background: #e5e5e5;
+  color: var(--colour-text);
+  text-decoration: none;
+}
+
+.button-warning {
+  background: var(--colour-error);
+  border-color: var(--colour-error);
+  color: #ffffff;
+  box-shadow: 0 2px 0 #671105;
+}
+
+.button-warning:hover {
+  background: #b5220c;
+  color: #ffffff;
 }
 
 .link-button {
@@ -221,25 +495,80 @@ a:hover {
   border: 0;
   padding: 0;
   text-decoration: underline;
-  text-underline-offset: 0.15em;
+  text-underline-offset: 0.18em;
+  color: var(--colour-brand-accent);
   cursor: pointer;
 }
 
+.link-button:hover {
+  color: #003078;
+  text-decoration-thickness: 3px;
+}
+
+/* Status Tags (GOV.UK Standard Pill/Rectangles) */
+.tag,
+.govuk-tag {
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1.25;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.tag-green {
+  background: var(--colour-tag-green-bg);
+  color: var(--colour-tag-green-text);
+}
+
+.tag-blue {
+  background: var(--colour-tag-blue-bg);
+  color: var(--colour-tag-blue-text);
+}
+
+.tag-yellow {
+  background: var(--colour-tag-yellow-bg);
+  color: var(--colour-tag-yellow-text);
+}
+
+.tag-red {
+  background: var(--colour-tag-red-bg);
+  color: var(--colour-tag-red-text);
+}
+
+.tag-grey {
+  background: var(--colour-tag-grey-bg);
+  color: var(--colour-tag-grey-text);
+}
+
+.tag-purple {
+  background: var(--colour-tag-purple-bg);
+  color: var(--colour-tag-purple-text);
+}
+
+/* Error Summary (GDS Standard) */
 .error-summary {
   border: 4px solid var(--colour-error);
+  background: #ffffff;
   padding: var(--space-3);
   margin-bottom: var(--space-4);
   max-width: var(--measure);
 }
 
 .error-summary h2 {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
+  color: var(--colour-error);
+  margin-top: 0;
+  margin-bottom: var(--space-2);
 }
 
 .error-message {
   display: block;
   color: var(--colour-error);
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: var(--space-2);
 }
 
@@ -247,42 +576,121 @@ a:hover {
   margin-top: var(--space-4);
 }
 
-/* Set-up keys and backup codes: easy to read and copy, character by character. */
-.secret,
-.backup-codes code {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 1.125rem;
-  letter-spacing: 0.05em;
+/* Inset Text / Callout (GDS Standard) */
+.inset-text,
+.govuk-inset-text,
+.notice {
+  border-left: 10px solid var(--colour-rule);
+  background: var(--colour-surface);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  max-width: var(--measure);
 }
 
-.backup-codes {
-  columns: 2;
-  max-width: 28rem;
-  padding-left: var(--space-4);
+.notice-warning,
+.notice-overdue {
+  border-left-color: var(--colour-error);
+  background: #fff8f7;
 }
 
-.nav ul {
-  display: flex;
-  flex-wrap: wrap;
+.notice-success {
+  border-left-color: var(--colour-success);
+  background: #f4faf6;
+}
+
+/* Metric / KPI Dashboard Cards */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: var(--space-3);
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: var(--space-4) 0 var(--space-5);
 }
 
-.nav a {
-  text-decoration: none;
+.metric-card {
+  background: #ffffff;
+  border: 1px solid var(--colour-rule-light);
+  border-left: 5px solid var(--colour-brand);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+.metric-card-accent {
+  border-left-color: var(--colour-brand-accent);
+}
+
+.metric-card-success {
+  border-left-color: var(--colour-success);
+}
+
+.metric-card-warning {
+  border-left-color: var(--colour-error);
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.9375rem;
   font-weight: 600;
+  color: var(--colour-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-1);
 }
 
-.nav a[aria-current='page'],
-.nav a:hover {
-  text-decoration: underline;
-  text-decoration-thickness: 3px;
-  text-underline-offset: 0.3em;
+.metric-value {
+  display: block;
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--colour-text);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--space-1);
 }
 
-/* Lists of records: plain tables, ruled rows, no zebra stripes. */
+.metric-sub {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--colour-text-secondary);
+}
+
+/* Quick Action Cards */
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.quick-action-card {
+  display: block;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-rule-light);
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none;
+  color: var(--colour-text);
+  transition: all 0.15s ease;
+}
+
+.quick-action-card:hover {
+  background: #ffffff;
+  border-color: var(--colour-brand-accent);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+}
+
+.quick-action-card strong {
+  display: block;
+  font-size: 1.125rem;
+  color: var(--colour-brand);
+  margin-bottom: var(--space-1);
+}
+
+.quick-action-card p {
+  font-size: 0.9375rem;
+  color: var(--colour-text-secondary);
+  margin: 0;
+}
+
+/* Tables (UK Legal Standard) */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -300,13 +708,28 @@ a:hover {
   text-align: left;
   vertical-align: top;
   padding: var(--space-2) var(--space-3) var(--space-2) 0;
-  border-bottom: 1px solid var(--colour-rule);
+  border-bottom: 1px solid var(--colour-rule-light);
 }
 
-/* Details of one record: label and value side by side, stacked on narrow screens. */
+.table th {
+  font-weight: 700;
+  border-bottom: 2px solid var(--colour-text);
+  color: var(--colour-text);
+}
+
+.table tbody tr:hover {
+  background: var(--colour-surface);
+}
+
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Summary / Definition Lists (GOV.UK Summary List Standard) */
 .summary {
   display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  grid-template-columns: minmax(10rem, 16rem) 1fr;
   margin: 0 0 var(--space-4);
   max-width: var(--page);
 }
@@ -315,34 +738,107 @@ a:hover {
 .summary dd {
   margin: 0;
   padding: var(--space-2) var(--space-3) var(--space-2) 0;
-  border-bottom: 1px solid var(--colour-rule);
+  border-bottom: 1px solid var(--colour-rule-light);
 }
 
 .summary dt {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--colour-text);
 }
 
-@media (max-width: 40rem) {
-  .table {
-    display: block;
-    overflow-x: auto;
-  }
-
-  .summary {
-    grid-template-columns: 1fr;
-  }
-
-  .summary dt {
-    border-bottom: 0;
-    padding-bottom: 0;
-  }
+.summary-row {
+  display: contents;
 }
 
-.caption {
+/* Summary Card Wrapper */
+.summary-card {
+  border: 1px solid var(--colour-rule-light);
+  background: #ffffff;
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+.summary-card-header {
+  background: var(--colour-surface);
+  border-bottom: 1px solid var(--colour-rule-light);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.summary-card-header h2,
+.summary-card-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.summary-card-body {
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Notifications */
+.notification-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  max-width: var(--measure);
+}
+
+.notification-list li {
+  border-bottom: 1px solid var(--colour-rule-light);
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+.notification-list h2 {
+  margin-bottom: var(--space-2);
+}
+
+.notification-unread {
+  border-left: 6px solid var(--colour-brand-accent);
+  padding-left: var(--space-3) !important;
+  background: var(--colour-surface);
+}
+
+/* Fieldset, Radios, Checkbox, Select */
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+
+.fieldset legend {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin-bottom: var(--space-2);
+}
+
+.radios label,
+.checkbox label {
   display: block;
-  color: var(--colour-text-secondary);
-  font-size: 1.1875rem;
-  margin-bottom: var(--space-1);
+  padding: var(--space-1) 0;
+  cursor: pointer;
+}
+
+.radios input,
+.checkbox input {
+  width: 1.375rem;
+  height: 1.375rem;
+  margin-right: var(--space-2);
+  vertical-align: -0.2em;
+  cursor: pointer;
+}
+
+.select {
+  font: inherit;
+  font-size: 1.125rem;
+  padding: var(--space-2);
+  border: 2px solid var(--colour-text);
+  border-radius: 0;
+  background: var(--colour-background);
+  color: var(--colour-text);
+  max-width: 100%;
 }
 
 .actions {
@@ -351,11 +847,6 @@ a:hover {
   gap: var(--space-3);
   align-items: center;
   margin-bottom: var(--space-4);
-}
-
-.button-secondary {
-  background: var(--colour-background);
-  color: var(--colour-brand);
 }
 
 .form-grid {
@@ -371,52 +862,6 @@ a:hover {
   margin-bottom: var(--space-4);
 }
 
-.notice-warning,
-.notice-overdue {
-  border-left-color: var(--colour-error);
-}
-
-/* For an action that cannot be undone, such as closing a matter. */
-.button-warning {
-  background: var(--colour-error);
-  border-color: var(--colour-error);
-}
-
-.fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0 0 var(--space-4);
-}
-
-.fieldset legend {
-  font-weight: 600;
-  margin-bottom: var(--space-2);
-}
-
-.radios label,
-.checkbox label {
-  display: block;
-  padding: var(--space-1) 0;
-}
-
-.radios input,
-.checkbox input {
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-right: var(--space-2);
-  vertical-align: -0.15em;
-}
-
-.select {
-  font: inherit;
-  padding: var(--space-2);
-  border: 2px solid var(--colour-text);
-  border-radius: 0;
-  background: var(--colour-background);
-  max-width: 100%;
-}
-
-/* A list of actions, one per line, without bullets. */
 .plain-list {
   list-style: none;
   padding: 0;
@@ -427,40 +872,86 @@ a:hover {
   margin-bottom: var(--space-3);
 }
 
-.notification-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--space-4);
-  max-width: var(--measure);
+.secret,
+.backup-codes code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.05em;
+  background: var(--colour-surface);
+  padding: 2px 6px;
+  border: 1px solid var(--colour-rule-light);
 }
 
-.notification-list li {
-  border-bottom: 1px solid var(--colour-rule);
-  padding: var(--space-3) 0 var(--space-4);
+.backup-codes {
+  columns: 2;
+  max-width: 28rem;
+  padding-left: var(--space-4);
 }
 
-.notification-list h2 {
-  margin-bottom: var(--space-2);
+.caption {
+  display: block;
+  color: var(--colour-text-secondary);
+  font-size: 1.125rem;
+  margin-bottom: var(--space-1);
 }
 
-.notification-unread {
-  border-left: 6px solid var(--colour-brand);
-  padding-left: var(--space-3) !important;
+/* Institutional Footer (GOV.UK Standard) */
+.footer {
+  background: var(--colour-surface-alt);
+  border-top: 1px solid var(--colour-rule);
+  color: var(--colour-text-secondary);
+  font-size: 0.9375rem;
+  padding: var(--space-5) 0 var(--space-6);
+  margin-top: auto;
 }
 
-/* Something the reader must not miss, such as a matter waiting for conflict clearance. */
-.notice {
-  border-left: 6px solid var(--colour-brand);
-  padding: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-4);
+.footer-inner {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--space-3);
 }
 
-/* Groups a label and its value without adding a box of its own. */
-.summary-row {
-  display: contents;
+.footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-5);
+  align-items: flex-start;
 }
 
-/* Read by screen readers, not shown: for example which row a "Change" link is in. */
+.footer-meta-item {
+  display: flex;
+  gap: var(--space-3);
+  max-width: 44rem;
+}
+
+.footer-crest {
+  flex-shrink: 0;
+  color: var(--colour-brand);
+  margin-top: 2px;
+}
+
+.footer-details p {
+  margin: 0 0 var(--space-2);
+  line-height: 1.45;
+}
+
+.footer-title {
+  font-weight: 700;
+  color: var(--colour-text);
+  font-size: 1rem;
+}
+
+.footer-regulatory {
+  font-size: 0.875rem;
+}
+
+.footer-copyright {
+  font-size: 0.8125rem;
+  color: var(--colour-text-secondary);
+}
+
+/* Screen Reader Utility */
 .visually-hidden {
   position: absolute !important;
   width: 1px !important;
@@ -471,4 +962,29 @@ a:hover {
   clip-path: inset(50%) !important;
   white-space: nowrap !important;
   border: 0 !important;
+}
+
+/* Responsive Overrides */
+@media (max-width: 48rem) {
+  .table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary dt {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .footer-meta {
+    flex-direction: column;
+  }
+
+  .backup-codes {
+    columns: 1;
+  }
 }

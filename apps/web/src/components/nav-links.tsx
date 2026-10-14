@@ -36,10 +36,17 @@ export function NavLinks({ unreadCount, canViewFinance, canViewCompliance, compl
               <Link
                 href={href}
                 aria-current={current ? 'page' : undefined}
-                aria-label={notifications ? `Notifications, ${unreadCount} unread` :
-                  compliance ? `Compliance, ${complianceAttention} ordinary actions require attention` : undefined}
+                aria-label={
+                  notifications
+                    ? `Notifications, ${unreadCount} unread`
+                    : compliance
+                      ? `Compliance, ${complianceAttention} ordinary actions require attention`
+                      : undefined
+                }
               >
-                {label}{notifications && ` (${unreadCount})`}{compliance && complianceAttention > 0 && ` (${complianceAttention})`}
+                <span>{label}</span>
+                {notifications && unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
+                {compliance && complianceAttention > 0 && <span className="nav-badge">{complianceAttention}</span>}
               </Link>
             </li>
           );

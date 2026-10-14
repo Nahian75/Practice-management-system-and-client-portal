@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stass Practice Management System & Client Portal - Complete Plain-English Manual</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+    @bottom-center {
+      content: "Stass Legal Practice Management System — User & System Manual";
+      font-size: 8pt;
+      color: #64748b;
+    }
+    @bottom-right {
+      content: counter(page);
+      font-size: 8pt;
+      color: #64748b;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    font-size: 10pt;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4 {
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  h1 {
+    font-size: 24pt;
+    line-height: 1.2;
+    margin: 0 0 8px 0;
+    color: #0f2744;
+  }
+
+  h2 {
+    font-size: 14pt;
+    line-height: 1.3;
+    margin: 24px 0 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #0f2744;
+    color: #0f2744;
+  }
+
+  h3 {
+    font-size: 11pt;
+    margin: 16px 0 6px 0;
+    color: #1e3a8a;
+  }
+
+  h4 {
+    font-size: 10pt;
+    margin: 12px 0 4px 0;
+    color: #334155;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+  }
+
+  ul, ol {
+    margin: 0 0 10px 0;
+    padding-left: 20px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  /* Cover Page */
+  .cover-page {
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+    break-after: page;
+    padding: 40px 10px 20px 10px;
+  }
+
+  .cover-top {
+    border-top: 6px solid #0f2744;
+    padding-top: 25px;
+  }
+
+  .cover-badge {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 600;
+    font-size: 9pt;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .cover-title {
+    font-size: 28pt;
+    font-weight: 800;
+    color: #0f2744;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    color: #475569;
+    line-height: 1.4;
+    margin-bottom: 25px;
+    max-width: 90%;
+  }
+
+  .cover-meta {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 30px;
+  }
+
+  .cover-meta table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .cover-meta td {
+    padding: 6px 10px;
+    font-size: 9.5pt;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .cover-meta td:first-child {
+    font-weight: 600;
+    color: #334155;
+    width: 30%;
+  }
+
+  .cover-footer {
+    border-top: 1px solid #cbd5e1;
+    padding-top: 15px;
+    font-size: 8.5pt;
+    color: #64748b;
+  }
+
+  /* Table of Contents */
+  .toc {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 18px;
+    margin: 20px 0 30px 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .toc h2 {
+    margin-top: 0;
+    border-bottom: 2px solid #0f2744;
+  }
+
+  .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 25px;
+  }
+
+  .toc-item {
+    font-size: 9.5pt;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dashed #cbd5e1;
+    padding-bottom: 3px;
+  }
+
+  .toc-item a {
+    text-decoration: none;
+    color: #0f2744;
+    font-weight: 600;
+  }
+
+  .toc-num {
+    color: #0284c7;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+
+  /* Callout Boxes */
+  .callout {
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .callout-rule {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    color: #991b1b;
+  }
+
+  .callout-tip {
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    color: #166534;
+  }
+
+  .callout-info {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+  }
+
+  .callout-warning {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+  }
+
+  .callout-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Tables */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  table.data-table th, table.data-table td {
+    padding: 7px 10px;
+    border: 1px solid #cbd5e1;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  table.data-table th {
+    background: #0f2744;
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  table.data-table tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* Badges & Tags */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 8pt;
+    font-weight: 600;
+  }
+  .badge-yes { background: #dcfce7; color: #166534; }
+  .badge-no { background: #fee2e2; color: #991b1b; }
+  .badge-role { background: #e0e7ff; color: #3730a3; }
+  .badge-warn { background: #fef3c7; color: #92400e; }
+
+  /* Flow diagrams */
+  .flow-container {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+    margin: 12px 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .flow-box {
+    flex: 1;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    font-size: 8.5pt;
+  }
+
+  .flow-box.highlight {
+    background: #eff6ff;
+    border-color: #3b82f6;
+  }
+
+  .flow-box b {
+    display: block;
+    color: #0f2744;
+    margin-bottom: 4px;
+    font-size: 9.5pt;
+  }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    font-weight: bold;
+    font-size: 14pt;
+  }
+
+  /* Three Parts Diagram */
+  .three-parts {
+    display: flex;
+    gap: 12px;
+    margin: 14px 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .part-card {
+    flex: 1;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 12px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .part-card h4 {
+    margin-top: 0;
+    color: #0f2744;
+    border-bottom: 1.5px solid #e2e8f0;
+    padding-bottom: 5px;
+  }
+
+  .part-tech {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 8pt;
+    background: #e2e8f0;
+    color: #334155;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  /* Page break rules */
+  .page-break {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  code {
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 9pt;
+    background: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #0f2744;
+    border: 1px solid #e2e8f0;
+  }
+
+  pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 8.5pt;
+    overflow-x: hidden;
+    line-height: 1.4;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    color: inherit;
+  }
+
+  .section-tag {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #0284c7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================== -->
+<!-- COVER PAGE                                 -->
+<!-- ========================================== -->
+<div class="cover-page">
+  <div class="cover-top">
+    <div class="cover-badge">Official System & User Guide</div>
+    <div class="cover-title">Stass Practice Management System & Client Portal</div>
+    <div class="cover-subtitle">
+      A Complete, Plain-English Manual to Every Feature, Safety Rule, and Daily Workflow in the Firm's Legal Platform
+    </div>
+
+    <div class="cover-meta">
+      <table>
+        <tr>
+          <td>System Name</td>
+          <td><strong>Stass</strong> (Practice Management System & Client Portal)</td>
+        </tr>
+        <tr>
+          <td>Intended Audience</td>
+          <td>New Joiners, Lawyers, Partners, Accounts, Compliance, HR, and System Learners</td>
+        </tr>
+        <tr>
+          <td>Style & Tone</td>
+          <td>Plain English, simple sentences, easy-to-understand explanations</td>
+        </tr>
+        <tr>
+          <td>Regulatory Alignment</td>
+          <td>SRA Accounts Rules, UK GDPR, AML 2017, UK Sanctions List, Home Office RTW</td>
+        </tr>
+        <tr>
+          <td>Architecture</td>
+          <td>Next.js (Web Frontend) + NestJS (Secure API) + PostgreSQL (Locked Database)</td>
+        </tr>
+        <tr>
+          <td>Document Version</td>
+          <td>Version 1.0 (Comprehensive Edition — October 2026)</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <strong>How to use this manual:</strong> You do not need to be a software engineer to understand this guide. Every concept is explained step by step, using real-life examples from a modern law firm. Read through to learn the entire system or jump to the chapter you need.
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- TABLE OF CONTENTS                          -->
+<!-- ========================================== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <div class="toc-grid">
+    <div class="toc-col">
+      <div class="toc-item"><a href="#ch1"><span class="toc-num">1.</span> Welcome to Stass: The Big Picture</a></div>
+      <div class="toc-item"><a href="#ch2"><span class="toc-num">2.</span> How the System is Built (3 Parts)</a></div>
+      <div class="toc-item"><a href="#ch3"><span class="toc-num">3.</span> User Roles: Who is Allowed to Do What</a></div>
+      <div class="toc-item"><a href="#ch4"><span class="toc-num">4.</span> Signing In & 2-Factor Security (2FA)</a></div>
+      <div class="toc-item"><a href="#ch5"><span class="toc-num">5.</span> Managing Clients: People & Companies</a></div>
+      <div class="toc-item"><a href="#ch6"><span class="toc-num">6.</span> Matters: The Legal Cases We Work On</a></div>
+      <div class="toc-item"><a href="#ch7"><span class="toc-num">7.</span> Conflict of Interest Checks</a></div>
+      <div class="toc-item"><a href="#ch8"><span class="toc-num">8.</span> Client Onboarding & Engagement</a></div>
+    </div>
+    <div class="toc-col">
+      <div class="toc-item"><a href="#ch9"><span class="toc-num">9.</span> Documents: Encrypted & Scanned Files</a></div>
+      <div class="toc-item"><a href="#ch10"><span class="toc-num">10.</span> Tasks: Organising Daily Legal Work</a></div>
+      <div class="toc-item"><a href="#ch11"><span class="toc-num">11.</span> Notifications & Privacy-Safe Emails</a></div>
+      <div class="toc-item"><a href="#ch12"><span class="toc-num">12.</span> Finance: Client Money & SRA Rules</a></div>
+      <div class="toc-item"><a href="#ch13"><span class="toc-num">13.</span> Compliance, Anti-Money Laundering & Sanctions</a></div>
+      <div class="toc-item"><a href="#ch14"><span class="toc-num">14.</span> People & HR (Safe Staff Records)</a></div>
+      <div class="toc-item"><a href="#ch15"><span class="toc-num">15.</span> AI Legal Drafting Assistant</a></div>
+      <div class="toc-item"><a href="#ch16"><span class="toc-num">16.</span> The Client Portal (Client Experience)</a></div>
+      <div class="toc-item"><a href="#ch17"><span class="toc-num">17.</span> Quick Start Guide & Local Testing</a></div>
+      <div class="toc-item"><a href="#ch18"><span class="toc-num">18.</span> Glossary of Everyday Terms</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 1: WELCOME TO STASS                -->
+<!-- ========================================== -->
+<div id="ch1" class="page-break">
+  <div class="section-tag">Chapter 1</div>
+  <h2>Welcome to Stass: The Big Picture</h2>
+
+  <p><strong>What is Stass?</strong></p>
+  <p>
+    Stass is the computer system that powers our law firm. It is both a <strong>Practice Management System</strong> (for our staff, lawyers, accounts, and managers) and a <strong>Client Portal</strong> (for our clients to check their cases and download files).
+  </p>
+
+  <p><strong>What problems does Stass solve for us?</strong></p>
+  <ul>
+    <li><strong>Keeps everything in one tidy home:</strong> Client records, case files, emails, letters, money, and to-do lists are kept safely in one system.</li>
+    <li><strong>Stops mistakes before they happen:</strong> In a law firm, making a mistake with client money or forgetting a conflict check can lose a solicitor their licence. Stass has automatic safety guards that stop rules from being broken.</li>
+    <li><strong>Protects client secrets:</strong> A client's private information is locked away so that only the lawyers working on that specific case can see it.</li>
+    <li><strong>Gives clients peace of mind:</strong> Clients can log in from home to see how their case is progressing and read documents in a secure portal.</li>
+  </ul>
+
+  <div class="callout callout-rule">
+    <div class="callout-title">The First Golden Rule of Stass: Changes Keep a History</div>
+    <p>
+      Day-to-day corrections do not silently rewrite important records. If you make a typo on a financial entry, you create a linked correction. If a document was added to the wrong case, it is withdrawn with an explanation. Records may still be disposed of through the controlled retention process when policy and law allow it.
+    </p>
+  </div>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">The Second Golden Rule: Real Security at the Door</div>
+    <p>
+      Hiding a button on a web page is not real security. In Stass, every single security check happens on the secure server and inside the database. Even if someone tried to bypass the web page, the server strictly refuses any request that does not follow the rules.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 2: HOW THE SYSTEM IS BUILT         -->
+<!-- ========================================== -->
+<div id="ch2" class="avoid-break">
+  <div class="section-tag">Chapter 2</div>
+  <h2>How the System is Built: The Three Parts</h2>
+
+  <p>To understand Stass easily, think of it as a <strong>traditional, secure law firm office building</strong> with three distinct areas:</p>
+
+  <div class="three-parts">
+    <div class="part-card">
+      <h4>1. The Reception Desk</h4>
+      <p>This is what you see in your web browser. It is pleasant, fast, and easy to use. It displays buttons, tables, and forms.</p>
+      <p><strong>Key Fact:</strong> The reception desk holds zero secrets. It never talks directly to the vault. It only passes messages to the Security Office.</p>
+      <div class="part-tech">Built with: Next.js & React</div>
+    </div>
+
+    <div class="part-card">
+      <h4>2. The Security Office</h4>
+      <p>Every single click or action travels here first. The security office asks: <em>"Who are you? What role do you have? Are you working on this case? May you see this document?"</em></p>
+      <p><strong>Key Fact:</strong> If a required check fails, the request is refused. Security-relevant actions and successful record changes create protected audit entries.</p>
+      <div class="part-tech">Built with: NestJS (Node.js API)</div>
+    </div>
+
+    <div class="part-card">
+      <h4>3. The Locked Vault</h4>
+      <p>This is where all the valuable records, client details, money ledgers, and documents are kept under heavy lock and key.</p>
+      <p><strong>Key Fact:</strong> Files are encrypted so that nobody can read them directly from the disk. Only the Security Office has the key.</p>
+      <div class="part-tech">Built with: PostgreSQL & Encrypted Storage</div>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Why do we separate them?</div>
+    <p>
+      If a burglar breaks a window at the reception desk (a browser bug), they still cannot reach the files in the vault. They would have to get past the Security Office, which verifies every single request individually.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 3: USER ROLES                      -->
+<!-- ========================================== -->
+<div id="ch3" class="page-break">
+  <div class="section-tag">Chapter 3</div>
+  <h2>User Roles: Who is Allowed to Do What</h2>
+
+  <p>
+    Not everyone in a law firm should see everything. For example, an IT administrator should not be reading a client's private divorce papers, and a lawyer should not be approving their own bank payouts. Stass separates people into clear <strong>Roles</strong>:
+  </p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 20%;">Role Name</th>
+        <th style="width: 35%;">Who This Person Is</th>
+        <th style="width: 45%;">What They Can & Cannot Do</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-role">Administrator</span></td>
+        <td>IT staff and technical managers who set up accounts.</td>
+        <td>
+          <strong>Can:</strong> Invite staff, manage system settings, fix technical issues.<br>
+          <strong>Cannot:</strong> Read client case files or view financial accounting ledgers.
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">Partner</span></td>
+        <td>Senior lawyers who own or lead the firm.</td>
+        <td>
+          <strong>Can:</strong> Supervise matters, clear conflicts of interest, take over unassigned clients, approve firm policies.<br>
+          <strong>Cannot:</strong> View matters they are not assigned to (holding the partner role alone opens no cases!).
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">Fee Earner</span></td>
+        <td>Solicitors, legal executives, and caseworkers.</td>
+        <td>
+          <strong>Can:</strong> Create clients, open matters, draft tasks, upload files, record time spent on cases.<br>
+          <strong>Cannot:</strong> Approve payments, clear conflicts, or change firm compliance settings.
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">Accounts</span></td>
+        <td>Finance and cashier staff.</td>
+        <td>
+          <strong>Can:</strong> Post receipts, prepare bills, import bank statements, match payments, reconcile ledgers.<br>
+          <strong>Cannot:</strong> Touch legal casework or read private legal strategy notes.
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">Compliance</span></td>
+        <td>Risk officers (COLP, COFA, MLRO, Nominated Officers).</td>
+        <td>
+          <strong>Can:</strong> Review anti-money laundering checks, screen against the UK Sanctions list, inspect files for audits (with a recorded reason), handle confidential reports.<br>
+          <strong>Cannot:</strong> Work on legal cases without leaving an audited trail.
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">People / HR</span></td>
+        <td>Human resources specialists.</td>
+        <td>
+          <strong>Can:</strong> Keep employee records, verify right-to-work, record annual leave, handle fair grievance cases.<br>
+          <strong>Cannot:</strong> View client legal records or firm client accounts.
+        </td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-role">Client</span></td>
+        <td>The person or company paying for legal help.</td>
+        <td>
+          <strong>Can:</strong> Sign in to their dedicated portal, see who is working on their case, download documents shared with them, view payment requests.<br>
+          <strong>Cannot:</strong> See internal notes, tasks, conflict checks, or any other client's file.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Important Rule: The "Need to Know" Layer</div>
+    <p>
+      Just because you are a Solicitor or a Partner does <em>not</em> mean you can see all cases in the firm! You can only open a matter if you are an <strong>active member of that matter's team</strong>. This protects client confidentiality even inside the firm.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 4: SIGNING IN & 2-FACTOR SECURITY  -->
+<!-- ========================================== -->
+<div id="ch4" class="avoid-break">
+  <div class="section-tag">Chapter 4</div>
+  <h2>Signing In & Two-Factor Security (2FA)</h2>
+
+  <p>
+    Passwords alone are not enough to protect a law firm from hackers. That is why Stass uses <strong>Two-Factor Authentication (2FA)</strong> for everyone — both staff members and clients.
+  </p>
+
+  <p><strong>How the two steps work:</strong></p>
+  <ol>
+    <li><strong>Step 1: Something you know</strong> — Your work email address and your private password.</li>
+    <li><strong>Step 2: Something you have</strong> — A 6-digit security code that changes every 30 seconds.</li>
+  </ol>
+
+  <div class="flow-container">
+    <div class="flow-box">
+      <b>1. Enter Email & Password</b>
+      Stass checks that the account is active and password matches.
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight">
+      <b>2. Enter 6-Digit Code</b>
+      From phone app, backup code, or local helper.
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <b>3. Safe Work Session</b>
+      Signed in! Automatically signed out if left idle.
+    </div>
+  </div>
+
+  <h3>Ways to Get Your 6-Digit Code</h3>
+  <ul>
+    <li><strong>Authenticator App:</strong> An app on your smartphone (like Google Authenticator or Microsoft Authenticator) that shows a 6-digit number.</li>
+    <li><strong>Emergency Backup Codes:</strong> A printed list of single-use codes given when you first set up your account. Each code works once and is then crossed off.</li>
+    <li><strong>Local Testing Helper (<code>code.bat</code>):</strong> When testing on your computer, double-clicking <code>code.bat</code> instantly displays the current 6-digit code!</li>
+  </ul>
+
+  <h3>Automatic Sign-Out (Session Timeouts)</h3>
+  <p>If you walk away from your desk, Stass protects your screen:</p>
+  <ul>
+    <li><strong>Staff sessions:</strong> Automatically signed out after <strong>30 minutes</strong> of inactivity.</li>
+    <li><strong>Client portal sessions:</strong> Automatically signed out after <strong>15 minutes</strong> of inactivity.</li>
+    <li><strong>Instant shutoff:</strong> If an account is disabled or an email address changes, all active sessions end immediately.</li>
+  </ul>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 5: MANAGING CLIENTS               -->
+<!-- ========================================== -->
+<div id="ch5" class="page-break">
+  <div class="section-tag">Chapter 5</div>
+  <h2>Managing Clients: People & Organisations</h2>
+
+  <p>
+    A client is the person or business that hires our law firm. In Stass, every client receives a permanent reference number (such as <code>C-000001</code>) that stays with them forever.
+  </p>
+
+  <h3>Two Kinds of Clients</h3>
+  <div class="flow-container">
+    <div class="flow-box">
+      <b>Individual Clients</b>
+      Real human beings. Stass records their title, given name, family name, date of birth, contact email, telephone, and postal address.
+    </div>
+    <div class="flow-box">
+      <b>Organisation Clients</b>
+      Companies, partnerships, LLPs, charities, and trusts. Stass records the company name, type, registration number (e.g. Companies House), and registered address.
+    </div>
+  </div>
+
+  <h3>Client Contacts</h3>
+  <p>
+    You cannot speak directly to a company building; you speak to the people who work there! For organisation clients, Stass records <strong>Contacts</strong> (such as the Managing Director, Financial Officer, or In-House Solicitor).
+  </p>
+  <ul>
+    <li>Each contact has their own name, job title, email, and phone.</li>
+    <li>If a contact leaves the company, we mark them <em>inactive</em>. We never delete their history.</li>
+  </ul>
+
+  <h3>The Responsible Person & Client Takeover</h3>
+  <p>
+    Every client has one <strong>Responsible Person</strong> (usually the lawyer who brought them in).
+  </p>
+  <ul>
+    <li>Only the Responsible Person and the team members assigned to the client's cases can see full client details.</li>
+    <li><strong>What happens if the lawyer leaves the firm?</strong> A Partner can perform a <strong>Client Takeover</strong>. The Partner must write an official reason why they are taking over. The system logs the change so that no client is ever lost or neglected.</li>
+  </ul>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Safe Client Searching</div>
+    <p>
+      When staff search for existing clients, the search screen shows <em>only</em> the reference number, type, and name. It does not show private phone numbers, home addresses, or matter details until permission is verified.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 6: MATTERS (LEGAL CASES)           -->
+<!-- ========================================== -->
+<div id="ch6" class="avoid-break">
+  <div class="section-tag">Chapter 6</div>
+  <h2>Matters: The Legal Cases We Work On</h2>
+
+  <p>
+    A <strong>Matter</strong> is a specific piece of legal work we do for a client. For example: buying a house at 12 High Street, handling a commercial lease, or drafting a will.
+  </p>
+
+  <p>
+    Almost everything in Stass hangs off a matter: documents, tasks, time entries, bills, and what the client sees in their portal!
+  </p>
+
+  <h3>How Matters Are Numbered</h3>
+  <p>
+    Every matter gets a clean, unique reference code made of the client reference plus a counter:
+  </p>
+  <pre><code>C-000123/001   (The client's first case)
+C-000123/002   (The client's second case)
+C-000123/003   (The client's third case)</code></pre>
+  <p>Two lawyers opening cases at the exact same second will never get the same number because the database locks and numbers them safely.</p>
+
+  <h3>Matter Types</h3>
+  <p>Stass supports fixed legal categories so work is tracked cleanly:</p>
+  <ul>
+    <li>Residential Property (conveyancing)</li>
+    <li>Commercial Property</li>
+    <li>Family & Divorce</li>
+    <li>Litigation & Disputes</li>
+    <li>Employment Law</li>
+    <li>Wills & Probate</li>
+    <li>Corporate & Commercial</li>
+    <li>Immigration</li>
+    <li>Crime</li>
+  </ul>
+
+  <h3>The Matter Team</h3>
+  <p>Every matter has a clearly defined legal team:</p>
+  <ul>
+    <li><strong>Supervising Partner:</strong> Exactly one senior partner who is legally responsible for overseeing the case.</li>
+    <li><strong>Fee Earners:</strong> One or more solicitors, legal executives, or paralegals doing the day-to-day legal work.</li>
+  </ul>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">Closing a Matter Safely</div>
+    <p>
+      When the case is finished, the matter is <strong>closed</strong> with an explanation. It is not deleted. Stass refuses to close a matter while it still has an open task; finance records remain available after closure so accounts work can be completed safely.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 7: CONFLICT OF INTEREST CHECKS     -->
+<!-- ========================================== -->
+<div id="ch7" class="page-break">
+  <div class="section-tag">Chapter 7</div>
+  <h2>Conflict of Interest Checks: Protecting Integrity</h2>
+
+  <p>
+    <strong>What is a conflict of interest?</strong> In law, a firm cannot represent two people who are fighting against each other (for example, representing both the buyer and the seller of the same house, or both husband and wife in a divorce). Doing so is illegal and breaches professional ethics.
+  </p>
+
+  <p>
+    In Stass, you <strong>cannot open a matter</strong> without running an automated <strong>Conflict Check</strong> first!
+  </p>
+
+  <div class="flow-container">
+    <div class="flow-box">
+      <b>1. Name the Parties</b>
+      You type the names of the client, opponents, and opponent solicitors.
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <b>2. Stass Scans the Vault</b>
+      The system searches every past client, matter, and opponent record.
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight">
+      <b>3. Clean or Match?</b>
+      0 matches = Matter opens.<br>
+      Matches found = Awaiting Clearance!
+    </div>
+  </div>
+
+  <h3>What Happens if a Potential Conflict is Found?</h3>
+  <p>If the system finds that someone with that name was an opponent in a past case:</p>
+  <ol>
+    <li>The matter is placed into a safety state called <code>awaiting_clearance</code>.</li>
+    <li>While awaiting clearance, <strong>no work can be done</strong>. No documents can be uploaded, no tasks can be created, and no time can be billed.</li>
+    <li>Only the <strong>Supervising Partner</strong> can clear the conflict. They must review the names and write an official explanation (e.g. <em>"John Smith is a common name; verified birth date proves this is a different individual"</em>).</li>
+    <li>When cleared, the compliance team is automatically emailed, and the matter becomes <code>open</code>.</li>
+  </ol>
+
+  <div class="callout callout-rule">
+    <div class="callout-title">No Cheating the Conflict Check</div>
+    <p>
+      The conflict check ID must be less than 24 hours old, must belong to the same client, and can only be used once. You cannot use yesterday's check for a new case.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 8: ONBOARDING & ENGAGEMENT         -->
+<!-- ========================================== -->
+<div id="ch8" class="avoid-break">
+  <div class="section-tag">Chapter 8</div>
+  <h2>Client Onboarding & Engagement</h2>
+
+  <p>
+    Before a law firm can start doing serious legal work, a new client must be properly "onboarded." This means confirming who they are, agreeing on fees, and having them sign our terms of business.
+  </p>
+
+  <h3>The Onboarding Journey (Step by Step)</h3>
+  <ol>
+    <li><strong>Client Record Created:</strong> Basic details entered.</li>
+    <li><strong>Email Verification:</strong> A secure, one-time link is sent to the client's email. Clicking it proves they control that email inbox.</li>
+    <li><strong>Identity & Evidence:</strong> The client provides their passport, driver's licence, or company registration certificate.</li>
+    <li><strong>Risk & Anti-Money Laundering Review:</strong> Staff verify where the client's funds came from and confirm they are not on any sanctions list.</li>
+    <li><strong>Compliance Approval:</strong> The Compliance team gives formal clearance to act.</li>
+    <li><strong>Client-Care Letter & Fee Agreement:</strong> The firm sends engagement documents setting out the scope of work and hourly fees.</li>
+    <li><strong>Signature Review:</strong> The client signs the agreement, and the lawyer confirms the signed document.</li>
+    <li><strong>Initial Deposit:</strong> The client deposits any required money into the client bank account.</li>
+    <li><strong>Activation:</strong> The matter is officially active and casework begins!</li>
+  </ol>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">Firm Policies Library</div>
+    <p>
+      Stass includes an immutable <strong>Firm Policies</strong> module. Compliance writes rules (like our Client Care Policy or AML Policy), Partners approve them, and all lawyers must click to acknowledge they have read them.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 9: DOCUMENTS & FILE SAFETY         -->
+<!-- ========================================== -->
+<div id="ch9" class="page-break">
+  <div class="section-tag">Chapter 9</div>
+  <h2>Documents: Encrypted, Scanned & Versioned Files</h2>
+
+  <p>
+    Lawyers handle sensitive files: contracts, deeds, medical evidence, and court orders. Stass treats document safety as top priority.
+  </p>
+
+  <h3>1. Automatic Virus Scanning (ClamAV)</h3>
+  <p>
+    Every single file uploaded to Stass is scanned by an antivirus engine (ClamAV) <em>before</em> it is saved to the disk.
+  </p>
+  <ul>
+    <li>If a file is infected with malware, Stass refuses it immediately, discards it, and sends an urgent email alert to Compliance.</li>
+    <li>If the virus scanner is offline or broken, Stass refuses all uploads. <strong>No unscanned file is ever stored.</strong></li>
+  </ul>
+
+  <h3>2. Strong Military-Grade Encryption (AES-256-GCM)</h3>
+  <p>
+    Once scanned, the file is encrypted using a unique, random encryption key. Even if a thief stole the firm's physical backup hard drives, they could not open or read a single word of any document!
+  </p>
+
+  <h3>3. Safe File Formats Only</h3>
+  <p>
+    To prevent malicious software, Stass only accepts clean, modern formats: PDF, Word (<code>.docx</code>), Excel (<code>.xlsx</code>), PowerPoint (<code>.pptx</code>), Plain Text, Images (PNG, JPEG), and Emails (<code>.eml</code>). Macro-enabled files (which can contain computer viruses) are strictly blocked.
+  </p>
+
+  <h3>4. Version History: Nothing Overwritten</h3>
+  <p>
+    When you upload an updated draft of a contract, Stass does not overwrite the old file. It creates <strong>Version 2</strong>. Both Version 1 and Version 2 remain in the vault and can be downloaded anytime.
+  </p>
+
+  <h3>5. Withdrawing a Mistaken Document</h3>
+  <div class="callout callout-warning">
+    <div class="callout-title">What if I upload the wrong client's file by mistake?</div>
+    <p>
+      You cannot delete it. Instead, you <strong>withdraw</strong> the document and type a reason (e.g. <em>"Uploaded wrong appendix by mistake"</em>). Withdrawing instantly hides the file from the case list, cuts off all client access, and blocks downloads, while preserving an honest audit trail.
+    </p>
+  </div>
+
+  <h3>6. Sharing Documents with the Client</h3>
+  <p>
+    By default, <strong>every document starts internal/private</strong>. Only when a lawyer deliberately clicks <em>"Share with client"</em> does the latest version appear in the client's portal.
+  </p>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 10: TASKS (DAILY WORK)             -->
+<!-- ========================================== -->
+<div id="ch10" class="avoid-break">
+  <div class="section-tag">Chapter 10</div>
+  <h2>Tasks: Organising Daily Legal Work</h2>
+
+  <p>
+    In Stass, a <strong>Task</strong> represents real legal work that must be completed on a case (for example: <em>"File defence by Friday"</em> or <em>"Order local authority search"</em>).
+  </p>
+
+  <h3>Task Rules</h3>
+  <ul>
+    <li><strong>Tied to a Matter:</strong> A task always belongs to exactly one matter. It is not an informal sticky note outside the case.</li>
+    <li><strong>Assigned to Team Members:</strong> A task can only be assigned to a lawyer or caseworker who is an active member of that matter's team.</li>
+    <li><strong>Clear Details:</strong> Each task has a Title, an optional Description, a Due Date (calendar date), Priority (Low, Normal, High, Urgent), and Status (Open, Completed, Cancelled).</li>
+    <li><strong>Audit Trail:</strong> If you reassign a task to a colleague, Stass records who reassigned it, when, and from whom.</li>
+    <li><strong>Internal Only:</strong> Tasks are for law firm staff only. Clients never see internal tasks in their portal.</li>
+  </ul>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">Who can complete or cancel a task?</div>
+    <p>
+      Only two people have authority to mark a task completed or cancelled:
+      <br>1. The person currently assigned to the task.
+      <br>2. The Supervising Partner for that matter.
+      <br>This ensures that work is not accidentally marked as done by someone unfamiliar with the case.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 11: NOTIFICATIONS & EMAILS         -->
+<!-- ========================================== -->
+<div id="ch11" class="page-break">
+  <div class="section-tag">Chapter 11</div>
+  <h2>Notifications & Privacy-Preserving Emails</h2>
+
+  <p>
+    Lawyers need to be alerted when work is assigned to them or when a deadline is approaching. However, standard email is not 100% private: emails can pop up on lock screens, get forwarded, or be stored on personal phones.
+  </p>
+
+  <p>
+    Stass solves this with a clever, privacy-preserving notification system:
+  </p>
+
+  <h3>1. The In-App Inbox</h3>
+  <p>
+    Inside Stass, staff have a personal notification bell/inbox. Here you see clear notices when a task is assigned to you, reassigned, or updated. If you are removed from a case, those notifications gracefully disappear from your list.
+  </p>
+
+  <h3>2. Automatic Due-Date Reminders</h3>
+  <p>Stass automatically schedules reminders at 09:00 UK time:</p>
+  <ul>
+    <li><strong>7 days before</strong> the due date (early warning)</li>
+    <li><strong>1 day before</strong> the due date (action tomorrow)</li>
+    <li><strong>On the due date</strong> (action today)</li>
+    <li><strong>1 day overdue</strong> (urgent reminder if still open)</li>
+  </ul>
+
+  <h3>3. Zero-Leak Email Design</h3>
+  <div class="callout callout-rule">
+    <div class="callout-title">Why Stass Emails Contain No Client Names</div>
+    <p>
+      When Stass sends an email alert, it <strong>never</strong> includes the client's name, the case title, or the task description! Instead, it says:
+      <br><em>"You have a pending task reminder in Stass. Please sign in securely to view your work."</em>
+      <br>This prevents sensitive legal secrets from ever leaking through external email servers.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 12: FINANCE & CLIENT MONEY         -->
+<!-- ========================================== -->
+<div id="ch12" class="avoid-break">
+  <div class="section-tag">Chapter 12</div>
+  <h2>Finance: Client Money & SRA Accounts Rules</h2>
+
+  <p>
+    In England and Wales, law firm accounting is governed by the <strong>SRA Accounts Rules</strong>. The rules are strict because lawyers hold millions of pounds of other people's money. Breaking these rules can lead to criminal charges or firm closure.
+  </p>
+
+  <h3>The Most Important Rule: Two Kinds of Money</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Client Money (Belongs to the Client!)</th>
+        <th style="width: 50%;">Office / Business Money (Belongs to the Firm!)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          • Money held for a house purchase deposit.<br>
+          • Money held to pay court fees or stamp duty.<br>
+          • Money received from the other side in a settlement.<br>
+          <strong>Must be kept in a dedicated Client Bank Account.</strong><br>
+          <span class="badge badge-no">CAN NEVER BE USED FOR FIRM BILLS OR SALARIES!</span>
+        </td>
+        <td>
+          • Fees earned by the firm after an invoice is issued.<br>
+          • The firm's own operating capital.<br>
+          • Used to pay staff salaries, office rent, and utility bills.<br>
+          <strong>Kept in the Firm's Office Bank Account.</strong>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Exact Pence Accounting</h3>
+  <p>
+    Computers sometimes make rounding errors with decimals (like <code>$10.0000001</code>). In Stass, all money is stored in <strong>exact British pence</strong> (e.g. £150.00 is stored as <code>15000</code>). There are zero rounding discrepancies.
+  </p>
+
+  <h3>Time Recording & Invoices</h3>
+  <ul>
+    <li>Fee earners log their billable time in minutes, with a clear description and their billing rate.</li>
+    <li>Invoices are generated with unique, sequential numbers, explicit VAT rates (20% standard, 5% reduced, 0% zero-rated, exempt, or outside scope).</li>
+    <li>Mistakes are reversed with a formal <strong>Credit Note</strong>; an invoice is never silently edited or destroyed.</li>
+  </ul>
+
+  <h3>The Four-Eyes Principle (Payment Protection)</h3>
+  <div class="callout callout-warning">
+    <div class="callout-title">The Four-Eyes Rule: No One Pays Alone</div>
+    <p>
+      To prevent fraud, whenever client money is paid out, Stass requires <strong>Four-Eyes Approval</strong>:
+      <br>1. One authorised person enters the payment request with evidence.
+      <br>2. A <em>second, different</em> authorised person must review and approve it.
+      <br>The person who asks for the payment <strong>can never approve their own request!</strong>
+    </p>
+  </div>
+
+  <h3>Five-Week Client Account Reconciliation</h3>
+  <p>
+    At least every five weeks, the accounts team imports bank statements, matches them against the internal ledgers, and the COFA (Compliance Officer for Finance and Administration) formally signs off on the reconciliation.
+  </p>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 13: COMPLIANCE, AML & SANCTIONS    -->
+<!-- ========================================== -->
+<div id="ch13" class="page-break">
+  <div class="section-tag">Chapter 13</div>
+  <h2>Compliance, Anti-Money Laundering & Sanctions</h2>
+
+  <p>
+    Criminals often try to use law firms to "clean" dirty money or hide illegal wealth. The firm has a strict legal obligation under the <strong>Money Laundering Regulations 2017</strong> to stop this.
+  </p>
+
+  <h3>Customer Due Diligence (CDD)</h3>
+  <p>Before doing business, we must verify:</p>
+  <ul>
+    <li><strong>Identity:</strong> Who is the client? (Proof of ID and proof of address).</li>
+    <li><strong>Beneficial Owners:</strong> If the client is a company, who are the real human beings who own or control it (anyone holding 25% or more)?</li>
+    <li><strong>Source of Funds & Wealth:</strong> Where did the money actually come from? (e.g. savings from employment, sale of a property, inheritance).</li>
+  </ul>
+
+  <h3>Official UK Sanctions List Screening</h3>
+  <p>
+    Stass imports the official UK Government Sanctions List. Every client and party is screened against it automatically:
+  </p>
+  <ul>
+    <li>If a match is found, Stass applies an immediate <strong>Sanctions Hold</strong>.</li>
+    <li>All funds and transactions for that client are frozen until the Compliance Officer reviews the case. Handling funds for a sanctioned person without a government licence is a serious criminal offence.</li>
+  </ul>
+
+  <h3>The Compliance Gate</h3>
+  <div class="callout callout-rule">
+    <div class="callout-title">The Automatic Compliance Gate</div>
+    <p>
+      The database itself enforces the Compliance Gate! If a matter does not have approved Anti-Money Laundering clearance, the database <strong>blocks time recording, billing, document sharing, and money transfers</strong>. Work cannot proceed in the dark.
+    </p>
+  </div>
+
+  <h3>Confidential Speak-Up Channel (Reporting Concerns)</h3>
+  <p>
+    Every staff member has a <em>"Report a Concern"</em> button in their navigation menu (<code>/report-concern</code>). If you see something suspicious:
+  </p>
+  <ul>
+    <li>You can submit a confidential report directly to the MLRO (Money Laundering Reporting Officer).</li>
+    <li>The system gives you a neutral receipt. It does <em>not</em> create public notifications, preventing any unlawful "tipping off" of the suspect.</li>
+  </ul>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 14: PEOPLE & HR                    -->
+<!-- ========================================== -->
+<div id="ch14" class="avoid-break">
+  <div class="section-tag">Chapter 14</div>
+  <h2>People & HR: Safe Staff Records</h2>
+
+  <p>
+    Employment records contain sensitive personal data: salaries, home addresses, right-to-work checks, sickness records, and disciplinary files.
+  </p>
+
+  <h3>Separation of Powers</h3>
+  <p>
+    In Stass, being a System Administrator does <em>not</em> give you the right to inspect employee HR files. The HR module is protected by its own distinct security authority.
+  </p>
+
+  <h3>Key HR Features</h3>
+  <ul>
+    <li><strong>Right to Work Checks:</strong> Records evidence prescribed by the UK Home Office (passports, share codes) before work begins, with reminder alerts before visas expire.</li>
+    <li><strong>Annual Leave & Working Time:</strong> Tracks holiday entitlement and approvals to ensure compliance with the Working Time Regulations 1998.</li>
+    <li><strong>Continuing Competence (CPD):</strong> Solicitors must maintain professional knowledge. Stass tracks learning plans, training courses, and reflections as required by the SRA.</li>
+    <li><strong>Appraisals & Objectives:</strong> Records annual goals and performance reviews.</li>
+    <li><strong>Confidential Cases:</strong> Grievance or disciplinary matters are restricted strictly to named investigators.</li>
+  </ul>
+
+  <div class="callout callout-tip">
+    <div class="callout-title">Privacy-Preserving Sickness Tracking</div>
+    <p>
+      When an employee is off sick, operational managers need to know that the person is absent and what workplace adjustments are required. They <strong>do not</strong> need to see private medical diagnoses or doctor's clinical notes! Stass shields sensitive medical information, showing managers only the operational facts.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 15: AI LEGAL DRAFTING ASSISTANT    -->
+<!-- ========================================== -->
+<div id="ch15" class="page-break">
+  <div class="section-tag">Chapter 15</div>
+  <h2>AI Legal Drafting Assistant: Smart, Safe Assistance</h2>
+
+  <p>
+    Generative Artificial Intelligence (AI) can save hours of time by drafting letters, summarising long bundles, and creating case chronologies. However, in a law firm, using AI recklessly can cause catastrophic leaks or court penalties.
+  </p>
+
+  <p>
+    Stass includes a provider-neutral <strong>AI Legal Assistant</strong> with human review and confidentiality safeguards:
+  </p>
+
+  <div class="flow-container">
+    <div class="flow-box">
+      <b>1. Solicitor Asks AI</b>
+      e.g. <em>"Summarise these 5 emails into a timeline."</em>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">
+      <b>2. Approved Provider Boundary</b>
+      The local build uses an offline mock. A production provider needs separate privacy and hosting approval.
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight">
+      <b>3. Human Lawyer Reviews</b>
+      Solicitor reads, checks facts, and signs off. AI never acts alone!
+    </div>
+  </div>
+
+  <h3>The Four Unbreakable AI Rules in Stass</h3>
+  <ol>
+    <li><strong>Human Lawyers Remain 100% Responsible:</strong> The solicitor whose name is on the letter is legally responsible for everything in it. An AI cannot practice law, cannot give legal advice, and cannot be blamed for errors.</li>
+    <li><strong>Provider boundary:</strong> The local build uses an offline mock provider and sends no client data to an external AI service. Any production provider must be separately approved and configured with appropriate privacy, retention, and training controls.</li>
+    <li><strong>Check for Hallucinations:</strong> AI models can sometimes make up fake court case citations or hallucinate laws. Solicitors must verify all case citations against primary sources (like BAILII or legislation.gov.uk) before putting them in front of a judge!</li>
+    <li><strong>No Secret Machine Decisions:</strong> AI is never allowed to decide whether someone gets fired, whether someone is guilty of money laundering, or whether a client is accepted. Humans make all decisions.</li>
+  </ol>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 16: THE CLIENT PORTAL              -->
+<!-- ========================================== -->
+<div id="ch16" class="avoid-break">
+  <div class="section-tag">Chapter 16</div>
+  <h2>The Client Portal: What Our Clients Experience</h2>
+
+  <p>
+    The <strong>Client Portal</strong> is the modern, friendly face of our firm. Clients can log in from their laptop or smartphone to stay updated without waiting on hold on the telephone.
+  </p>
+
+  <h3>How a Client Gets Access</h3>
+  <ul>
+    <li><strong>Invitation Only:</strong> There is no public registration form. A client only gets an account when their lawyer clicks <em>"Invite to portal"</em>.</li>
+    <li><strong>Sent Only to Verified Email:</strong> The invitation goes strictly to the email address already on the official client record. A lawyer cannot type a random email on the fly.</li>
+    <li><strong>Two-Factor Security:</strong> Clients must also use a 6-digit security code from their phone when logging in.</li>
+  </ul>
+
+  <h3>What Clients Can See & Do</h3>
+  <ul>
+    <li><strong>Case Overview:</strong> See their active and closed cases, reference numbers, and the names of the solicitors handling their file.</li>
+    <li><strong>Shared Documents:</strong> Read and download documents that the legal team has explicitly shared with them.</li>
+    <li><strong>Sign Engagement Letters:</strong> Review and sign firm client-care agreements electronically.</li>
+    <li><strong>Upload Evidence:</strong> Upload requested documents (such as photo ID, utility bills, or bank statements).</li>
+    <li><strong>Payment Requests:</strong> View bills and payment instructions safely without fear of email interception scams.</li>
+  </ul>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Automatic Access Cut-Off</div>
+    <p>
+      If a client contact leaves their company or is marked inactive, their portal access terminates <strong>instantly on their very next click</strong>. They cannot download another file, even if they were already logged in.
+    </p>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 17: QUICK START & LOCAL TESTING    -->
+<!-- ========================================== -->
+<div id="ch17" class="page-break">
+  <div class="section-tag">Chapter 17</div>
+  <h2>Quick Start Guide: Running & Testing the System</h2>
+
+  <p>
+    If you are developing or testing Stass on your local computer, the entire system has been automated with simple one-click batch scripts.
+  </p>
+
+  <h3>How to Start and Stop Stass</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 25%;">Action</th>
+        <th style="width: 35%;">How to Run</th>
+        <th style="width: 40%;">What It Does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Start the App</strong></td>
+        <td>Double-click <code>start.bat</code></td>
+        <td>Starts PostgreSQL database, private file storage, antivirus scanner, NestJS API, and Next.js web app. Opens your browser automatically when ready!</td>
+      </tr>
+      <tr>
+        <td><strong>Get 2FA Code</strong></td>
+        <td>Double-click <code>code.bat</code></td>
+        <td>Prints the current 6-digit security code for the demo account right on your screen.</td>
+      </tr>
+      <tr>
+        <td><strong>Stop the App</strong></td>
+        <td>Double-click <code>stop.bat</code></td>
+        <td>Gracefully stops all background containers and servers while keeping your test data intact.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Important Web Addresses on Your Computer</h3>
+  <ul>
+    <li><strong>The Stass Web App:</strong> <a href="http://localhost:3000">http://localhost:3000</a></li>
+    <li><strong>Local Email Inbox (Mailpit):</strong> <a href="http://127.0.0.1:8025">http://127.0.0.1:8025</a> (Shows all invitations, password resets, and reminder emails sent by Stass without sending real internet emails).</li>
+  </ul>
+
+  <h3>Demo Login</h3>
+  <p>
+    The local demo email is <code>demo@practice.test</code>. Read <code>DEMO-LOGIN.txt</code> in the local project folder
+    for its current password and other account details.
+    That file is deliberately excluded from source control and must not be copied into shared documentation.
+    Run <code>code.bat</code> to get the live 2FA code.
+  </p>
+</div>
+
+<!-- ========================================== -->
+<!-- CHAPTER 18: GLOSSARY OF EVERYDAY TERMS     -->
+<!-- ========================================== -->
+<div id="ch18" class="avoid-break">
+  <div class="section-tag">Chapter 18</div>
+  <h2>Glossary of Everyday Terms</h2>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 25%;">Term</th>
+        <th style="width: 75%;">Simple Explanation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Matter</strong></td>
+        <td>One specific piece of legal casework done for a client (e.g. buying a property or drafting a contract).</td>
+      </tr>
+      <tr>
+        <td><strong>Fee Earner</strong></td>
+        <td>A lawyer, solicitor, or caseworker who does billable legal work.</td>
+      </tr>
+      <tr>
+        <td><strong>Supervising Partner</strong></td>
+        <td>The senior solicitor who oversees a matter and is legally accountable for the quality of work.</td>
+      </tr>
+      <tr>
+        <td><strong>Conflict Check</strong></td>
+        <td>An automated search to make sure the firm is not acting for both sides of an argument.</td>
+      </tr>
+      <tr>
+        <td><strong>Client Money</strong></td>
+        <td>Money belonging to the client (like a house deposit) held in trust in a separate bank account.</td>
+      </tr>
+      <tr>
+        <td><strong>Office Money</strong></td>
+        <td>The firm's own money, earned from fees, used to pay rent and wages.</td>
+      </tr>
+      <tr>
+        <td><strong>Four-Eyes Principle</strong></td>
+        <td>A safety rule requiring two different people to check and approve a payment before money leaves the bank.</td>
+      </tr>
+      <tr>
+        <td><strong>AML (Anti-Money Laundering)</strong></td>
+        <td>Rules and checks designed to stop criminals from using legal transactions to hide dirty money.</td>
+      </tr>
+      <tr>
+        <td><strong>CDD (Customer Due Diligence)</strong></td>
+        <td>Verifying who the client is, checking their identity documents, and confirming their business ownership.</td>
+      </tr>
+      <tr>
+        <td><strong>Sanctions List</strong></td>
+        <td>A government list of banned individuals and entities whose money must be immediately frozen.</td>
+      </tr>
+      <tr>
+        <td><strong>SAR (Suspicious Activity Report)</strong></td>
+        <td>A confidential report sent to the UK National Crime Agency if money laundering is suspected.</td>
+      </tr>
+      <tr>
+        <td><strong>ClamAV</strong></td>
+        <td>The built-in antivirus scanner that checks every file before it is allowed into Stass.</td>
+      </tr>
+      <tr>
+        <td><strong>Withdrawing a Document</strong></td>
+        <td>Hiding a mistakenly uploaded file from normal view and blocking downloads while keeping the audit trail intact.</td>
+      </tr>
+      <tr>
+        <td><strong>2FA (Two-Factor Authentication)</strong></td>
+        <td>Requiring both a password and a 6-digit phone code to log in, preventing hacker break-ins.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-tip" style="margin-top: 25px; text-align: center;">
+    <strong>Congratulations! You now understand how the entire Stass Practice Management System works.</strong>
+  </div>
+</div>
+
+</body>
+</html>
