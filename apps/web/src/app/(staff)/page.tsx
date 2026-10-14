@@ -21,9 +21,8 @@ function statusToVariant(status: MatterSummary['status']): TagVariant {
 }
 
 export default async function HomePage() {
-  const account = await currentAccount();
-
-  const [clientsRes, mattersRes, notificationsRes, complianceRes, financeRes] = await Promise.all([
+  const [account, clientsRes, mattersRes, notificationsRes, complianceRes, financeRes] = await Promise.all([
+    currentAccount(),
     apiGet<{ clients: ClientSummary[]; next: string | null }>('/clients'),
     apiGet<{ matters: MatterSummary[]; next: string | null }>('/matters'),
     apiGet<NotificationPage>('/notifications'),
@@ -45,7 +44,7 @@ export default async function HomePage() {
       <h1>Home</h1>
       <p>You are signed in as {account?.displayName}.</p>
 
-      {/* Jurisdiction & Regulatory Compliance Tags */}
+      {/* Jurisdiction and access-boundary tags */}
       <div className="actions" style={{ marginBottom: 'var(--space-4)' }}>
         <StatusTag variant="blue">England &amp; Wales</StatusTag>
         <StatusTag variant="green">Role-based access</StatusTag>
@@ -54,17 +53,21 @@ export default async function HomePage() {
 
       {/* Key Practice Performance Metrics */}
       <div className="metric-grid">
-        <div className="metric-card metric-card-accent">
-          <span className="metric-label">Matter teams</span>
-          <span className="metric-value">{matterCount}</span>
-          <span className="metric-sub">Visible records, including closed matters</span>
-        </div>
+        {mattersRes.status === 200 && (
+          <div className="metric-card metric-card-accent">
+            <span className="metric-label">Matter teams</span>
+            <span className="metric-value">{matterCount}</span>
+            <span className="metric-sub">Visible records, including closed matters</span>
+          </div>
+        )}
 
-        <div className="metric-card">
-          <span className="metric-label">Visible clients</span>
-          <span className="metric-value">{clientCount}</span>
-          <span className="metric-sub">Clients you manage or whose matter team you are on</span>
-        </div>
+        {clientsRes.status === 200 && (
+          <div className="metric-card">
+            <span className="metric-label">Visible clients</span>
+            <span className="metric-value">{clientCount}</span>
+            <span className="metric-sub">Clients you manage or whose matter team you are on</span>
+          </div>
+        )}
 
         {complianceRes.status === 200 && (
           <div className={`metric-card ${complianceAttention > 0 ? 'metric-card-warning' : 'metric-card-success'}`}>
@@ -77,7 +80,7 @@ export default async function HomePage() {
         )}
 
         <div className={`metric-card ${unreadCount > 0 ? 'metric-card-accent' : ''}`}>
-          <span className="metric-label">Unread Notices</span>
+          <span className="metric-label">Unread notices</span>
           <span className="metric-value">{unreadCount}</span>
           <span className="metric-sub">Task assignments &amp; alerts</span>
         </div>
@@ -86,26 +89,30 @@ export default async function HomePage() {
       {/* Common Practice Actions */}
       <h2>Common practice actions</h2>
       <div className="quick-action-grid">
-        <Link className="quick-action-card" href="/clients/new">
-          <strong>New Client &amp; Conflict Check</strong>
-          <p>Register an individual or company client and complete the practice&rsquo;s conflict check.</p>
-        </Link>
+        {clientsRes.status === 200 && (
+          <Link className="quick-action-card" href="/clients/new">
+            <strong>New Client &amp; Conflict Check</strong>
+            <p>Register an individual or company client and complete the practice&rsquo;s conflict check.</p>
+          </Link>
+        )}
 
-        <Link className="quick-action-card" href="/matters">
-          <strong>Matters Workspace</strong>
-          <p>Review active instructions, file documents, and track team progress.</p>
-        </Link>
+        {mattersRes.status === 200 && (
+          <Link className="quick-action-card" href="/matters">
+            <strong>Matters Workspace</strong>
+            <p>Review active instructions, file documents, and track team progress.</p>
+          </Link>
+        )}
 
         {complianceRes.status === 200 && (
           <Link className="quick-action-card" href="/compliance">
-            <strong>Compliance &amp; MLR Oversight</strong>
-            <p>Supervise AML risk ratings, sanctions screening, and SRA compliance audits.</p>
+            <strong>Compliance &amp; AML Oversight</strong>
+            <p>Review AML risk ratings, sanctions screening, and compliance work.</p>
           </Link>
         )}
 
         {canViewFinance && (
           <Link className="quick-action-card" href="/finance">
-            <strong>SRA Financial Ledgers</strong>
+            <strong>Finance Workspace</strong>
             <p>Review client and office bank balances, disbursements, and unallocated receipts.</p>
           </Link>
         )}
@@ -113,51 +120,54 @@ export default async function HomePage() {
 
       <hr className="rule" />
 
-      {/* Active Matters Summary */}
-      <h2>Recent matters</h2>
-      {matters.length === 0 ? (
-        <div className="inset-text">
-          <p>You are on no matter team yet.</p>
-          <p className="secondary" style={{ marginBottom: 0 }}>
-            To open an instruction, navigate to a client record or register a new client.
-          </p>
-        </div>
-      ) : (
-        <table className="table">
-          <caption className="secondary">
-            Showing up to 5 most recent matters assigned to your teams.
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Reference</th>
-              <th scope="col">Title</th>
-              <th scope="col">Client</th>
-              <th scope="col">Type</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {matters.slice(0, 5).map((matter) => (
-              <tr key={matter.id}>
-                <td>
-                  <strong>{matter.reference}</strong>
-                </td>
-                <td>
-                  <Link href={`/matters/${matter.id}`}>{matter.title}</Link>
-                </td>
-                <td>{matter.client.name}</td>
-                <td>{MATTER_TYPE_LABELS[matter.matterType]}</td>
-                <td>
-                  <StatusTag variant={statusToVariant(matter.status)}>
-                    {MATTER_STATUS_LABELS[matter.status]}
-                  </StatusTag>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Recent matters summary */}
+      {mattersRes.status === 200 && (
+        <>
+          <h2>Recent matters</h2>
+          {matters.length === 0 ? (
+            <div className="inset-text">
+              <p>You are on no matter team yet.</p>
+              <p className="secondary" style={{ marginBottom: 0 }}>
+                To open an instruction, navigate to a client record or register a new client.
+              </p>
+            </div>
+          ) : (
+            <table className="table">
+              <caption className="secondary">
+                Showing up to 5 most recent matters assigned to your teams.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Reference</th>
+                  <th scope="col">Title</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matters.slice(0, 5).map((matter) => (
+                  <tr key={matter.id}>
+                    <td>
+                      <strong>{matter.reference}</strong>
+                    </td>
+                    <td>
+                      <Link href={`/matters/${matter.id}`}>{matter.title}</Link>
+                    </td>
+                    <td>{matter.client.name}</td>
+                    <td>{MATTER_TYPE_LABELS[matter.matterType]}</td>
+                    <td>
+                      <StatusTag variant={statusToVariant(matter.status)}>
+                        {MATTER_STATUS_LABELS[matter.status]}
+                      </StatusTag>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
-
     </>
   );
 }

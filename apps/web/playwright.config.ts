@@ -81,7 +81,7 @@ export default defineConfig({
       command: 'npm run start -- --port 3100',
       url: `${E2E_WEB_URL}/sign-in`,
       reuseExistingServer: false,
-      env: { API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'Stass' },
+      env: { NODE_ENV: 'production', API_URL: `http://127.0.0.1:${E2E_API_PORT}`, APP_NAME: 'Stass' },
     },
     {
       // Nothing listens on 3109: every call to the API is refused, as when it is down.
@@ -89,7 +89,7 @@ export default defineConfig({
       command: 'npm run start -- --port 3102',
       port: 3102,
       reuseExistingServer: false,
-      env: { API_URL: 'http://127.0.0.1:3109', APP_NAME: 'Stass' },
+      env: { NODE_ENV: 'production', API_URL: 'http://127.0.0.1:3109', APP_NAME: 'Stass' },
     },
   ],
 });

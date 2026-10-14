@@ -148,6 +148,14 @@ active staff can use. Step 16a adds this separate matrix:
 | `hr.retention` - define rules, schedule records, manage holds and run disposal | | | | | | ✓ |
 | `hr.export` - prepare, review and download fixed HR bundles | | | | | | ✓ |
 
+The AI module adds a separate least-privilege matrix:
+
+| Permission | Administrator | Partner | Fee earner | Accounts | Compliance | HR |
+|---|---:|---:|---:|---:|---:|---:|
+| `ai.use` - generate matter summaries, chronologies and draft correspondence | | ✓ | ✓ | | | |
+| `ai.manage_config` - configure providers, models and token limits | | ✓ | | | | |
+| `ai.audit` - inspect AI audit events, token metrics and review statistics | | ✓ | | | ✓ | |
+
 Self-service does not grant `hr.manage`. The database binds `/hr/me` to the
 caller's account and `/hr/reports/:personId` to the current effective reporting
 line. A former manager loses access on the next request. Administrator and
