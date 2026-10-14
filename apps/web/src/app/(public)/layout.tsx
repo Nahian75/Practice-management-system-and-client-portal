@@ -8,8 +8,9 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <header className="header">
-        <div className="header-inner">
-          <div className="header-brand-wrap">
+        <div className="header-primary">
+          <div className="header-inner">
+            <div className="header-brand-wrap">
             <span className="header-crest" aria-hidden="true">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3v18" />
@@ -20,13 +21,14 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
               </svg>
             </span>
             <span className="header-name">{appName()}</span>
+            </div>
           </div>
         </div>
       </header>
-      <PhaseBanner phase="SECURE SIGN-IN">
+      <PhaseBanner phase="Secure sign-in">
         Use only the invitation or account issued to you by the practice.
       </PhaseBanner>
-      <main id="main" className="main">
+      <main id="main" className="main main-public">
         {children}
       </main>
       <Footer />

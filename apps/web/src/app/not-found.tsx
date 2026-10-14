@@ -9,10 +9,12 @@ export default function NotFound() {
   return (
     <>
       <header className="header">
-        <div className="header-inner">
-          <Link className="header-name" href="/">
-            {appName()}
-          </Link>
+        <div className="header-primary">
+          <div className="header-inner">
+            <Link className="header-name" href="/">
+              {appName()}
+            </Link>
+          </div>
         </div>
       </header>
       <main id="main" className="main">

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 /** A short description of the current application area. */
 export function PhaseBanner({
-  phase = 'STAFF WORKSPACE',
+  phase = 'Staff workspace',
   children,
 }: {
   phase?: string;
