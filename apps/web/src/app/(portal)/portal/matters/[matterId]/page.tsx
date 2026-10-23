@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { apiGet } from '@/lib/api';
 import { CATEGORY_LABELS, formatSize } from '@/lib/documents';
 import { formatDate } from '@/lib/format';
@@ -74,6 +75,11 @@ export default async function PortalMatterPage({
         {matter.reference} &middot; {MATTER_STATUS_LABELS[matter.status]}
       </span>
       <h1>{matter.title}</h1>
+      <HowTo>
+        <li>&ldquo;Team&rdquo; shows who at the firm is working on your matter.</li>
+        <li>&ldquo;Documents&rdquo; lists the files the firm has shared with you. Select one to download it.</li>
+        <li>For questions, contact a person named in the team.</li>
+      </HowTo>
       {matter.status === 'closed' && (
         <div className="notice">
           <p>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import type { ClientSummary } from '@/lib/clients';
@@ -26,6 +27,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <h1>Clients</h1>
+      <HowTo>
+        <li>Search first, so you do not create the same client twice.</li>
+        <li>Select &ldquo;Create a client&rdquo; to add a new person or company. The conflict check runs as part of this.</li>
+        <li>Select a client&rsquo;s name to see their details, contacts and matters.</li>
+        <li>On a client&rsquo;s page, select &ldquo;Open a matter&rdquo; to start new work for them.</li>
+      </HowTo>
       <div className="actions">
         <Link className="button" href="/clients/new">
           Create a client

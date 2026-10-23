@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, currentAccount } from '@/lib/api';
 import { CATEGORY_LABELS, contentPath, formatSize, type DocumentDetails } from '@/lib/documents';
@@ -52,6 +53,12 @@ export default async function DocumentPage({ params }: { params: Promise<{ docum
       )}
       <span className="caption">{CATEGORY_LABELS[document.category]}</span>
       <h1>{document.title}</h1>
+      <HowTo>
+        <li>Select &ldquo;Download&rdquo; next to a version to get the file. Every download is recorded.</li>
+        <li>Use &ldquo;Add a new version&rdquo; when the file changes. Earlier versions are kept.</li>
+        <li>Use &ldquo;Client sharing&rdquo; to let the client see the latest version in their portal.</li>
+        <li>If it was added by mistake, withdraw it with a reason. This cannot be undone.</li>
+      </HowTo>
 
       {document.withdrawal && (
         <div className="notice">

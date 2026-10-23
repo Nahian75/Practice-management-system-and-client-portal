@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
@@ -32,6 +33,12 @@ export default async function HrWorkspacePage() {
   ]);
   const names = new Map(directoryResult.body.people.filter((item) => item.personId).map((item) => [item.personId!, item.displayName]));
   return <><h1>HR workspace</h1>
+    <HowTo>
+      <li>Each section lists what is waiting for you, such as leave to approve or right-to-work checks due.</li>
+      <li>Select a person&rsquo;s name to open their record and act on it.</li>
+      <li>Use the links at the top for the directory, retention and exports.</li>
+      <li>You see only the sections your HR role allows.</li>
+    </HowTo>
     <p className="secondary">Personnel administration and evidence. Account roles, client ownership and other modules remain with their owners.</p>
     <nav aria-label="HR sections" className="section-nav"><ul><li><Link href="/people">People directory</Link></li>
       {access.canManageRetention && <li><Link href="/hr/retention">Retention and disposal</Link></li>}

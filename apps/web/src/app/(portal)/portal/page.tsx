@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { apiGet } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { MATTER_STATUS_LABELS, MATTER_TYPE_LABELS, TEAM_ROLE_LABELS } from '@/lib/matters';
@@ -40,6 +41,12 @@ export default async function PortalMattersPage({ searchParams }: { searchParams
 
   return (
     <>
+      <HowTo>
+        <li>Anything the firm needs from you, such as a payment, a signature or evidence, appears at the top.</li>
+        <li>Select a matter&rsquo;s title to see who is working on it and the documents shared with you.</li>
+        <li>Select a document to download it.</li>
+        <li>If something is unclear, contact a person named in the matter&rsquo;s team.</li>
+      </HowTo>
       <PortalPaymentRequests requests={paymentRequests} />
       <PortalEngagementDocuments documents={engagementDocs} />
       <EvidenceRequests requests={requests} />

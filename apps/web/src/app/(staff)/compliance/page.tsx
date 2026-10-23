@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import type { ComplianceAccess, ComplianceHold, RetentionScheduleSummary, ReviewQueueItem,
@@ -29,6 +30,12 @@ export default async function CompliancePage() {
 
   return <>
     <h1>Compliance</h1>
+    <HowTo>
+      <li>Check the &ldquo;Sanctions list&rdquo; box. &ldquo;Action required&rdquo; means the list needs updating.</li>
+      <li>Open each possible sanctions match and decide whether it is the same person.</li>
+      <li>Open each matter under &ldquo;Matter reviews&rdquo; to clear it or keep it on hold.</li>
+      <li>Use the links at the top for policies, retention, exports and AI records.</li>
+    </HowTo>
     <p className="secondary">Firm-wide AML and sanctions work. Stass records evidence and decisions; it does not make a legal or reporting decision.</p>
     <nav aria-label="Compliance sections" className="section-nav"><ul>
       <li><Link href="/policies">Firm policies</Link></li>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
@@ -35,6 +36,12 @@ export default async function FinancePage() {
   const bankNames = new Map(banks.body.bankAccounts.map((bank) => [bank.id, `${bank.name} •••• ${bank.lastFour}`]));
   return <>
     <h1>Finance</h1>
+    <HowTo>
+      <li>Check &ldquo;Deadlines&rdquo; first. Anything marked Overdue needs action today.</li>
+      <li>Each section lists work waiting: draft bills, payment requests, statements and reconciliations.</li>
+      <li>Select any item to open it and see the next step you can take.</li>
+      <li>Client money is checked by a second person, so a request you make waits for approval.</li>
+    </HowTo>
     <p className="secondary">GBP records only. Stass records authority and bank-confirmed outcomes; it does not move money.</p>
     <section aria-labelledby="deadlines-heading">
       <h2 id="deadlines-heading">Deadlines</h2>

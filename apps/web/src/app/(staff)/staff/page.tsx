@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { ACCOUNT_STATUS_LABELS, STAFF_ROLE_LABELS, type StaffMember } from '@/lib/staff';
@@ -15,6 +16,11 @@ export default async function StaffPage() {
   return (
     <>
       <h1>Staff</h1>
+      <HowTo>
+        <li>Select &ldquo;Invite someone&rdquo; to give a new colleague an account. They get an email to set their password.</li>
+        <li>Select a name to change that person&rsquo;s roles or account status.</li>
+        <li>Roles decide what each person can see and do, so give only the roles they need.</li>
+      </HowTo>
       <div className="actions">
         <Link className="button" href="/staff/invite">
           Invite someone

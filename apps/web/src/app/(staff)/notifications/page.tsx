@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { apiGet } from '@/lib/api';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
 import { NOTIFICATION_KIND_LABELS, type NotificationPage } from '@/lib/notifications';
@@ -30,6 +31,11 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <>
       <h1>Notifications</h1>
+      <HowTo>
+        <li>Each notification is about a task given to you or changed.</li>
+        <li>Select the task title to open it and do the work.</li>
+        <li>Select &ldquo;Older notifications&rdquo; at the bottom to see earlier ones.</li>
+      </HowTo>
       {body.notifications.length === 0 ? (
         <p>You have no notifications.</p>
       ) : (

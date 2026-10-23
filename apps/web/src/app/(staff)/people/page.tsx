@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { apiGet } from '@/lib/api';
 import { hasHrWorkspace, type HrAccess, type HrCaseSummary, type HrDirectoryMember } from '@/lib/hr';
 
@@ -14,6 +15,11 @@ export default async function PeoplePage() {
   return <>
     <h1>People</h1>
     <p className="secondary">Your work directory and private employment self-service.</p>
+    <HowTo>
+      <li>Select &ldquo;My record&rdquo; to see your own details, request leave or ask for a correction.</li>
+      <li>If you manage people, select &ldquo;My team&rdquo; to see them.</li>
+      <li>Use the directory below to find a colleague&rsquo;s team and work email.</li>
+    </HowTo>
     <nav aria-label="People sections" className="section-nav"><ul>
       {access.body.personId && <li><Link href="/people/me">My record</Link></li>}
       {access.body.reportCount > 0 && <li><Link href="/people/team">My team ({access.body.reportCount})</Link></li>}

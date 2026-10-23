@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { clientName, type Client } from '@/lib/clients';
@@ -131,6 +132,12 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
         {client.reference} · {CLIENT_KIND_LABELS[client.kind]}
       </span>
       <h1>{clientName(client)}</h1>
+      <HowTo>
+        <li>Check the details below are right. Select &ldquo;Change details&rdquo; to correct them.</li>
+        <li>Complete &ldquo;Identity and due diligence&rdquo; before work starts: matters stay blocked until it is cleared.</li>
+        <li>Select &ldquo;Open a matter&rdquo; to start a new piece of work for this client.</li>
+        <li>Their existing matters are listed at the bottom.</li>
+      </HowTo>
       <div className="actions">
         <Link href={`/clients/${client.id}/edit`}>Change details</Link>
         {client.kind === 'organisation' && <Link href={`/clients/${client.id}/contacts/new`}>Add a contact</Link>}

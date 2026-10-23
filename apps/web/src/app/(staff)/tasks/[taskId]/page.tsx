@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet, currentAccount } from '@/lib/api';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
@@ -42,6 +43,12 @@ export default async function TaskPage({ params }: { params: Promise<{ taskId: s
         {TASK_STATUS_LABELS[task.status]} · {TASK_PRIORITY_LABELS[task.priority]} priority
       </span>
       <h1>{task.title}</h1>
+      <HowTo>
+        <li>Use &ldquo;Change status&rdquo; when you start or finish the task.</li>
+        <li>Use &ldquo;Reassign task&rdquo; to give it to someone else on the team.</li>
+        <li>Use &ldquo;Change task details&rdquo; to correct the title, description, priority or due date.</li>
+        <li>Every change is listed under &ldquo;History&rdquo;.</li>
+      </HowTo>
 
       {matter.status === 'closed' && (
         <div className="notice">

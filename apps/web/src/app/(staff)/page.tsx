@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HowTo } from '@/components/how-to';
 import { apiGet, currentAccount } from '@/lib/api';
 import type { ClientSummary } from '@/lib/clients';
 import { MATTER_STATUS_LABELS, MATTER_TYPE_LABELS, type MatterSummary } from '@/lib/matters';
@@ -52,6 +53,13 @@ export default async function HomePage() {
           <StatusTag variant="purple">Matter-based access</StatusTag>
         </div>
       </div>
+
+      <HowTo>
+        <li>Use the menu at the top to move between sections.</li>
+        <li>Choose one of the common practice actions to start everyday work.</li>
+        <li>Open a recent matter to carry on where you left off.</li>
+        <li>Check Notifications for tasks given to you.</li>
+      </HowTo>
 
       {/* Key Practice Performance Metrics */}
       <div className="metric-grid">

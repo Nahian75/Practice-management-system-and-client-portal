@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { HowTo } from '@/components/how-to';
 import { apiGet } from '@/lib/api';
 import { formatCalendarDate, formatDateTime } from '@/lib/format';
 import { POLICY_KIND_LABELS, type PolicyVersion, type StaffPolicy } from '@/lib/policies';
@@ -19,6 +20,11 @@ export default async function PoliciesPage() {
 
   return <>
     <h1>Firm policies</h1>
+    <HowTo>
+      <li>Read each policy on this page.</li>
+      <li>Select &ldquo;Acknowledge this version&rdquo; to confirm you have read it.</li>
+      <li>Do this before the due date shown next to the button.</li>
+    </HowTo>
     <p className="secondary">Approved policies that apply to your work. Acknowledging a policy records that you received this exact version; it does not replace required training.</p>
     {!mine.body.policies.length ? <p>No approved effective policies are available.</p> : mine.body.policies.map((policy) =>
       <section key={policy.id} aria-labelledby={`policy-${policy.id}`}><h2 id={`policy-${policy.id}`}>{policy.title}</h2>

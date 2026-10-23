@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { NoAccess } from '@/components/no-access';
 import { apiGet } from '@/lib/api';
 import { MATTER_STATUS_LABELS, MATTER_TYPE_LABELS, type MatterSummary } from '@/lib/matters';
@@ -31,6 +32,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     <>
       <h1>Matters</h1>
       <p>To open a matter, go to the client&rsquo;s page.</p>
+      <HowTo>
+        <li>A matter is one piece of work for a client, such as a house purchase or a dispute.</li>
+        <li>You see only the matters whose team you are on.</li>
+        <li>Select a matter&rsquo;s title to add documents and tasks and to record time.</li>
+        <li>To start a new matter, open the client and select &ldquo;Open a matter&rdquo;.</li>
+      </HowTo>
       {matters.length === 0 ? (
         <p>You are on no matter team yet.</p>
       ) : (
