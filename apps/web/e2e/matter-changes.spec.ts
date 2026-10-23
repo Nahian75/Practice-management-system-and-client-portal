@@ -101,6 +101,11 @@ test('compliance looks at a matter with a reason, and its supervising partner se
   test.slow();
   const partner = await apiSessionFor(request, ['partner']);
   const matter = await openMatter(partner.api, partner.accountId);
+  const lease = Buffer.from('%PDF-1.7\n% signed lease\n%%EOF\n', 'ascii');
+  const added = await partner.api.post(`/api/matters/${matter.id}/documents`, {
+    multipart: { title: 'Signed lease', category: 'contract', file: { name: 'lease.pdf', mimeType: 'application/pdf', buffer: lease } },
+  });
+  expect(added.status()).toBe(201);
   await signedInStaff(page, request, ['compliance']);
 
   await page.goto('/matters');
@@ -120,6 +125,15 @@ test('compliance looks at a matter with a reason, and its supervising partner se
   await expect(page.getByRole('heading', { name: matter.title })).toBeVisible();
   await expect(page.getByText('Read-only. This look has been recorded')).toBeVisible();
   await noAxeViolations(page);
+  await page.getByLabel('Document', { exact: true }).selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Download' }).click();
+  await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('Give a reason of 10 to 500 characters');
+  await page.getByLabel('Why you need this document').fill('Checking the signed lease after the complaint');
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download' }).click();
+  expect((await downloading).suggestedFilename()).toBe('lease.pdf');
+  await expect(page.getByText('Downloaded “Signed lease”. The download and its reason were recorded.')).toBeVisible();
+  await expect(page.getByLabel('Why you need this document')).toHaveValue('');
   await page.reload();
   await expect(page.getByRole('heading', { name: matter.title })).toHaveCount(0);
 
@@ -128,6 +142,7 @@ test('compliance looks at a matter with a reason, and its supervising partner se
   await signIn(partnerPage, partner.staff);
   await partnerPage.goto(`/matters/${matter.id}`);
   await expect(partnerPage.getByRole('row', { name: /Complaint received about this file/ })).toBeVisible();
+  await expect(partnerPage.getByRole('row', { name: /Downloaded “Signed lease”, version 1 Checking the signed lease/ })).toBeVisible();
   await partnerContext.close();
 });
 

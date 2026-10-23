@@ -758,6 +758,120 @@ describe('hourly upload allowance (review D4)', () => {
     });
   });
 
+  describe('compliance access to documents, a reason for each download', () => {
+    const REASON = 'Complaint received about this file';
+    let officer: TestAccount;
+    let officerToken: string;
+    let reference: string;
+
+    const downloadWithReason = (sessionToken: string, documentId: string, body: object = { reason: REASON }, number = 1) =>
+      request(app.getHttpServer())
+        .post(`/documents/${documentId}/versions/${number}/compliance-downloads`)
+        .set('Cookie', cookie(sessionToken))
+        .send(body)
+        .buffer(true)
+        .parse((response, done) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => done(null, Buffer.concat(chunks)));
+        });
+    const accessesTo = (matter: string) =>
+      db.selectFrom('matter_compliance_accesses').select(['accessed_by', 'reason', 'document_version_id']).where('matter_id', '=', matter).execute();
+
+    beforeEach(async () => {
+      officer = await staffWith('compliance');
+      officerToken = await signedIn(officer);
+      ({ reference } = await db.selectFrom('matters').select('reference').where('id', '=', matterId).executeTakeFirstOrThrow());
+    });
+
+    it("lists the matter's documents with the matter, read through the access", async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      const looked = await request(app.getHttpServer())
+        .post('/matter-compliance-accesses')
+        .set('Cookie', cookie(officerToken))
+        .send({ matterReference: reference, reason: REASON });
+
+      expect(looked.status).toBe(200);
+      expect(looked.body.documents).toEqual([expect.objectContaining({ id: added.body.id, title: 'Signed lease', latest: expect.objectContaining({ number: 1 }) })]);
+    });
+
+    it('sends the exact file, records the download as its own access, and tells the supervising partner', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      const response = await downloadWithReason(officerToken, added.body.id);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(PDF);
+      expect(response.headers).toMatchObject({ 'content-disposition': expect.stringMatching(/^attachment;/), 'content-security-policy': "default-src 'none'; sandbox" });
+      const [access] = await accessesTo(matterId);
+      expect(access).toEqual({ accessed_by: officer.id, reason: REASON, document_version_id: expect.any(String) });
+      const events = await db
+        .selectFrom('audit_events')
+        .select(['action', 'metadata'])
+        .where('actor_id', '=', officer.id)
+        .where('action', 'in', ['matter.accessed_with_reason', 'document.downloaded'])
+        .orderBy('occurred_at')
+        .execute();
+      expect(events).toEqual([
+        { action: 'matter.accessed_with_reason', metadata: { accessId: expect.any(String), documentId: added.body.id, version: 1 } },
+        { action: 'document.downloaded', metadata: { matterId, version: 1, accessId: events[0]?.metadata.accessId } },
+      ]);
+      expect(JSON.stringify(events)).not.toContain('Complaint');
+      expect(await waitForEmailWithSubject(partner.email, `Compliance downloaded a document from ${reference}`)).toBeDefined();
+    });
+
+    it('shows the supervising partner which document was downloaded, and why', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await downloadWithReason(officerToken, added.body.id);
+
+      const listed = await request(app.getHttpServer()).get(`/matters/${matterId}/compliance-accesses`).set('Cookie', cookie(await signedIn(partner)));
+
+      expect(listed.body.accesses).toEqual([expect.objectContaining({ reason: REASON, document: { id: added.body.id, title: 'Signed lease', version: 1 } })]);
+    });
+
+    it('needs a reason for every download, and grants nothing lasting', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await downloadWithReason(officerToken, added.body.id);
+
+      expect((await downloadWithReason(officerToken, added.body.id, {})).status).toBe(400);
+      expect((await downloadWithReason(officerToken, added.body.id, { reason: 'audit' })).status).toBe(400);
+      expect((await request(app.getHttpServer()).get(`/documents/${added.body.id}/versions/1/content`).set('Cookie', cookie(officerToken))).status).toBe(403);
+      expect(await accessesTo(matterId)).toHaveLength(1);
+    });
+
+    it('refuses a withdrawn document and a version that does not exist, recording no access', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      await request(app.getHttpServer())
+        .post(`/documents/${added.body.id}/withdrawal`)
+        .set('Cookie', cookie(token))
+        .send({ reason: 'Uploaded to the wrong matter by mistake' });
+
+      expect((await downloadWithReason(officerToken, added.body.id)).status).toBe(410);
+      expect((await downloadWithReason(officerToken, randomUUID())).status).toBe(404);
+      expect(await accessesTo(matterId)).toEqual([]);
+    });
+
+    it.each(['partner', 'fee_earner', 'administrator'] as const)('is closed to %s', async (role) => {
+      const added = await upload(token, PDF, 'lease.pdf');
+
+      expect((await downloadWithReason(await signedIn(await staffWith(role)), added.body.id)).status).toBe(403);
+    });
+
+    it('is refused by the database for a version of another matter', async () => {
+      const added = await upload(token, PDF, 'lease.pdf');
+      const { id: versionId } = await db.selectFrom('document_versions').select('id').where('document_id', '=', added.body.id).executeTakeFirstOrThrow();
+      const otherMatterId = (await openMatter(token)).id;
+
+      await expect(
+        db
+          .insertInto('matter_compliance_accesses')
+          .values({ matter_id: otherMatterId, accessed_by: officer.id, reason: REASON, document_version_id: versionId })
+          .execute(),
+      ).rejects.toThrow(/document of its own matter only/);
+    });
+  });
+
   describe('POST /documents/:id/versions', () => {
     const addVersion = (sessionToken: string, documentId: string, file: Buffer, fileName: string) =>
       request(app.getHttpServer()).post(`/documents/${documentId}/versions`).set('Cookie', cookie(sessionToken)).attach('file', file, fileName);

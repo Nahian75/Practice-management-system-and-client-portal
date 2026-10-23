@@ -192,7 +192,14 @@ partner. Built in 8g (migration `0022`):
 - `matter.accessed_with_reason` records the access id; the reason stays with
   the access. The supervising partner is emailed (matter reference only) and
   sees every access, with its reason, at `GET /matters/:id/compliance-accesses`.
+- The answer also lists the matter's documents (newest 100, latest version
+  each), read through the same access. Downloading one needs its own reason:
+  `POST /documents/:id/versions/:number/compliance-downloads` records a new
+  access naming that version (migration `0076`; the database checks the
+  version belongs to the matter), then sends the file. The supervising partner
+  sees which document was downloaded, and is emailed.
 - At most 30 accesses per person per hour (review M4); the 31st gets 429.
+  Downloads count towards it.
   Reaching the limit is recorded once an hour and emailed to every other
   compliance holder and administrator.
 
@@ -284,7 +291,8 @@ unchanged.
 | POST | `/matters/:id/supervisor` | `matters.supervise` + supervising partner | `{accountId}`: hand supervision to another partner |
 | POST | `/matter-supervision-takeovers` | `matters.supervise` | `{matterReference, reason}`: take over from a supervising partner who can no longer act |
 | POST | `/matters/:id/close` | `matters.supervise` + supervising partner | `{reason}` |
-| POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}`: the matter, read-only, for that request |
+| POST | `/matter-compliance-accesses` | `matters.access_with_reason` | `{matterReference, reason}`: the matter and its documents, read-only, for that request |
+| POST | `/documents/:id/versions/:number/compliance-downloads` | `matters.access_with_reason` | `{reason}`: one download, recorded as its own access |
 | GET | `/matters/:id/compliance-accesses` | `matters.supervise` + supervising partner | Every compliance access, with its reason |
 | GET | `/clients/:id/matters` | `clients.view` + client visibility | The client's matters you can see |
 | GET | `/colleagues` | `matters.open` | Who can be put on a team: active partners and fee earners, with name and whether each is a partner. No email addresses or other roles |

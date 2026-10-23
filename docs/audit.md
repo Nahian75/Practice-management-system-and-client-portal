@@ -48,11 +48,45 @@ Each module adds its events as it is built. Required by the engineering rules:
 | Backdated or forged entries | `pms_app` may insert only the descriptive columns. `id` and `occurred_at` always come from the database |
 | Junk or oversized entries | Check constraints on every column |
 | An action succeeds but its audit entry is lost | `AuditService.record` accepts the caller's transaction, so the action and its audit entry commit or roll back together |
+| A database superuser disables the triggers and edits, deletes or rebuilds history | Hash chain with a daily checkpoint emailed outside the database: see below |
 
-**Not yet covered:** a database superuser can still disable triggers. Detecting
-that needs tamper evidence outside the database's control (a hash chain
-anchored externally, or shipping events to write-once storage). Planned
-before production.
+## Tamper evidence
+
+Decided by the project owner: a hash chain, with its latest link emailed to
+compliance daily (migration `0077`).
+
+- **Sealing.** Every minute the API seals each committed event not yet sealed:
+  `app.audit_seals` row `n` holds SHA-256 of seal `n-1` and the event's
+  content as stored (`src/audit/chain/audit-digest.ts`). Seals are numbered
+  1, 2, 3 with no gaps, and are append-only like the events. Sealing runs
+  outside the transactions that write events, so it never slows them down.
+  One sealer at a time, across API instances (advisory lock).
+- **Checkpoint.** At 09:00 London each day the latest seal is recorded in
+  `app.audit_checkpoints` and emailed to every compliance holder, in one
+  transaction: `Audit log checkpoint for <date>`, with the seal number and
+  fingerprint. The emails are the copy a superuser cannot reach.
+- **Checking.** `npm run audit:verify -w @practice/api -- --checkpoint <seq>:<fingerprint>`
+  (`:local` to read `.env`) recomputes every seal in Node, independently of
+  any database function, and exits 1 on any problem:
+  - an event changed or removed (its seal no longer matches);
+  - a gap or reordering in the seals;
+  - a checkpoint from an email that the chain no longer matches, or that is
+    past its end: the chain was rebuilt or cut after that email;
+  - an event over an hour old with no seal.
+
+  Give it the checkpoints from as many emails as you have; the oldest proves
+  the most.
+
+**Limits:**
+- Events written in the minute before sealing can be removed by a superuser
+  without trace. The window is a minute, not forever.
+- A forged event inserted by a superuser is sealed like any other. The chain
+  proves history was not changed or removed, not that every event is genuine.
+- An event whose transaction stays open for over an hour after it was written
+  is never sealed (`shortcut:` in `audit-chain.service.ts`); the check reports
+  it.
+- The check is run by hand. Run it at least monthly, and before giving the log
+  to a regulator.
 
 ## Rules for callers
 

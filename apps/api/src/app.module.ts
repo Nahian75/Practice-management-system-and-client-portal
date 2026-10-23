@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from '@nestjs/common';
+import { AuditChainModule } from './audit/chain/audit-chain.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ConfigModule } from './config/config.module.js';
 import type { Env } from './config/env.js';
@@ -22,7 +23,7 @@ export class AppModule {
   static forRoot(env: Env): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule, HrModule, OnboardingModule, AiModule],
+      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, AuditChainModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule, HrModule, OnboardingModule, AiModule],
     };
   }
 }

@@ -783,6 +783,15 @@ input[type='file'].input {
   margin-bottom: 0;
 }
 
+.how-to summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.how-to ol {
+  margin: var(--space-2) 0 0;
+}
+
 .notice-warning,
 .notice-overdue,
 .notice-error {

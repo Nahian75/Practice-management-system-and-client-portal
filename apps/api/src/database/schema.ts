@@ -40,6 +40,20 @@ export interface AuditEventsTable {
 
 export type AuditMetadataValue = string | number | boolean | null;
 
+export interface AuditSealsTable {
+  seq: InsertOnly<string>;
+  event_id: InsertOnly<string>;
+  hash: InsertOnly<Buffer>;
+  sealed_at: DatabaseSet<Date>;
+}
+
+export interface AuditCheckpointsTable {
+  london_date: InsertOnly<string>;
+  seq: InsertOnly<string>;
+  hash: InsertOnly<Buffer>;
+  created_at: DatabaseSet<Date>;
+}
+
 export type EmailKind =
   | 'account_invitation'
   | 'password_reset'
@@ -563,6 +577,8 @@ export interface MatterComplianceAccessesTable {
   accessed_by: InsertOnly<string>;
   reason: InsertOnly<string>;
   accessed_at: DatabaseSet<Date>;
+  /** Set when the access is one download of this version. */
+  document_version_id: InsertOnly<string | null>;
 }
 
 export type DocumentCategory = 'correspondence' | 'contract' | 'evidence' | 'identity' | 'court' | 'other';
@@ -1758,7 +1774,9 @@ export interface Database {
   aml_officer_appointments: AmlOfficerAppointmentsTable;
   aml_training_completions: AmlTrainingCompletionsTable;
   policy_acknowledgements: PolicyAcknowledgementsTable;
+  audit_checkpoints: AuditCheckpointsTable;
   audit_events: AuditEventsTable;
+  audit_seals: AuditSealsTable;
   backup_codes: BackupCodesTable;
   bank_account_closures: BankAccountClosuresTable;
   bank_accounts: BankAccountsTable;

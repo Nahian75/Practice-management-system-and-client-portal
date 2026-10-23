@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { HowTo } from '@/components/how-to';
 import { ConflictResults } from '@/components/conflict-results';
 import { MatterDetails } from '@/components/matter-details';
 import { NoAccess } from '@/components/no-access';
@@ -73,6 +74,12 @@ export default async function MatterPage({
         {matter.reference} · {MATTER_STATUS_LABELS[matter.status]}
       </span>
       <h1>{matter.title}</h1>
+      <HowTo>
+        <li>Check &ldquo;Compliance clearance&rdquo; first. Some work is blocked until the matter is cleared.</li>
+        <li>Use &ldquo;Add a document&rdquo; to upload a file. Open a document to share it with the client.</li>
+        <li>Use &ldquo;Add a task&rdquo; to give work to someone on the team, with a due date.</li>
+        <li>Use &ldquo;Record time&rdquo; to log the time you spent, so it can be billed.</li>
+      </HowTo>
       {!closed && (
         <div className="actions">
           <Link href={`/matters/${matter.id}/edit`}>Change details</Link>
@@ -163,6 +170,7 @@ export default async function MatterPage({
                 <tr>
                   <th scope="col">When</th>
                   <th scope="col">Who</th>
+                  <th scope="col">What</th>
                   <th scope="col">Reason</th>
                 </tr>
               </thead>
@@ -171,6 +179,7 @@ export default async function MatterPage({
                   <tr key={access.id}>
                     <td>{formatDateTime(access.accessedAt)}</td>
                     <td>{access.accessedBy.displayName}</td>
+                    <td>{access.document ? <>Downloaded &ldquo;{access.document.title}&rdquo;, version {access.document.version}</> : 'Opened the matter'}</td>
                     <td>{access.reason}</td>
                   </tr>
                 ))}
