@@ -40,15 +40,17 @@ export default async function HomePage() {
 
   return (
     <>
-      <span className="caption">Practice Overview &middot; England &amp; Wales</span>
-      <h1>Home</h1>
-      <p>You are signed in as {account?.displayName}.</p>
-
-      {/* Jurisdiction and access-boundary tags */}
-      <div className="actions" style={{ marginBottom: 'var(--space-4)' }}>
-        <StatusTag variant="blue">England &amp; Wales</StatusTag>
-        <StatusTag variant="green">Role-based access</StatusTag>
-        <StatusTag variant="purple">Matter-based access</StatusTag>
+      <div className="dashboard-heading">
+        <div>
+          <span className="caption">Practice overview &middot; England &amp; Wales</span>
+          <h1>Good day, {account?.displayName}</h1>
+          <p className="secondary">Your operational overview and priority work.</p>
+        </div>
+        <div className="dashboard-assurance" aria-label="Workspace access">
+          <StatusTag variant="blue">England &amp; Wales</StatusTag>
+          <StatusTag variant="green">Role-based access</StatusTag>
+          <StatusTag variant="purple">Matter-based access</StatusTag>
+        </div>
       </div>
 
       {/* Key Practice Performance Metrics */}

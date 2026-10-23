@@ -13,7 +13,9 @@ export default async function SignInPage() {
 
   return (
     <>
+      <span className="caption">Secure account access</span>
       <h1>Sign in</h1>
+      <p className="secondary">Access your practice workspace or client portal.</p>
       <SignInForm />
     </>
   );
