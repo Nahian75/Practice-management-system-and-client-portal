@@ -1,0 +1,82 @@
+# Runs on every push to main and every pull request. GitHub Actions is free
+# for this: public repositories have no minute limit, private ones 2,000 a month.
+# Actions are pinned to a full commit, as docker images are pinned by digest.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Secrets, hygiene and types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history, so the secret scan sees every commit, as the local hook cannot be skipped here.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --fail --silent --show-error --location --output "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
+          ./gitleaks git --redact --no-banner
+      - run: npm ci
+      - run: npm run check:hidden-characters
+      - run: npm run check:production-hygiene
+      - run: npm run check:dependency-age
+      - run: npm run typecheck -w @practice/api
+      - run: npm run typecheck -w @practice/web
+
+  api-tests:
+    name: API tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Throwaway secrets for this run
+        run: |
+          secret() { node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"; }
+          for name in POSTGRES_PASSWORD PMS_OWNER_PASSWORD PMS_APP_PASSWORD DOCUMENTS_S3_ACCESS_KEY DOCUMENTS_S3_SECRET_KEY; do
+            value="$(secret)"
+            echo "::add-mask::${value}"
+            echo "${name}=${value}" >> .env
+            echo "${name}=${value}" >> "$GITHUB_ENV"
+          done
+      - name: Start PostgreSQL, Mailpit, SeaweedFS and ClamAV
+        # ClamAV downloads its virus definitions on first start, which takes a few minutes.
+        run: docker compose up --detach --wait --wait-timeout 900
+      - run: npm ci
+      - name: Run the API tests
+        working-directory: apps/api
+        run: |
+          export TEST_DATABASE_URL="postgres://pms_app:${PMS_APP_PASSWORD}@127.0.0.1:5432/pms_test"
+          export TEST_MIGRATION_DATABASE_URL="postgres://pms_owner:${PMS_OWNER_PASSWORD}@127.0.0.1:5432/pms_test"
+          export TEST_MAILPIT_URL="http://127.0.0.1:8025"
+          npm test
