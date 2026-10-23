@@ -24,7 +24,7 @@ export async function signIn(page: Page, staff: TestStaff): Promise<void> {
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Security code').fill(nextBackupCode(staff));
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
 }
 
 /** A new staff member with these roles, signed in in the browser. */

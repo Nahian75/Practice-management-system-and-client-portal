@@ -29,8 +29,7 @@ test('signs in with a password and an authenticator code, and signs out', async 
   await enterCode(page, await nextTotp(staff.secret));
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-  await expect(page.getByText(`You are signed in as ${staff.displayName}.`)).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Good day, ${staff.displayName}` })).toBeVisible();
 
   const signedOut = page.waitForResponse('**/api/auth/sign-out');
   await page.getByRole('button', { name: 'Sign out' }).click();
@@ -46,7 +45,7 @@ test('signs in with a backup code', async ({ page, request }) => {
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[0] ?? '');
 
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
 });
 
 test("shows the API's message for a wrong password, and moves focus to it", async ({ page, request }) => {
@@ -102,7 +101,7 @@ test('keeps nothing in browser storage, and the session cookie out of reach of s
   const staff = await createStaff(request);
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[1] ?? '');
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
 
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
   expect(await page.evaluate(() => document.cookie)).toBe('');
@@ -117,6 +116,6 @@ test('has no accessibility problems axe can find on the sign-in and home pages',
   const staff = await createStaff(request);
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[2] ?? '');
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
 });

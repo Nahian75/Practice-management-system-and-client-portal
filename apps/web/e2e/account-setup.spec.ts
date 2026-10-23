@@ -45,7 +45,7 @@ test.describe('accepting an invitation', () => {
 
     await page.getByRole('link', { name: /sign in/ }).click();
     await signIn(page, invited.email, password, codes[0] ?? '');
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
   });
 
   test('lists every reason the API gives for refusing a password', async ({ page }) => {
@@ -100,7 +100,7 @@ test.describe('resetting a password', () => {
     await expect(page.getByText('Your password has been changed')).toBeVisible();
 
     await signIn(page, staff.email, newPassword, staff.backupCodes[0] ?? '');
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
 

@@ -27,7 +27,7 @@ test('sends clients to their portal and keeps staff and client pages separate', 
   await signedInStaff(page, request);
   await page.goto('/portal');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good day/ })).toBeVisible();
 });
 
 test('shows safe matter details and only the latest shared document, which downloads exactly', async ({ page, request }) => {
