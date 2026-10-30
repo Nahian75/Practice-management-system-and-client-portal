@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1141.0",
-    "@aws-sdk/lib-storage": "3.1141.0",
+    "@aws-sdk/lib-storage": "3.1156.0",
     "@nestjs/common": "12.3.2",
     "@nestjs/core": "12.3.2",
     "@nestjs/platform-express": "12.3.2",
