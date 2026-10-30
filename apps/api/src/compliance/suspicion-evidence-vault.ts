@@ -1,3 +1,4 @@
+import { secretBoxFor } from '../common/crypto/key-ring.js';
 import { randomUUID } from 'node:crypto';
 import type { Readable, Transform } from 'node:stream';
 import { Inject, Injectable } from '@nestjs/common';
@@ -14,7 +15,7 @@ export class SuspicionEvidenceVault {
   private readonly keys: SecretBox;
 
   constructor(private readonly storage: ObjectStorage, @Inject(ENV) env: Env) {
-    this.keys = new SecretBox(Buffer.from(env.SUSPICION_ENCRYPTION_KEY, 'base64'), 1);
+    this.keys = secretBoxFor(env, 'SUSPICION');
   }
 
   async store(plaintext: Readable): Promise<StoredSuspicionEvidence> {

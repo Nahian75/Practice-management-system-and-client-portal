@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { createStaff, emailedToken, inviteStaff, totp } from './support/staff';
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
@@ -8,10 +8,10 @@ const noAxeViolations = async (page: Page) => expect((await new AxeBuilder({ pag
 async function signIn(page: Page, email: string, password: string, code: string) {
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Security code').fill(code);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
 }
 
 test.describe('accepting an invitation', () => {
@@ -33,6 +33,13 @@ test.describe('accepting an invitation', () => {
     await page.getByLabel('Type it again').fill(password);
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('img', { name: 'QR code for your authenticator app' })).toBeVisible();
+    // Moving between steps must not reuse the password input as a visible code input.
+    await expect(page.getByLabel('Code from the app')).toHaveValue('');
+    await expect(page.getByLabel('Code from the app')).toHaveAttribute('autocomplete', 'one-time-code');
+    await expect(page.getByRole('heading', { name: 'Enter the app’s code here in Stass' })).toBeVisible();
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('not your password');
+    await page.getByText('Can’t scan the QR code?', { exact: true }).click();
     const secret = (await page.locator('code.secret').textContent())?.replaceAll(' ', '') ?? '';
     await noAxeViolations(page);
 
@@ -45,7 +52,7 @@ test.describe('accepting an invitation', () => {
 
     await page.getByRole('link', { name: /sign in/ }).click();
     await signIn(page, invited.email, password, codes[0] ?? '');
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
   });
 
   test('lists every reason the API gives for refusing a password', async ({ page }) => {
@@ -85,7 +92,7 @@ test.describe('resetting a password', () => {
   test('changes the password from the emailed link; the old one stops working', async ({ page, request }) => {
     const staff = await createStaff(request);
     await page.goto('/sign-in');
-    await page.getByRole('link', { name: 'Forgot your password?' }).click();
+    await page.getByRole('link', { name: 'Forgot password?' }).click();
     await page.getByLabel('Email address').fill(staff.email);
     await page.getByRole('button', { name: 'Send the link' }).click();
     const token = await emailedToken(staff.email, '/reset-password');
@@ -100,12 +107,12 @@ test.describe('resetting a password', () => {
     await expect(page.getByText('Your password has been changed')).toBeVisible();
 
     await signIn(page, staff.email, newPassword, staff.backupCodes[0] ?? '');
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
 
     await page.getByLabel('Email address').fill(staff.email);
-    await page.getByLabel('Password').fill(staff.password);
+    await page.getByLabel('Password', { exact: true }).fill(staff.password);
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('Email or password is incorrect');
   });

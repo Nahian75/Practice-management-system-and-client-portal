@@ -1701,7 +1701,19 @@ export interface AiReviewsTable {
   reviewed_at: DatabaseSet<Date>;
 }
 
+export interface CalendarEventsTable {
+  id: DatabaseSet<string>; created_by: InsertOnly<string>; matter_id: InsertOnly<string|null>;
+  title: InsertOnly<string>; description: InsertOnly<string|null>; starts_at: InsertOnly<Date>; ends_at: InsertOnly<Date>;
+  created_at: DatabaseSet<Date>;
+}
+export interface CalendarEventCancellationsTable {
+  event_id: InsertOnly<string>; cancelled_by: InsertOnly<string>; cancelled_at: DatabaseSet<Date>;
+}
+
 export interface Database {
+  performance_preferences: { account_id: InsertOnly<string>; daily_target_minutes: Writable<number|null>; updated_at: DatabaseSet<Date> };
+  calendar_events: CalendarEventsTable;
+  calendar_event_cancellations: CalendarEventCancellationsTable;
   ai_configurations: AiConfigurationsTable;
   ai_requests: AiRequestsTable;
   ai_drafts: AiDraftsTable;

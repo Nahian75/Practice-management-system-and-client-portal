@@ -1,3 +1,4 @@
+import {keyParameters} from '../common/crypto/key-ring.js';
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module.js';
 import { AuthModule } from '../auth/auth.module.js';
@@ -25,12 +26,12 @@ import { ReconciliationService } from './reconciliation.service.js';
     {
       provide: BankAccountCipher,
       inject: [ENV],
-      useFactory: (env: Env) => new BankAccountCipher(Buffer.from(env.FINANCE_ENCRYPTION_KEY, 'base64')),
+      useFactory: (env: Env) => new BankAccountCipher(...keyParameters(env, 'FINANCE')),
     },
     {
       provide: PaymentDetailsCipher,
       inject: [ENV],
-      useFactory: (env: Env) => new PaymentDetailsCipher(Buffer.from(env.FINANCE_ENCRYPTION_KEY, 'base64')),
+      useFactory: (env: Env) => new PaymentDetailsCipher(...keyParameters(env, 'FINANCE')),
     },
     FinanceRepository,
     FinanceService,

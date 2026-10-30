@@ -64,6 +64,11 @@ export function requireVerifiedTlsInProduction<Key extends string>(key: Key) {
 
 const envSchema = z
   .object({
+    ENCRYPTION_KEY_VERSION:z.coerce.number().int().min(1).max(64).optional(),
+    PREVIOUS_ENCRYPTION_KEYS:z.string().transform((value,ctx)=>{
+      if(value==='')return {};
+      try{return JSON.parse(value) as unknown;}catch{ctx.addIssue({code:'custom',message:'must be valid key-ring JSON'});return z.NEVER;}
+    }).pipe(z.partialRecord(z.enum(['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT']),z.record(z.string().regex(/^[1-9]\d?$/),encryptionKeySchema))).optional(),
     NODE_ENV: nodeEnvSchema,
     HOST: z.string().min(1).default('127.0.0.1'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -106,6 +111,12 @@ const envSchema = z
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
   .superRefine((env, ctx) => {
+    const version=env.ENCRYPTION_KEY_VERSION??1;
+    for(const purpose of ['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT'] as const){
+      const previous=env.PREVIOUS_ENCRYPTION_KEYS?.[purpose]??{};
+      if(version>1&&!previous['1'])ctx.addIssue({code:'custom',path:['PREVIOUS_ENCRYPTION_KEYS'],message:`must retain the original ${purpose} key for existing records and fingerprints`});
+      for(const [old,key] of Object.entries(previous))if(Number(old)>=version||key===env[`${purpose}_ENCRYPTION_KEY`])ctx.addIssue({code:'custom',path:['PREVIOUS_ENCRYPTION_KEYS'],message:'previous keys must have older versions and differ from current keys'});
+    }
     for (const key of ['TOTP_ENCRYPTION_KEY','MAIL_ENCRYPTION_KEY','FINANCE_ENCRYPTION_KEY','DOCUMENT_ENCRYPTION_KEY'] as const) {
       if (env.AML_ENCRYPTION_KEY === env[key]) {
         ctx.addIssue({ code:'custom', path:['AML_ENCRYPTION_KEY'], message:`must be separate from ${key}` });

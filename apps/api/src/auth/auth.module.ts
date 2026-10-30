@@ -1,3 +1,4 @@
+import { secretBoxFor } from '../common/crypto/key-ring.js';
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module.js';
 import { SecretBox } from '../common/crypto/secret-box.js';
@@ -35,7 +36,6 @@ import { TwoFactorSignInService } from './two-factor/two-factor-sign-in.service.
 import { TwoFactorService } from './two-factor/two-factor.service.js';
 import { SecurityRetentionService } from './retention/security-retention.service.js';
 
-const CURRENT_KEY_VERSION = 1;
 
 @Module({
   imports: [DatabaseModule, AuditModule, PasswordsModule, MailModule],
@@ -58,7 +58,7 @@ const CURRENT_KEY_VERSION = 1;
     {
       provide: SecretBox,
       inject: [ENV],
-      useFactory: (env: Env) => new SecretBox(Buffer.from(env.TOTP_ENCRYPTION_KEY, 'base64'), CURRENT_KEY_VERSION),
+      useFactory: (env: Env) => secretBoxFor(env, 'TOTP'),
     },
     TotpCredentialsRepository,
     TwoFactorService,

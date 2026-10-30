@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { follow, noAxeViolations, unique } from './support/checks';
 import { apiSessionFor, signedInStaff } from './support/session';
 import { emailedToken } from './support/staff';
@@ -10,7 +10,8 @@ test('an administrator invites someone, then gives them a role', async ({ page, 
   await signedInStaff(page, request, ['administrator']);
   const email = `e2e-invite-${unique()}@example.com`;
 
-  await follow(page, page.getByRole('link', { name: 'Staff' }));
+  await follow(page, page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings', exact: true }));
+  await follow(page, page.getByRole('link', { name: /Users & permissions/ }));
   await noAxeViolations(page);
   await follow(page, page.getByRole('link', { name: 'Invite someone' }));
   await noAxeViolations(page);

@@ -16,13 +16,14 @@ import { ComplianceModule } from './compliance/compliance.module.js';
 import { HrModule } from './hr/hr.module.js';
 import { OnboardingModule } from './onboarding/onboarding.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { WorkspaceModule } from './workspace/workspace.module.js';
 
 @Module({})
 export class AppModule {
   static forRoot(env: Env): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule, HrModule, OnboardingModule, AiModule],
+      imports: [ConfigModule.forRoot(env), DatabaseModule, AuthModule, HealthModule, StaffModule, ClientsModule, MattersModule, DocumentsModule, PortalModule, NotificationsModule, TasksModule, FinanceModule, ComplianceModule, HrModule, OnboardingModule, AiModule, WorkspaceModule],
     };
   }
 }

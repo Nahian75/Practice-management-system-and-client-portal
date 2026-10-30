@@ -258,12 +258,15 @@ process before it accepts any request.
 | 2026-10-14 | People / HR module | [reviews/2026-10-14-hr.md](reviews/2026-10-14-hr.md) |
 | 2026-10-14 | AI & Legal Drafting Assistant | [reviews/2026-10-14-ai.md](reviews/2026-10-14-ai.md) |
 
-Pre-production security items closed (Step 19):
-- **F2 (Edge Reverse Proxy & Rate Limiting):** Closed. Production Nginx and Caddy reverse proxy configurations in `infra/proxy/` enforce 52 MB streaming upload limits on document/evidence routes, 1 MB default limits, connection limits, and sign-in brute-force rate limits.
-- **F3 (Ephemeral Security Retention):** Closed. Migration `0075_security_ephemeral_retention.sql`, `SecurityRetentionService`, and CLI command `retention:sweep` purge expired sessions, sign-in failures, password resets, invitations, and completed email outbox rows.
-- **C6 (Encrypted Storage & Backups):** Closed. [docs/disaster-recovery.md](disaster-recovery.md) specifies AES-256 block encryption, continuous WAL archiving, RPO ≤ 15 min, RTO ≤ 4 hr, dual-region UK residency, immutable WORM backups, and the post-restore disposal replay procedure.
-- **Authentication F5:** Closed by the persistent email outbox in [Notifications step 13a](notifications.md).
-- **Production Hygiene Gate:** Enforced via `npm run check:production-hygiene`.
+Implementation notes (production evidence remains pending):
+- **F2 (Edge Reverse Proxy & Rate Limiting):** Payload boundaries are configured in the supplied proxies; shared application rate limits now cover IP, authentication, recovery and accounts. Actual provider edge/origin protections still need verification.
+- **F3 (Ephemeral Security Retention):** Migration `0075_security_ephemeral_retention.sql`, `SecurityRetentionService`, and `retention:sweep` purge eligible ephemeral records. Migration 0078 adds bounded rate-limit buckets and pruning. Verify deployed scheduling and alerts.
+- **C6 (Encrypted Storage & Backups):** The local encrypted logical restore drill passes. Production WAL/PITR, object/key recovery, immutable backups, achieved RPO/RTO and disposal replay are not established by documentation. Follow the corrected [recovery runbook](disaster-recovery.md) and obtain provider evidence and officer approval.
+- **Authentication F5:** Persistent encrypted outbox delivery is implemented; actual production SMTP and inbox delivery need verification.
+- **Production Hygiene Gate:** Available via `npm run check:production-hygiene` and the configured CI workflow; repository branch protection and successful CI execution remain pending.
+
+See the [current remediation report](reviews/2026-10-30-security-remediation.md)
+and [operational release gates](security-operations.md) before using live client data.
 
 Local demo conveniences that must not reach production (to fix before
 deploying): `code.bat` and `scripts/demo-code.mjs`, which show the current

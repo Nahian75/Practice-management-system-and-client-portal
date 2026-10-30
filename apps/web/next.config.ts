@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
+import { resolve } from 'node:path';
 
 const config: NextConfig = {
+  output: process.env.CONTAINER_BUILD === '1' ? 'standalone' : undefined,
+  outputFileTracingRoot: resolve(process.cwd(), '../..'),
   // The framework is not advertised in a header.
   poweredByHeader: false,
   reactStrictMode: true,

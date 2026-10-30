@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/logo-mark';
 import { appName } from '@/config';
 
 /** Identifies the application without making claims about the firm's regulatory status. */
@@ -9,25 +10,7 @@ export function Footer() {
       <div className="footer-inner">
         <div className="footer-meta">
           <div className="footer-meta-item">
-            <div className="footer-crest" aria-hidden="true">
-              {/* Scales of Justice & British law heraldic emblem */}
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3v18" />
-                <path d="M6 7h12" />
-                <path d="M4 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                <path d="M16 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                <path d="M4 21h16" />
-              </svg>
-            </div>
+            <LogoMark className="logo-mark-footer" />
             <div className="footer-details">
               <p className="footer-title">{appName()} Practice Management System</p>
               <p className="footer-regulatory">

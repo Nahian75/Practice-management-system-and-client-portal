@@ -6,7 +6,7 @@ import { ErrorSummary } from '@/components/error-summary';
 import { DateFields, dateFrom } from '@/components/fields';
 import { messagesOf, postJson } from '@/lib/requests';
 
-export function TimeEntryForm({ matterId }: { matterId: string }) {
+export function TimeEntryForm({ matterId,initialMinutes }: { matterId: string;initialMinutes?:number }) {
   const router = useRouter();
   const [errors, setErrors] = useState<string[]>();
   const [saved, setSaved] = useState(false);
@@ -29,7 +29,7 @@ export function TimeEntryForm({ matterId }: { matterId: string }) {
     try {
       const response = await postJson(`/api/matters/${encodeURIComponent(matterId)}/time-entries`, { workedOn, minutes, description });
       if (!response.ok) { setErrors(response.status === 400 ? ['Check the time entry details'] : await messagesOf(response)); return; }
-      formElement.reset(); setSaved(true); router.refresh();
+      await response.json(); formElement.reset(); setSaved(true); window.dispatchEvent(new Event('stass-time-recorded')); router.refresh();
     } finally { setSending(false); }
   }
 
@@ -41,7 +41,7 @@ export function TimeEntryForm({ matterId }: { matterId: string }) {
       <DateFields name="workedOn" legend="Work date" hint="For example 9 10 2026" />
       <div className="field">
         <label className="label" htmlFor="minutes">Minutes</label>
-        <input className="input input-short" id="minutes" name="minutes" inputMode="numeric" />
+        <input className="input input-short" id="minutes" name="minutes" inputMode="numeric" defaultValue={initialMinutes} />
       </div>
       <div className="field">
         <label className="label" htmlFor="timeDescription">Work description</label>

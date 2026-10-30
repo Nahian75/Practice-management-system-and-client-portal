@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+[[allowlists]]
+description = "Exact adjacent migration identifiers in the generated schema diagram"
+regexTarget = "match"
+regexes = ['''0005_totp_credentials[",\s]+0006_two_factor_sign_in''']

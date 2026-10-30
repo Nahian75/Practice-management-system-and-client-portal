@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { noAxeViolations, randomName } from './support/checks';
 import { clientWithMatter, signInClient } from './support/client';
 import { isoDay } from './support/compliance';
@@ -356,6 +356,9 @@ test('records fee estimate with budget ceiling, requests deposit on account, cli
   await page.getByLabel('Payment type').selectOption('deposit_on_account');
   await page.getByLabel(/Amount \(£\)/).fill('500.00');
   await page.getByLabel('Description').fill('Deposit on account for search disbursements');
+  await expect(page.getByLabel('Account name', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Sort code', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Account number', { exact: true })).toHaveValue('');
   await page.getByRole('button', { name: 'Create Payment Request' }).click();
 
   await expect(page.getByText('Initial payment request created successfully.')).toBeVisible();
@@ -372,9 +375,10 @@ test('records fee estimate with budget ceiling, requests deposit on account, cli
   await expect(page.getByText('Awaiting your payment')).toBeVisible();
 
   await page.getByRole('button', { name: 'View bank transfer details' }).click();
-  await expect(page.getByText('How to pay by UK Bank Transfer')).toBeVisible();
-  await expect(page.getByText('Stass Law Client Account')).toBeVisible();
-  await expect(page.getByText('20-00-00')).toBeVisible();
+  await expect(page.getByText('Bank transfer details are not available.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Stass Law Client Account')).toHaveCount(0);
+  await expect(page.getByText('20-00-00')).toHaveCount(0);
+  await expect(page.getByText('55667788')).toHaveCount(0);
 
   // 5. Staff records payment receipt with bank reference
   await signIn(page, feeEarner.staff);
@@ -385,8 +389,8 @@ test('records fee estimate with budget ceiling, requests deposit on account, cli
   await page.getByLabel('Audit notes').fill('Matched to Barclays client account statement');
   await page.getByRole('button', { name: 'Confirm Receipt' }).click();
 
-  await expect(page.getByText('Payment receipt successfully recorded and reconciled.')).toBeVisible();
-  await expect(page.getByText('Paid & reconciled')).toBeVisible();
+  await expect(page.getByText('Payment receipt successfully recorded.')).toBeVisible();
+  await expect(page.getByText('Payment recorded', { exact: true })).toBeVisible();
   await expect(page.getByText(/Ref: BACS-998811/)).toBeVisible();
 
   await noAxeViolations(page);

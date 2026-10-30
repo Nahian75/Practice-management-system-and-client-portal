@@ -1,7 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { E2E_NO_API_WEB_URL } from '../playwright.config';
 import { noAxeViolations } from './support/checks';
 import { signedInStaff } from './support/session';
+import {createServer} from 'node:http';
+
+// These dependency-failure cases temporarily own the same loopback port.
+test.describe.configure({mode:'serial'});
 
 test('an address with no page says so, in plain words', async ({ page }) => {
   const response = await page.goto('/no-such-page');
@@ -34,3 +38,19 @@ test('when the API is down, a page shows only a reference, never the error', asy
   }
   await noAxeViolations(page);
 });
+
+for(const status of [429,503]){
+  test(`API ${status} shows a retry page rather than a false sign-out`,async({page})=>{
+    const api=createServer((_request,response)=>{
+      response.writeHead(status,{'content-type':'application/json'});
+      response.end(JSON.stringify({message:'synthetic dependency failure'}));
+    });
+    await new Promise<void>(resolve=>api.listen(3109,'127.0.0.1',resolve));
+    try{
+      await page.goto(`${E2E_NO_API_WEB_URL}/`);
+      await expect(page.getByRole('heading',{name:'Sorry, there is a problem with the service'})).toBeVisible();
+      await expect(page.getByRole('heading',{name:'Sign in to your account'})).toHaveCount(0);
+      await expect(page.getByText('synthetic dependency failure')).toHaveCount(0);
+    }finally{await new Promise<void>((resolve,reject)=>api.close(error=>error?reject(error):resolve()));}
+  });
+}

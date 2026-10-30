@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Module, type INestApplication } from '@nestjs/common';
 import type { Kysely } from 'kysely';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestAccount, setAccountStatus, type TestAccount } from '../../../test/accounts.js';
 import { createTestApp } from '../../../test/create-test-app.js';
 import { FakeClock, HOUR_MS, MINUTE_MS } from '../../../test/fake-clock.js';
@@ -159,6 +159,25 @@ describe('Password reset', () => {
   });
 
   describe('completing', () => {
+    it.each(['hash', 'revocation', 'notice'] as const)('preserves the link, password and sessions if %s fails', async (failure) => {
+      const token = await resetToken();
+      const sessions = app.get(SessionsService);
+      const existing = await sessions.start(account, 'authenticated', {});
+      const spy = failure === 'hash' ? vi.spyOn(app.get(PasswordHasher), 'hash').mockRejectedValueOnce(new Error('Injected failure')) :
+        failure === 'revocation' ? vi.spyOn(sessions, 'endAllForAccount').mockRejectedValueOnce(new Error('Injected failure')) :
+        vi.spyOn(app.get(MailOutbox), 'enqueueInTransaction').mockRejectedValueOnce(new Error('Injected failure'));
+      try {
+        expect((await completeReset(token, NEW_PASSWORD)).status).toBe(500);
+        expect(await sessions.resolve(existing)).toBeDefined();
+        const stored = await db.selectFrom('accounts').select('password_hash').where('id', '=', account.id).executeTakeFirstOrThrow();
+        expect(await app.get(PasswordHasher).verify(OLD_PASSWORD, stored.password_hash!)).toBe(true);
+        const reset = await db.selectFrom('password_resets').select('closed_at').where('token_hash', '=', hashOpaqueToken(token)).executeTakeFirstOrThrow();
+        expect(reset.closed_at).toBeNull();
+      } finally { spy.mockRestore(); }
+      expect((await completeReset(token, NEW_PASSWORD)).status).toBe(204);
+      expect(await sessions.resolve(existing)).toBeUndefined();
+    });
+
     it('changes the password: the new one works and the old one does not', async () => {
       const token = await resetToken();
 

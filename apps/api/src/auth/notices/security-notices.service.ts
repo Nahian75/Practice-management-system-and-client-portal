@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, type Clock } from '../../common/time/clock.js';
 import type { StaffRole } from '../../database/schema.js';
+import type { Database } from '../../database/schema.js';
+import type { Kysely } from 'kysely';
 import { MailOutbox } from '../../mail/mail-outbox.js';
 import { AccountsRepository } from '../accounts/accounts.repository.js';
 import { SENSITIVE_ROLES } from '../permissions/permissions.js';
@@ -32,7 +34,7 @@ export class SecurityNoticesService {
     ]);
   }
 
-  async passwordChanged(accountId: string): Promise<void> {
+  async passwordChanged(accountId: string, executor?: Kysely<Database>): Promise<void> {
     const when = this.clock.now().toUTCString();
     await this.notify(accountId, 'Your password was changed', (name) => [
       `Hello ${name},`,
@@ -41,7 +43,7 @@ export class SecurityNoticesService {
       'Everyone signed in to your account has been signed out.',
       '',
       'If you did not do this, contact the firm immediately.',
-    ]);
+    ], executor);
   }
 
   /**
@@ -286,13 +288,13 @@ export class SecurityNoticesService {
     return account ? `by ${account.display_name}` : 'by the system';
   }
 
-  private async notify(accountId: string, subject: string, lines: (name: string) => string[]): Promise<void> {
-    const account = await this.accounts.findById(accountId);
+  private async notify(accountId: string, subject: string, lines: (name: string) => string[], executor?: Kysely<Database>): Promise<void> {
+    const account = await this.accounts.findById(accountId, executor);
     if (account) {
-      await this.outbox.enqueue(
-        { to: account.email, subject, text: lines(account.display_name).join('\n') },
-        { kind: 'security_notice', recipientAccountId: account.id },
-      );
+      const message = { to: account.email, subject, text: lines(account.display_name).join('\n') };
+      const options = { kind: 'security_notice' as const, recipientAccountId: account.id };
+      if (executor) await this.outbox.enqueueInTransaction(message, options, executor);
+      else await this.outbox.enqueue(message, options);
     }
   }
 }

@@ -1,3 +1,4 @@
+import { secretBoxFor } from '../common/crypto/key-ring.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { SecretBox, type SealedSecret } from '../common/crypto/secret-box.js';
 import { ENV } from '../config/config.module.js';
@@ -11,7 +12,7 @@ export class SuspicionDataCipher {
   private readonly box: SecretBox;
 
   constructor(@Inject(ENV) env: Env) {
-    this.box = new SecretBox(Buffer.from(env.SUSPICION_ENCRYPTION_KEY, 'base64'), 1);
+    this.box = secretBoxFor(env, 'SUSPICION');
   }
 
   seal(value: unknown, context: string): SealedSuspicionData {

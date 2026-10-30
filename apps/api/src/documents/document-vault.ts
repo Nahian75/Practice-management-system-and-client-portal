@@ -1,3 +1,4 @@
+import { secretBoxFor } from '../common/crypto/key-ring.js';
 import { randomUUID } from 'node:crypto';
 import type { Readable, Transform } from 'node:stream';
 import { Inject, Injectable } from '@nestjs/common';
@@ -7,7 +8,6 @@ import type { Env } from '../config/env.js';
 import { DecryptingStream, EncryptingStream, newFileKey } from './file-cipher.js';
 import { ObjectStorage } from './object-storage.js';
 
-const MASTER_KEY_VERSION = 1;
 
 export interface StoredFile {
   storageKey: string;
@@ -28,7 +28,7 @@ export class DocumentVault {
     private readonly storage: ObjectStorage,
     @Inject(ENV) env: Env,
   ) {
-    this.keys = new SecretBox(Buffer.from(env.DOCUMENT_ENCRYPTION_KEY, 'base64'), MASTER_KEY_VERSION);
+    this.keys = secretBoxFor(env, 'DOCUMENT');
   }
 
   /** Encrypts `plaintext` as it streams into storage, under a new key and a new random storage key. */

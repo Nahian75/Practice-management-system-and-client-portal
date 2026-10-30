@@ -4,6 +4,8 @@ Stass is a security-focused practice management system and client portal for leg
 
 > **Project status:** local development and evaluation. The repository includes production architecture and deployment guidance, but no hosted production environment is provided.
 
+Current verification: [security fixes and remaining production requirements](docs/reviews/2026-10-30-security-remediation.md).
+
 ## What it includes
 
 - Client onboarding, contacts, conflict checks, engagement documents, and matter activation gates
@@ -39,6 +41,8 @@ The browser only talks to the Next.js application. The NestJS API owns business 
 
 See [Architecture](docs/architecture.md), [Security](docs/security.md), and [Data model](docs/data-model.md) for the detailed design.
 
+The staff prototype now follows a Clio Manage-inspired workspace structure. See the [design and feature comparison](docs/clio-manage-design-and-features.md) for implemented workflows, current limits and remaining gaps.
+
 ## Requirements
 
 - Node.js 24
@@ -49,6 +53,8 @@ See [Architecture](docs/architecture.md), [Security](docs/security.md), and [Dat
 
 ## Local setup
 
+For managed hosting, use the [Render deployment guide](docs/render-hosting.md) and root `render.yaml`. For a Linux server, use the [single-server hosting guide](docs/easy-hosting.md) and `sh host.sh`. The Windows scripts below are for local development.
+
 1. Clone and install dependencies.
 
    ```powershell
@@ -57,7 +63,15 @@ See [Architecture](docs/architecture.md), [Security](docs/security.md), and [Dat
    npm ci
    ```
 
-2. Create the three local environment files.
+2. Generate the three local environment files with separate random passwords and encryption keys.
+
+   ```powershell
+   npm.cmd run setup:local
+   ```
+
+   This leaves existing configuration unchanged and refuses to replace keys in a partially configured installation. The generated files are ignored by Git. Keep them for future starts: the database and encrypted records depend on the same passwords and keys.
+
+   For manual configuration instead, copy the templates:
 
    ```powershell
    Copy-Item .env.example .env
@@ -65,7 +79,7 @@ See [Architecture](docs/architecture.md), [Security](docs/security.md), and [Dat
    Copy-Item apps/web/.env.example apps/web/.env.local
    ```
 
-3. Fill every required value. Use different random values for every password and encryption key. The comments in each example file include generation commands and explain which values must match.
+3. If you copied the templates manually, fill every required value. Use different random values for every password and encryption key. The comments in each example file include generation commands and explain which values must match. The setup command above fills these values automatically for local use.
 
 4. Start the application.
 
@@ -126,6 +140,7 @@ The end-to-end suite builds both applications, recreates an isolated `pms_e2e` d
 
 - [System manual (PDF)](docs/Stass_Practice_Management_System_Manual.pdf)
 - [API](docs/api.md)
+- [Database design](docs/database-design.md) and [interactive schema explorer](docs/database-design.html)
 - [Authentication](docs/authentication.md) and [authorization](docs/authorization.md)
 - [Client portal](docs/portal.md)
 - [Documents and document security](docs/documents.md)

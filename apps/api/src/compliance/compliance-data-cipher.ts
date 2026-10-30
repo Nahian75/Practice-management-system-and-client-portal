@@ -1,3 +1,4 @@
+import { secretBoxFor } from '../common/crypto/key-ring.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { SecretBox, type SealedSecret } from '../common/crypto/secret-box.js';
 import { ENV } from '../config/config.module.js';
@@ -9,7 +10,7 @@ export interface SealedComplianceData extends SealedSecret { context: string }
 @Injectable()
 export class ComplianceDataCipher {
   private readonly box: SecretBox;
-  constructor(@Inject(ENV) env: Env) { this.box = new SecretBox(Buffer.from(env.AML_ENCRYPTION_KEY, 'base64'), 1); }
+  constructor(@Inject(ENV) env: Env) { this.box = secretBoxFor(env, 'AML'); }
 
   seal(value: unknown, context: string): SealedComplianceData {
     return { context, ...this.box.seal(Buffer.from(JSON.stringify(value), 'utf8'), context) };

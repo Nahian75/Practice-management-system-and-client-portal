@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { COUNTRY_CODES as API_COUNTRY_CODES } from '../../api/src/common/validation/country-codes';
 import { COUNTRY_CODES as WEB_COUNTRY_CODES } from '../src/lib/country-codes';
 import { follow, noAxeViolations, unique, watchForCspViolations } from './support/checks';
@@ -9,10 +9,10 @@ test('creates an individual client and shows the details in UK form', async ({ p
   await signedInStaff(page, request);
   const family = `Doe${unique()}`;
 
-  await page.getByRole('link', { name: 'Clients' }).click();
-  await expect(page.getByRole('link', { name: 'Clients' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Contacts', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Contacts', exact: true })).toHaveAttribute('aria-current', 'page');
   await noAxeViolations(page);
-  await follow(page, page.getByRole('link', { name: 'Create a client' }));
+  await follow(page, page.getByRole('link', { name: 'New contact' }));
   await noAxeViolations(page);
 
   await page.getByLabel('Given names').fill('Jane');
@@ -37,7 +37,7 @@ test('creates an individual client and shows the details in UK form', async ({ p
   expect(answer.headers()['cache-control'], 'API answers through the pass-through are not kept (review W2)').toBe('no-store');
   await noAxeViolations(page);
 
-  await page.getByRole('link', { name: 'Clients' }).click();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Contacts', exact: true }).click();
   await expect(page.getByRole('link', { name: `Jane ${family}` })).toBeVisible();
   expect(violations).toEqual([]);
 });
@@ -103,8 +103,9 @@ test("finds another person's client by name, but cannot open it, nor take it ove
   await signedInStaff(page, request);
 
   await page.goto('/clients');
+  await page.getByText('Find a client across the firm', { exact: true }).click();
   await page.getByLabel('Name or reference').fill(name);
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('region', { name: 'Find a client', exact: true }).getByRole('button', { name: 'Search', exact: true }).click();
   await page.getByRole('link', { name: `Alex ${name}` }).click();
 
   await expect(page).toHaveURL(new RegExp(`/clients/${id}$`));
@@ -118,8 +119,9 @@ test('asks for at least 2 characters to search', async ({ page, request }) => {
   await signedInStaff(page, request);
   await page.goto('/clients');
 
+  await page.getByText('Find a client across the firm', { exact: true }).click();
   await page.getByLabel('Name or reference').fill('a');
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('region', { name: 'Find a client', exact: true }).getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('Enter at least 2 characters');
 });

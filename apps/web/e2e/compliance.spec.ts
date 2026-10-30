@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from './support/test';
 import { noAxeViolations, randomName } from './support/checks';
 import { apiSessionFor, signedInStaff } from './support/session';
 import { openMatter } from './support/matters';

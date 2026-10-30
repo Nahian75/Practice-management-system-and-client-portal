@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { noAxeViolations } from './support/checks';
 import { clientSession, clientWithMatter, signInClient } from './support/client';
 import { signedInStaff } from './support/session';
@@ -27,7 +27,7 @@ test('sends clients to their portal and keeps staff and client pages separate', 
   await signedInStaff(page, request);
   await page.goto('/portal');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
 });
 
 test('shows safe matter details and only the latest shared document, which downloads exactly', async ({ page, request }) => {

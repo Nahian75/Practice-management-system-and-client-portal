@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+psql -U postgres -d pms -v ON_ERROR_STOP=1 -v owner_password="$PMS_OWNER_PASSWORD" -v app_password="$PMS_APP_PASSWORD" <<'SQL'
+CREATE ROLE pms_owner LOGIN PASSWORD :'owner_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+CREATE ROLE pms_app LOGIN PASSWORD :'app_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 50;
+ALTER ROLE pms_owner SET search_path=app,extensions;
+ALTER ROLE pms_app SET search_path=app,extensions;
+ALTER ROLE pms_app SET statement_timeout='15s';
+ALTER ROLE pms_app SET idle_in_transaction_session_timeout='30s';
+REVOKE ALL ON DATABASE pms FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT CONNECT ON DATABASE pms TO pms_owner,pms_app;
+CREATE SCHEMA app AUTHORIZATION pms_owner;
+GRANT USAGE ON SCHEMA app TO pms_app;
+CREATE SCHEMA migrations AUTHORIZATION pms_owner;
+ALTER DEFAULT PRIVILEGES FOR ROLE pms_owner IN SCHEMA app GRANT SELECT,INSERT ON TABLES TO pms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE pms_owner IN SCHEMA app GRANT USAGE ON SEQUENCES TO pms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE pms_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+CREATE SCHEMA extensions;
+REVOKE ALL ON SCHEMA extensions FROM PUBLIC;
+GRANT USAGE ON SCHEMA extensions TO pms_owner,pms_app;
+CREATE EXTENSION pg_trgm SCHEMA extensions;
+CREATE EXTENSION unaccent SCHEMA extensions;
+SQL

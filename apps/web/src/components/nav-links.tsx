@@ -1,57 +1,15 @@
 'use client';
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { WorkspaceIcon } from './workspace-icon';
 
-const LINKS = [
-  { href: '/', label: 'Home' },
-  { href: '/clients', label: 'Clients' },
-  { href: '/matters', label: 'Matters' },
-  { href: '/people', label: 'People' },
-  { href: '/policies', label: 'Policies' },
-  { href: '/hr', label: 'HR workspace' },
-  { href: '/finance', label: 'Finance' },
-  { href: '/compliance', label: 'Compliance' },
-  { href: '/report-concern', label: 'Report a concern' },
-  { href: '/notifications', label: 'Notifications' },
-  { href: '/staff', label: 'Staff' },
-] as const;
-
-/** The main sections. The current one is marked for screen readers as well as by sight. */
-export function NavLinks({ unreadCount, canViewFinance, canViewCompliance, complianceAttention, canViewHr }:
-  { unreadCount: number; canViewFinance: boolean; canViewCompliance: boolean; complianceAttention: number;
-    canViewHr: boolean }) {
-  const pathname = usePathname();
-
-  return (
-    <nav aria-label="Main" className="nav">
-      <ul>
-        {LINKS.filter(({ href }) => (href !== '/finance' || canViewFinance) &&
-          (href !== '/compliance' || canViewCompliance) && (href !== '/hr' || canViewHr)).map(({ href, label }) => {
-          const current = href === '/' ? pathname === '/' : pathname.startsWith(href);
-          const notifications = href === '/notifications';
-          const compliance = href === '/compliance';
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={current ? 'page' : undefined}
-                aria-label={
-                  notifications
-                    ? `Notifications, ${unreadCount} unread`
-                    : compliance
-                      ? `Compliance, ${complianceAttention} ordinary actions require attention`
-                      : undefined
-                }
-              >
-                <span>{label}</span>
-                {notifications && unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
-                {compliance && complianceAttention > 0 && <span className="nav-badge">{complianceAttention}</span>}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
+export function NavLinks({unreadCount,canViewFinance,canViewCompliance,complianceAttention,canViewHr,canViewWork=true}:
+{unreadCount:number;canViewFinance:boolean;canViewCompliance:boolean;complianceAttention:number;canViewHr:boolean;canViewWork?:boolean}){
+ const pathname=usePathname();
+ const groups=[
+  {label:'Practice',items:[{href:'/',label:'Dashboard',icon:'dashboard'},...(canViewWork?[{href:'/calendar',label:'Calendar',icon:'calendar'},{href:'/tasks',label:'Tasks',icon:'tasks'},{href:'/matters',label:'Matters',icon:'matters'},{href:'/clients',label:'Contacts',icon:'contacts'},{href:'/activities',label:'Activities',icon:'activities'},{href:'/documents',label:'Documents',icon:'documents'}]:[])]},
+  {label:'Business',items:[...(canViewFinance?[{href:'/billing',label:'Billing',icon:'billing'},{href:'/accounts',label:'Accounts',icon:'accounts'}]:[]),{href:'/reports',label:'Reports',icon:'reports'},...(canViewCompliance?[{href:'/compliance',label:'Compliance',icon:'shield',count:complianceAttention}]:[]),{href:'/people',label:'Team directory',icon:'team'},...(canViewHr?[{href:'/hr',label:'HR workspace',icon:'briefcase'}]:[])]},
+  {label:'Workspace',items:[{href:'/notifications',label:'Notifications',icon:'notifications',count:unreadCount},{href:'/settings',label:'Settings',icon:'settings'},{href:'/help',label:'Help & guides',icon:'help'}]},
+ ];
+ return <nav aria-label="Main" className="nav workspace-navigation">{groups.map(group=><div className="workspace-nav-group" key={group.label}><p className="workspace-nav-label">{group.label}</p><ul>{group.items.map(item=>{const current=item.href==='/'?pathname==='/':pathname.startsWith(item.href);const count='count'in item?item.count:0;return <li key={item.href}><Link href={item.href} aria-label={item.label} aria-current={current?'page':undefined}><WorkspaceIcon name={item.icon}/><span>{item.label}</span>{!!count&&<span className="nav-badge">{count}</span>}</Link></li>;})}</ul></div>)}</nav>;
 }

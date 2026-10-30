@@ -130,7 +130,7 @@ export function CompanyVerification({
       <div role="status">{statusMsg && <p className="notice">{statusMsg}</p>}</div>
 
       {lookup?.snapshot && (
-        <div className="card" style={{ marginTop: '1rem' }}>
+        <div className="card mt-4" >
           <h3>Companies House result: {lookup.snapshot.companyName}</h3>
           <p>
             <strong>Number:</strong> {lookup.snapshot.companyNumber} ·{' '}
@@ -140,7 +140,7 @@ export function CompanyVerification({
           </p>
 
           {!!lookup.discrepancies?.length && (
-            <div className="notice" style={{ borderColor: 'var(--color-danger, #d32f2f)' }}>
+            <div className="notice border-red-700" >
               <strong>Discrepancies against client record detected:</strong>
               <ul>
                 {lookup.discrepancies.map((d, index) => (
@@ -151,7 +151,7 @@ export function CompanyVerification({
             </div>
           )}
 
-          <div style={{ marginTop: '1rem' }}>
+          <div className="mt-4">
             <button className="button" type="button" onClick={handleSaveSnapshot} disabled={saving}>
               {saving ? 'Saving...' : 'Save company snapshot to record'}
             </button>
@@ -160,7 +160,7 @@ export function CompanyVerification({
       )}
 
       {snapshots.length > 0 && (
-        <div style={{ marginTop: '1.5rem' }}>
+        <div className="mt-6">
           <h3>Recorded company snapshots</h3>
           <table className="table">
             <thead>

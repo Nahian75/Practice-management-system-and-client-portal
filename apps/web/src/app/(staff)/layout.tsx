@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/logo-mark';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -8,8 +9,10 @@ import type { ComplianceAccess } from '@/lib/compliance';
 import { hasHrWorkspace, type HrAccess } from '@/lib/hr';
 import { NavLinks } from '@/components/nav-links';
 import { SignOutButton } from '@/components/sign-out-button';
-import { PhaseBanner } from '@/components/phase-banner';
+import { WorkspaceToolbar } from '@/components/workspace-toolbar';
 import { Footer } from '@/components/footer';
+import { PageGuide } from '@/components/page-guide';
+import {SidebarCollapse} from '@/components/sidebar-collapse';
 
 /**
  * Every staff page. Without a valid staff session the visitor is sent to sign
@@ -23,29 +26,23 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   if (account.kind !== 'staff') {
     redirect('/portal');
   }
-  const [{ body: notifications }, finance, compliance, hr] = await Promise.all([
+  const [{ body: notifications }, finance, compliance, hr, work] = await Promise.all([
     apiGet<NotificationPage>('/notifications'),
     apiGet('/finance/access'),
     apiGet<ComplianceAccess>('/compliance/access'),
     apiGet<HrAccess>('/hr/access'),
+    apiGet('/workspace/tasks'),
   ]);
 
   return (
-    <>
-      <header className="header">
+    <div className="staff-shell manage-shell">
+      <aside className="header workspace-sidebar" aria-label="Workspace navigation">
         <div className="header-primary">
           <div className="header-inner">
             <Link className="header-brand-wrap" href="/">
-              <span className="header-crest" aria-hidden="true">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v18" />
-                  <path d="M6 7h12" />
-                  <path d="M4 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                  <path d="M16 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                  <path d="M4 21h16" />
-                </svg>
-              </span>
+              <LogoMark />
               <span className="header-name">{appName()}</span>
+              <span className="header-product">Practice management</span>
             </Link>
             <div className="header-actions">
               <div className="header-user-tag">
@@ -53,6 +50,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
                 <strong>{account.displayName}</strong>
               </div>
               <SignOutButton />
+              <SidebarCollapse/>
             </div>
           </div>
         </div>
@@ -64,15 +62,17 @@ export default async function StaffLayout({ children }: { children: ReactNode })
               canViewCompliance={compliance.status === 200}
               complianceAttention={compliance.body?.attentionCount ?? 0}
               canViewHr={!!hr.body && hasHrWorkspace(hr.body)}
+              canViewWork={work.status===200}
             />
           </div>
         </div>
-      </header>
-      <PhaseBanner />
+      </aside>
+      <WorkspaceToolbar name={account.displayName} accountId={account.id} unread={notifications?.unreadCount??0} canViewWork={work.status===200}/>
       <main id="main" className="main">
+        <PageGuide />
         {children}
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

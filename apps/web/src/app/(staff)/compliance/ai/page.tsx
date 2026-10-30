@@ -41,7 +41,7 @@ export default async function AiGovernancePage() {
         Firm-wide management of AI assistant model providers, token budgeting ceilings, prompt injection security, and human-in-the-loop review metrics.
       </p>
 
-      <nav aria-label="AI Governance navigation" className="section-nav" style={{ marginBottom: '1.5rem' }}>
+      <nav aria-label="AI Governance navigation" className="section-nav mb-6">
         <ul>
           <li>
             <Link href="/compliance">← Back to Compliance</Link>

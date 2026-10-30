@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { noAxeViolations, unique } from './support/checks';
 import { openMatter } from './support/matters';
 import { apiSessionFor, signedInStaff } from './support/session';
@@ -28,7 +28,7 @@ test('records time on a visible matter and keeps firm-wide Finance out of ordina
 
   await page.goto(`/matters/${matter.id}`);
   await expect(page.getByRole('heading', { name: 'Time and finance' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Finance' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Billing & accounts' })).toHaveCount(0);
   const form = page.getByRole('form', { name: 'Record time' });
   const [year, month, day] = today().split('-');
   await form.getByLabel('Day').fill(String(Number(day)));
@@ -64,7 +64,7 @@ test('gives Accounts operational queues, cash books, exports and responsive acce
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/finance');
-  await expect(page.getByRole('heading', { name: 'Finance', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Billing & accounts', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Draft bills' })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Add bank account' })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Record bank-confirmed receipt' })).toBeVisible();
@@ -224,7 +224,7 @@ test('shows immutable statement matching and gives reconciliation sign-off only 
 test('keeps Compliance finance read-only apart from reconciliation sign-off', async ({ page, request }) => {
   await signedInStaff(page, request, ['compliance']);
   await page.goto('/finance');
-  await expect(page.getByRole('heading', { name: 'Finance', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Billing & accounts', exact: true })).toBeVisible();
   await expect(page.getByText('Compliance access is read-only except for reconciliation sign-off.')).toBeVisible();
   await expect(page.getByRole('form')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Record|Approve|Import|Prepare|Add bank/i })).toHaveCount(0);
@@ -235,7 +235,7 @@ test('denies firm-wide Finance to a fee earner without leaking its queues', asyn
   await signedInStaff(page, request, ['fee_earner']);
   await page.goto('/finance');
   await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Finance' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Billing & accounts' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Client-money payment requests' })).toHaveCount(0);
   await noAxeViolations(page);
 });

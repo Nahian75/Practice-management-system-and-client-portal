@@ -115,24 +115,25 @@ export class PasswordResetService {
       return { outcome: 'rejected', problems };
     }
 
-    // Close first: if two requests race with the same link, only one goes on.
-    if (!(await this.resets.close(reset.id, now))) {
-      return { outcome: 'invalid_link' };
-    }
-
-    await this.accounts.setPassword(reset.account_id, await this.hasher.hash(password), now);
-    const endedSessions = await this.sessions.endAllForAccount(reset.account_id, 'revoked');
-
-    await this.audit.record({
-      actor: auditActorFor({ id: reset.account_id, kind: reset.account_kind }),
-      action: 'auth.password_reset_completed',
-      outcome: 'success',
-      metadata: { endedSessions },
-      ...context,
+    // Expensive work happens before locking or consuming the link. All durable
+    // effects, including the encrypted notice, commit together or not at all.
+    const passwordHash = await this.hasher.hash(password);
+    return this.resets.transaction(async (trx): Promise<CompleteResetResult> => {
+      const current = await this.resets.findOpenByTokenHash(hashOpaqueToken(token), trx, true);
+      const completedAt = this.clock.now();
+      if (!current || current.account_status !== 'active' || completedAt >= current.expires_at ||
+          current.account_email !== reset.account_email || !(await this.resets.close(current.id, completedAt, trx))) {
+        return { outcome: 'invalid_link' };
+      }
+      await this.accounts.setPassword(current.account_id, passwordHash, completedAt, trx);
+      const endedSessions = await this.sessions.endAllForAccount(current.account_id, 'revoked', trx);
+      await this.audit.record({
+        actor: auditActorFor({ id: current.account_id, kind: current.account_kind }),
+        action: 'auth.password_reset_completed', outcome: 'success', metadata: { endedSessions }, ...context,
+      }, trx);
+      await this.notices.passwordChanged(current.account_id, trx);
+      return { outcome: 'completed' };
     });
-    await this.notices.passwordChanged(reset.account_id);
-
-    return { outcome: 'completed' };
   }
 
   /** The token travels in the fragment (#), which browsers never send to any server. */

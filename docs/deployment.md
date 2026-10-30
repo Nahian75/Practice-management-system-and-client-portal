@@ -1,7 +1,11 @@
 # Deployment
 
-**Current state (2026-10-13):** Local development only: the API, the web app,
-and the document storage and scanner containers. No hosted environments.
+**Current state (2026-10-30):** Local development, a managed Render deployment
+configuration and a single-server Docker release are available. Start with the
+[Render guide](render-hosting.md) for managed hosting, or the [Linux-server guide](easy-hosting.md)
+for Docker Compose. Neither configuration has been deployed to a public account.
+Hosting, real SMTP and production file-storage credentials are required to go online.
+The notes below document the earlier local and reference topologies.
 
 ## Local development
 

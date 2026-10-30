@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import { DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ENV } from '../config/config.module.js';
@@ -46,6 +46,10 @@ export class ObjectStorage implements OnApplicationShutdown {
       params: { Bucket: this.bucket, Key: checked(key), Body: body },
       ...(abort ? { abortController: abort } : {}),
     }).done();
+  }
+
+  async assertAvailable(): Promise<void> {
+    await this.client.send(new HeadBucketCommand({Bucket:this.bucket}),{abortSignal:AbortSignal.timeout(3000)});
   }
 
   async get(key: string): Promise<Readable> {

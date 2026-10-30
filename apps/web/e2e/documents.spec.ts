@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { follow, noAxeViolations, watchForCspViolations } from './support/checks';
 import { eicarTestFile } from './support/eicar';
 import { openMatter } from './support/matters';
@@ -18,7 +18,7 @@ async function onNewMatter(page: Page, request: Parameters<typeof signedInStaff>
 
 async function addDocument(page: Page, title: string, file: { name: string; buffer: Buffer; mimeType?: string }) {
   await page.getByLabel('Title', { exact: true }).fill(title);
-  await page.getByLabel('File').setInputFiles({ mimeType: 'application/octet-stream', ...file });
+  await page.getByLabel('File', { exact: true }).setInputFiles({ mimeType: 'application/octet-stream', ...file });
   await page.getByRole('button', { name: 'Add document' }).click();
 }
 
@@ -60,7 +60,7 @@ test("shows the API's reason for a refused file, and stores nothing", async ({ p
   const huge = test.info().outputPath('scan.pdf');
   await writeFile(huge, Buffer.alloc(50 * 1024 * 1024 + 1, 0x61));
   await page.getByLabel('Title', { exact: true }).fill('Huge scan');
-  await page.getByLabel('File').setInputFiles(huge);
+  await page.getByLabel('File', { exact: true }).setInputFiles(huge);
   await page.getByRole('button', { name: 'Add document' }).click();
   await expect(problem).toContainText('The file is over 50 MB');
 
@@ -84,7 +84,7 @@ test('adds a new version, then withdraws the document: kept, but no longer liste
   await follow(page, page.getByRole('link', { name: 'Draft lease', exact: true }));
   await noAxeViolations(page);
 
-  await page.getByLabel('File').setInputFiles({ name: 'lease-final.pdf', mimeType: 'application/pdf', buffer: PDF });
+  await page.getByLabel('File', { exact: true }).setInputFiles({ name: 'lease-final.pdf', mimeType: 'application/pdf', buffer: PDF });
   await page.getByRole('button', { name: 'Add version' }).click();
   await expect(page.getByRole('row', { name: /^2 lease-final\.pdf/ })).toBeVisible();
   await expect(page.getByRole('row', { name: /^1 lease-draft\.pdf/ })).toBeVisible();

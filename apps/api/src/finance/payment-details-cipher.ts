@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { SecretBox, type SealedSecret } from '../common/crypto/secret-box.js';
 
-const CURRENT_FINANCE_KEY_VERSION = 1;
 
 export interface PaymentDetails {
   name: string;
@@ -17,8 +16,8 @@ export interface SealedPaymentDetails extends SealedSecret {
 export class PaymentDetailsCipher {
   private readonly box: SecretBox;
 
-  constructor(key: Buffer) {
-    this.box = new SecretBox(key, CURRENT_FINANCE_KEY_VERSION);
+  constructor(key: Buffer,version=1,previousKeys:ReadonlyMap<number,Buffer> = new Map()) {
+    this.box = new SecretBox(key, version,previousKeys);
   }
 
   seal(details: PaymentDetails): SealedPaymentDetails {

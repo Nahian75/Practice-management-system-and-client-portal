@@ -1,0 +1,13 @@
+import Link from 'next/link';
+import { apiGet } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
+import { WorkspaceHeading,WorkspaceEmpty } from '@/components/workspace-page';
+import type { WorkspacePage,WorkDocument } from '@/lib/workspace';
+import { formatDateTime } from '@/lib/format';
+export const metadata={title:'Documents'};
+export default async function DocumentsPage({searchParams}:{searchParams:Promise<{q?:string;before?:string}>}){
+ const params=await searchParams;const query={q:typeof params.q==='string'?params.q.slice(0,100):undefined,before:typeof params.before==='string'?params.before:undefined};
+ const result=await apiGet<WorkspacePage<WorkDocument>>('/workspace/documents',query);if(result.status===403)return <NoAccess what="documents"/>;
+ if(!result.body)return <p role="alert">Documents could not be loaded. <Link href="/documents">Try again</Link>.</p>;
+ return <><WorkspaceHeading title="Documents" description="Find the latest files across your matters. Every upload is scanned and encrypted." action="Upload document" href="/documents/new"/><nav className="workspace-tabs" aria-label="Document views"><Link href="/documents" aria-current="page">All visible documents</Link></nav><form className="workspace-filters"><label>Search documents<input type="search" name="q" defaultValue={query.q} maxLength={100} placeholder="Search by document title"/></label><button className="button button-secondary">Search</button></form>{result.body.items.length?<div className="workspace-table-wrap"><table className="table"><thead><tr><th>Document</th><th>Matter</th><th>Category</th><th>Version</th><th>Size</th><th>Uploaded</th><th>Client access</th></tr></thead><tbody>{result.body.items.map(doc=><tr key={doc.id}><td><Link href={`/documents/${doc.id}`}>{doc.title}</Link><span className="workspace-cell-sub">{doc.fileName}</span></td><td><Link href={`/matters/${doc.matterId}`}>{doc.matterReference}</Link><span className="workspace-cell-sub">{doc.matterTitle}</span></td><td>{doc.category}</td><td>v{doc.version}</td><td>{(doc.sizeBytes/1024).toFixed(0)} KB</td><td>{formatDateTime(doc.uploadedAt)}</td><td><span className="workspace-status">{doc.sharedWithClient?'Shared':'Team only'}</span></td></tr>)}</tbody></table></div>:<WorkspaceEmpty title="Your files, organised by matter" href="/documents/new" action="Upload your first document">Choose a matter before uploading a file. Withdrawn and inaccessible documents do not appear here.</WorkspaceEmpty>}{result.body.next&&<div className="workspace-pagination"><Link href={`/documents?before=${result.body.next}${query.q?'&q='+encodeURIComponent(query.q):''}`}>Older documents →</Link></div>}</>;
+}

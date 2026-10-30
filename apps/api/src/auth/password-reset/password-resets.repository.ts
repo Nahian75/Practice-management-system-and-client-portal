@@ -15,6 +15,10 @@ export interface NewPasswordReset {
 export class PasswordResetsRepository {
   constructor(@Inject(DATABASE) private readonly db: Kysely<Database>) {}
 
+  transaction<T>(work: (trx: Kysely<Database>) => Promise<T>): Promise<T> {
+    return this.db.transaction().execute(work);
+  }
+
   /** Closes any open reset for the account and stores the new one, in one transaction. */
   async replaceOpen(reset: NewPasswordReset): Promise<string> {
     return this.db.transaction().execute(async (trx) => {
@@ -50,8 +54,8 @@ export class PasswordResetsRepository {
   }
 
   /** The open reset for a token, with its account. Expiry is checked by the caller. */
-  findOpenByTokenHash(tokenHash: Buffer) {
-    return this.db
+  findOpenByTokenHash(tokenHash: Buffer, executor: Kysely<Database> = this.db, lock = false) {
+    return executor
       .selectFrom('password_resets')
       .innerJoin('accounts', 'accounts.id', 'password_resets.account_id')
       .select([
@@ -64,12 +68,13 @@ export class PasswordResetsRepository {
       ])
       .where('password_resets.token_hash', '=', tokenHash)
       .where('password_resets.closed_at', 'is', null)
+      .$if(lock, (query) => query.forUpdate(['password_resets', 'accounts']))
       .executeTakeFirst();
   }
 
   /** Atomic: of two requests using the same token at once, only one succeeds. */
-  async close(resetId: string, at: Date): Promise<boolean> {
-    const result = await this.db
+  async close(resetId: string, at: Date, executor: Kysely<Database> = this.db): Promise<boolean> {
+    const result = await executor
       .updateTable('password_resets')
       .set({ closed_at: at, close_reason: 'used' })
       .where('id', '=', resetId)

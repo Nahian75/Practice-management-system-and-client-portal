@@ -71,10 +71,10 @@ export async function signInClient(page: Page, client: TestClient): Promise<void
   await page.context().clearCookies();
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(client.email);
-  await page.getByLabel('Password').fill(client.password);
+  await page.getByLabel('Password', { exact: true }).fill(client.password);
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Security code').fill(client.backupCode);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
   await expect(page).toHaveURL(/\/portal$/);
 }
 

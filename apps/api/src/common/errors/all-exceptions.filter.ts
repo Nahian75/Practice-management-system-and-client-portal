@@ -60,6 +60,10 @@ function statusCodeOf(exception: unknown): number {
 }
 
 function clientMessageOf(exception: unknown, statusCode: number): string | string[] {
+  // Preserve our public body-parser contract across framework patch versions.
+  if (statusCode === HttpStatus.PAYLOAD_TOO_LARGE && exception instanceof HttpException && exception.message === 'request entity too large') {
+    return reasonPhrase(statusCode);
+  }
   if (exception instanceof HttpException) {
     const response = exception.getResponse();
     if (typeof response === 'string') {

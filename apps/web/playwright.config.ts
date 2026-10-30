@@ -37,6 +37,10 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: E2E_WEB_URL,
+    ...(process.env.PMS_DAST_PROXY === 'http://127.0.0.1:8090' ? {
+      proxy: { server: 'http://127.0.0.1:8090' },
+      launchOptions: { args: ['--proxy-bypass-list=<-loopback>'] },
+    } : {}),
     // Traces and screenshots can show tokens; they stay in the git-ignored test-results/.
     trace: 'retain-on-failure',
   },

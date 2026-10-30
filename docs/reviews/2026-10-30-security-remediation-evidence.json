@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-30",
+  "scope": "local uncommitted working tree; isolated test databases",
+  "gitBase": "864feb0806e9ac32a4caf5d3c51e729851c684b7",
+  "api": {
+    "total": 2107,
+    "passed": 2107,
+    "failed": 0,
+    "skipped": 0
+  },
+  "finalConfigTests": {
+    "passed": 71,
+    "failed": 0
+  },
+  "browser": {
+    "passed": 99,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "durationSeconds": 620
+  },
+  "operationalTests": {
+    "passed": 8,
+    "failed": 0
+  },
+  "restore": {
+    "kind": "isolated local logical backup and restore",
+    "source": "pms_test",
+    "targetPrefix": "pms_restore_audit_",
+    "tables": 182,
+    "dataIntegrityVerified": true,
+    "encryption": "AES-256-GCM",
+    "durationSeconds": 10,
+    "productionRpoVerified": false,
+    "objectStorageRecoveryVerified": false,
+    "productionSignoff": false
+  },
+  "dependencyAdvisories": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "checks": {
+    "apiTypecheck": true,
+    "webTypecheck": true,
+    "apiBuild": true,
+    "webBuild": true,
+    "securitySourceGuard": true,
+    "productionHygiene": true,
+    "actionlint": true,
+    "yaml": true,
+    "caddyConfiguration": true,
+    "historySecretScan": true,
+    "sourceSecretScan": true,
+    "dependencyAge": true,
+    "localLiveness": true,
+    "localReadiness": true
+  },
+  "boundaries": {
+    "publicProductionDeployed": false,
+    "githubWorkflowExecuted": false,
+    "passiveDastExecuted": false,
+    "independentPenetrationTest": false,
+    "cloudWafVerified": false,
+    "independentAuditStoreProvisioned": false,
+    "productionRecoveryDrill": false,
+    "legalComplianceCertified": false,
+    "sharedDatabaseTenancyImplemented": false,
+    "telehealthImplemented": false
+  }
+}

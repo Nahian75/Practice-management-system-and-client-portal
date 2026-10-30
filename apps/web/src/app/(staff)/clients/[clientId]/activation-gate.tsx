@@ -107,27 +107,27 @@ export function ActivationGatePanel({
   const overallBadge = OVERALL_BADGES[gate.status] ?? { label: gate.status, className: 'badge' };
 
   return (
-    <section aria-labelledby="gate-heading" className="panel" style={{ marginTop: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <section aria-labelledby="gate-heading" className="panel mt-8" >
+      <div className="flex justify-between items-center">
         <div>
-          <h2 id="gate-heading" style={{ margin: 0 }}>Onboarding activation gate</h2>
-          <p className="secondary" style={{ margin: '0.25rem 0 0 0' }}>
+          <h2 id="gate-heading" className="m-0">Onboarding activation gate</h2>
+          <p className="secondary mt-2 mx-0 mb-0" >
             Enforces conflict search, email channel verification, identity/company evidence, and CDD clearance.
           </p>
         </div>
         <div>
-          <span className={overallBadge.className} style={{ fontSize: '1rem', padding: '0.4rem 0.8rem' }}>
+          <span className={[overallBadge.className,"text-base py-2 px-4"].filter(Boolean).join(" ")} >
             {overallBadge.label}
           </span>
         </div>
       </div>
 
-      {statusMsg && <p className="status status-success" role="status" style={{ marginTop: '1rem' }}>{statusMsg}</p>}
+      {statusMsg && <p className="status status-success mt-4" role="status" >{statusMsg}</p>}
       {errors && <ErrorSummary messages={errors} />}
 
       {gate.isActivated && (
-        <div className="card" style={{ marginTop: '1rem', background: 'var(--surface-sunken)' }}>
-          <p style={{ margin: 0 }}>
+        <div className="card mt-4 bg-slate-100" >
+          <p className="m-0">
             <strong>Client activated:</strong> Activated on {gate.activatedAt ? formatDate(gate.activatedAt) : 'recorded date'}.
             {gate.notes && <span> Notes: {gate.notes}</span>}
           </p>
@@ -135,9 +135,9 @@ export function ActivationGatePanel({
       )}
 
       {/* Mandatory Requirements Checklist */}
-      <div style={{ marginTop: '1.5rem' }}>
+      <div className="mt-6">
         <h3>Mandatory requirements</h3>
-        <table className="table" style={{ marginTop: '0.5rem' }}>
+        <table className="table mt-2" >
           <thead>
             <tr>
               <th scope="col">Requirement</th>
@@ -167,9 +167,9 @@ export function ActivationGatePanel({
 
       {/* Active Exceptions */}
       {exceptions.length > 0 && (
-        <div style={{ marginTop: '1.5rem' }}>
+        <div className="mt-6">
           <h3>Granted onboarding exceptions</h3>
-          <table className="table" style={{ marginTop: '0.5rem' }}>
+          <table className="table mt-2" >
             <thead>
               <tr>
                 <th scope="col">Requirement</th>
@@ -193,7 +193,7 @@ export function ActivationGatePanel({
       )}
 
       {/* Actions: Exceptions & Activation */}
-      <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="mt-6 flex gap-4 flex-wrap">
         {!gate.isActivated && (
           <button
             type="button"
@@ -217,7 +217,7 @@ export function ActivationGatePanel({
 
       {/* Grant Exception Form */}
       {openExceptionForm && (
-        <form onSubmit={handleGrantException} className="form-card" style={{ marginTop: '1rem' }}>
+        <form onSubmit={handleGrantException} className="form-card mt-4" >
           <h4>Grant reasoned time-limited exception</h4>
           <p className="secondary">
             Exceptions are separate, reasoned, partner/compliance approvals lasting up to 60 days. They do not edit underlying results.
@@ -260,7 +260,7 @@ export function ActivationGatePanel({
 
       {/* Activate Client Form */}
       {openActivateForm && (
-        <form onSubmit={handleActivateClient} className="form-card" style={{ marginTop: '1rem' }}>
+        <form onSubmit={handleActivateClient} className="form-card mt-4" >
           <h4>Formally activate client onboarding</h4>
           <p className="secondary">
             All mandatory requirements or valid exceptions are in place. Confirming activation permanently records the gate clearance.

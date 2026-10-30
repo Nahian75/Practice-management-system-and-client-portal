@@ -1,8 +1,11 @@
 # Data Model
 
-**Current state (2026-10-13):** The database foundation through Compliance
-step 15f and People / HR step 16f exists, with separate owner and application
-roles and forward-only migrations through `0064`.
+**Current state (2026-10-30):** The live schema has 178 tables and 75 applied
+forward-only migrations through `0075_security_ephemeral_retention`, including
+onboarding and AI drafting. See the [database design](database-design.md),
+[interactive schema explorer](database-design.html) and
+[catalog snapshot](database-schema.json) for the current structure and review
+findings. The module notes below describe the earlier implementation history.
 
 ## Database
 

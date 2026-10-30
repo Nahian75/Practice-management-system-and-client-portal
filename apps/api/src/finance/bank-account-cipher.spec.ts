@@ -5,6 +5,15 @@ import { BankAccountCipher } from './bank-account-cipher.js';
 describe('bank account encryption', () => {
   const details = { sortCode: '12-34-56', accountNumber: '12345678' };
 
+  it('preserves bank uniqueness fingerprints across encryption-key rotation',()=>{
+    const original=randomBytes(32),current=randomBytes(32);
+    const old=new BankAccountCipher(original).seal(details);
+    const rotated=new BankAccountCipher(current,2,new Map([[1,original]]));
+    expect(rotated.open(old)).toEqual(details);
+    expect(rotated.seal(details).fingerprint).toEqual(old.fingerprint);
+    expect(rotated.seal(details).keyVersion).toBe(2);
+  });
+
   it('round-trips details while exposing only the last four', () => {
     const cipher = new BankAccountCipher(randomBytes(32));
     const sealed = cipher.seal(details);

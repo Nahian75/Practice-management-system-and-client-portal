@@ -8,9 +8,13 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
     "check:dependency-age": "node scripts/check-dependency-age.mjs",
     "check:hidden-characters": "node scripts/check-hidden-characters.mjs --all",
     "check:production-hygiene": "node scripts/check-production-hygiene.mjs",
+    "check:security-source": "node scripts/check-security-source.mjs",
+    "check:passive-dast": "node scripts/passive-dast.mjs",
+    "check:restore-drill": "node scripts/restore-drill.mjs",
     "db:reset-test": "docker compose exec -T postgres psql -U postgres -d pms -q -v db=pms_test -f - < infra/postgres/reset-test-database.sql"
   }
 }

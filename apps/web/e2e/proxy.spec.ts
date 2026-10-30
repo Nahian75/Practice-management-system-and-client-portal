@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import { apiTarget } from '../src/lib/api-target';
 
 // No browser: these check the pass-through's address building directly.

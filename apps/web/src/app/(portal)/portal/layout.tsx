@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/logo-mark';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -6,6 +7,7 @@ import { appName } from '@/config';
 import { currentAccount } from '@/lib/api';
 import { PhaseBanner } from '@/components/phase-banner';
 import { Footer } from '@/components/footer';
+import { PageGuide } from '@/components/page-guide';
 
 /** The client side of the app, kept separate from every staff route. */
 export default async function PortalLayout({ children }: { children: ReactNode }) {
@@ -18,20 +20,12 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   }
 
   return (
-    <>
+    <div className="portal-shell">
       <header className="header">
         <div className="header-primary">
           <div className="header-inner">
             <Link className="header-brand-wrap" href="/portal">
-              <span className="header-crest" aria-hidden="true">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v18" />
-                  <path d="M6 7h12" />
-                  <path d="M4 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                  <path d="M16 14l2-7 2 7a2 2 0 0 1-4 0z" />
-                  <path d="M4 21h16" />
-                </svg>
-              </span>
+              <LogoMark />
               <span className="header-name">{appName()}</span>
               <span className="header-product">Client portal</span>
             </Link>
@@ -62,9 +56,10 @@ export default async function PortalLayout({ children }: { children: ReactNode }
         Only matters and documents deliberately shared with your portal account are shown here.
       </PhaseBanner>
       <main id="main" className="main">
+        <PageGuide />
         {children}
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

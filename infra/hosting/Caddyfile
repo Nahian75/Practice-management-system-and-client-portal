@@ -1,0 +1,40 @@
+{
+  admin off
+  email {$ADMIN_EMAIL}
+}
+{$DOMAIN} {
+  header {
+    -Server
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+  }
+  @uploads path_regexp upload ^/api/(matters/[^/]+/documents|documents/[^/]+/versions|clients/[^/]+/cdd/[^/]+/evidence|compliance/restricted-reports|hr/people/[^/]+/files)$
+  handle @uploads {
+    request_body {
+      max_size 52MB
+    }
+    uri strip_prefix /api
+    reverse_proxy api:3001 {
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+  handle /api/* {
+    request_body {
+      max_size 1MB
+    }
+    uri strip_prefix /api
+    reverse_proxy api:3001 {
+      header_up X-Forwarded-For {remote_host}
+      header_up X-Forwarded-Proto https
+    }
+  }
+  handle {
+    request_body {
+      max_size 1MB
+    }
+    reverse_proxy web:3000
+  }
+}

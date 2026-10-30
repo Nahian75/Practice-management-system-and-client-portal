@@ -1,0 +1,8 @@
+{
+  admin off
+  auto_https off
+}
+https://storage {
+  tls /certs/storage/server.crt /certs/storage/server.key
+  reverse_proxy seaweedfs:8333
+}

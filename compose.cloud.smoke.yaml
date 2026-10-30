@@ -1,0 +1,54 @@
+# Local simulation only: overlay on compose.hosting.yaml and compose.hosting.smoke.yaml.
+x-cloud-env: &cloud-env
+  CLOUD_ROOT_KEY: ${CLOUD_ROOT_KEY:?Set a disposable smoke root secret}
+  CLOUD_ADMIN_DATABASE_URL: postgresql://cloud_admin:${POSTGRES_PASSWORD}@postgres:5432/pms
+  CLOUD_APP_BASE_URL: https://localhost:18443
+  TRUSTED_PROXIES: uniquelocal
+
+services:
+  postgres:
+    volumes: !override
+      - cloud-postgres-data:/var/lib/postgresql
+      - private-tls:/certs:ro
+      - ./infra/hosting/smoke/cloud-init:/docker-entrypoint-initdb.d:ro
+      - ./infra/hosting/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+  migrate:
+    image: stass-api:render
+    build: !reset null
+    command: [node, /app/infra/hosting/cloud-bootstrap.mjs]
+    environment:
+      <<: *cloud-env
+  api:
+    image: stass-api:render
+    build: !reset null
+    command: [node, /app/infra/hosting/cloud-runtime.mjs]
+    environment:
+      <<: *cloud-env
+  maintenance:
+    profiles: [manual]
+  web:
+    image: stass-web:render
+    build: !reset null
+    environment:
+      API_HOST: api
+      PORT: '10000'
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:10000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  edge:
+    volumes: !override
+      - ./infra/hosting/smoke/cloud-edge.Caddyfile:/etc/caddy/Caddyfile:ro
+      - https-data:/data
+      - https-config:/config
+    networks:
+      private: {ipv4_address: 172.29.44.254}
+
+networks:
+  private:
+    ipam:
+      config: !override [{subnet: 172.29.44.0/24}]
+
+volumes:
+  cloud-postgres-data:
+  scanner-data:
+    external: true
+    name: stass-hosting-smoke_scanner-data

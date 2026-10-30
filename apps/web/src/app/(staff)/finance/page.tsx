@@ -9,6 +9,7 @@ import {
   type StaffRate, type StatementImport,
 } from '@/lib/finance';
 import { FinanceForms } from './finance-forms';
+import {WorkspaceHeading} from '@/components/workspace-page';
 
 export const metadata: Metadata = { title: 'Finance' };
 
@@ -34,7 +35,8 @@ export default async function FinancePage() {
   }
   const bankNames = new Map(banks.body.bankAccounts.map((bank) => [bank.id, `${bank.name} •••• ${bank.lastFour}`]));
   return <>
-    <h1>Finance</h1>
+    <WorkspaceHeading title="Billing & accounts" description="Review billing, payment requests and bank records in one workspace."/>
+    <nav className="workspace-tabs" aria-label="Finance sections"><Link href="#drafts-heading">Draft bills</Link><Link href="#payments-heading">Payment requests</Link><Link href="#rates-heading">Rates</Link><Link href="#statements-heading">Statements</Link><Link href="#reconciliations-heading">Reconciliations</Link></nav>
     <p className="secondary">GBP records only. Stass records authority and bank-confirmed outcomes; it does not move money.</p>
     <section aria-labelledby="deadlines-heading">
       <h2 id="deadlines-heading">Deadlines</h2>

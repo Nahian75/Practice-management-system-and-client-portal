@@ -1,0 +1,200 @@
+name: stass-hosting
+
+x-api-service: &api-service
+  image: stass-api:${RELEASE_TAG:-local}
+  build:
+    context: .
+    target: api
+  init: true
+  security_opt: [no-new-privileges:true]
+  volumes: [private-tls:/certs:ro]
+  networks: [private]
+
+x-api-env: &api-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: 3001
+  DATABASE_URL: ${DATABASE_URL:?Run host.sh setup first}
+  APP_BASE_URL: ${APP_BASE_URL:?Set APP_BASE_URL}
+  SMTP_URL: ${SMTP_URL:?Set SMTP_URL}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?Set MAIL_FROM_ADDRESS}
+  MAIL_FROM_NAME: ${APP_NAME:-Stass}
+  TRUSTED_PROXIES: 172.29.43.254/32,172.29.43.253/32
+  NODE_EXTRA_CA_CERTS: /certs/ca.crt
+  TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set encryption keys}
+  MAIL_ENCRYPTION_KEY: ${MAIL_ENCRYPTION_KEY:?Set encryption keys}
+  FINANCE_ENCRYPTION_KEY: ${FINANCE_ENCRYPTION_KEY:?Set encryption keys}
+  AML_ENCRYPTION_KEY: ${AML_ENCRYPTION_KEY:?Set encryption keys}
+  SUSPICION_ENCRYPTION_KEY: ${SUSPICION_ENCRYPTION_KEY:?Set encryption keys}
+  HR_ENCRYPTION_KEY: ${HR_ENCRYPTION_KEY:?Set encryption keys}
+  DOCUMENT_ENCRYPTION_KEY: ${DOCUMENT_ENCRYPTION_KEY:?Set encryption keys}
+  ENCRYPTION_KEY_VERSION: ${ENCRYPTION_KEY_VERSION:-1}
+  PREVIOUS_ENCRYPTION_KEYS: ${PREVIOUS_ENCRYPTION_KEYS:-}
+  DOCUMENTS_S3_ENDPOINT: https://storage
+  DOCUMENTS_S3_BUCKET: pms-documents
+  DOCUMENTS_S3_REGION: eu-west-2
+  DOCUMENTS_S3_ACCESS_KEY: ${DOCUMENTS_S3_ACCESS_KEY:?Set storage credentials}
+  DOCUMENTS_S3_SECRET_KEY: ${DOCUMENTS_S3_SECRET_KEY:?Set storage credentials}
+  CLAMAV_HOST: clamav
+  CLAMAV_PORT: 3310
+  SANCTIONS_LIST_URL: https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv
+
+services:
+  tls-init:
+    <<: *api-service
+    user: '0:0'
+    volumes: [private-tls:/certs, private-ca:/authority]
+    command: [node, /app/infra/hosting/prepare-tls.mjs]
+    restart: 'no'
+
+  postgres:
+    image: postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    depends_on:
+      tls-init: {condition: service_completed_successfully}
+    environment:
+      POSTGRES_DB: pms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set database passwords}
+      PMS_OWNER_PASSWORD: ${PMS_OWNER_PASSWORD:?Set database passwords}
+      PMS_APP_PASSWORD: ${PMS_APP_PASSWORD:?Set database passwords}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    command: [postgres, -c, ssl=on, -c, ssl_min_protocol_version=TLSv1.2, -c, ssl_cert_file=/certs/postgres/server.crt, -c, ssl_key_file=/certs/postgres/server.key, -c, hba_file=/etc/postgresql/pg_hba.conf]
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - private-tls:/certs:ro
+      - ./infra/hosting/postgres-init:/docker-entrypoint-initdb.d:ro
+      - ./infra/hosting/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, pms]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    restart: unless-stopped
+    command: [mini, -dir=/data, -bucket=pms-documents]
+    environment:
+      AWS_ACCESS_KEY_ID: ${DOCUMENTS_S3_ACCESS_KEY:?Set storage credentials}
+      AWS_SECRET_ACCESS_KEY: ${DOCUMENTS_S3_SECRET_KEY:?Set storage credentials}
+    volumes: [document-data:/data]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+
+  storage:
+    image: caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    restart: unless-stopped
+    depends_on:
+      tls-init: {condition: service_completed_successfully}
+      seaweedfs: {condition: service_started}
+    volumes:
+      - ./infra/hosting/storage.Caddyfile:/etc/caddy/Caddyfile:ro
+      - private-tls:/certs:ro
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+
+  clamav:
+    image: clamav/clamav:1.5.4@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    restart: unless-stopped
+    environment: {CLAMD_CONF_AlertExceedsMax: 'yes', TZ: UTC}
+    volumes: [scanner-data:/var/lib/clamav]
+    healthcheck:
+      test: [CMD, clamdcheck.sh]
+      interval: 30s
+      timeout: 10s
+      start_period: 10m
+      retries: 5
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+
+  migrate:
+    <<: *api-service
+    restart: 'no'
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      <<: *api-env
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?Set migration database URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set initial administrator email}
+      ADMIN_NAME: ${ADMIN_NAME:?Set initial administrator name}
+    command: [node, /app/infra/hosting/migrate-and-invite.mjs]
+
+  api:
+    <<: *api-service
+    restart: unless-stopped
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage: {condition: service_started}
+      clamav: {condition: service_healthy}
+    environment: *api-env
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3001/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  maintenance:
+    <<: *api-service
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    environment: *api-env
+    command: [node, /app/infra/hosting/security-maintenance.mjs]
+
+  web:
+    image: stass-web:${RELEASE_TAG:-local}
+    build: {context: ., target: web}
+    init: true
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:3001
+      APP_NAME: ${APP_NAME:-Stass}
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+    networks:
+      private: {ipv4_address: 172.29.43.253}
+
+  edge:
+    image: caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    restart: unless-stopped
+    depends_on:
+      web: {condition: service_healthy}
+    ports:
+      - ${PUBLIC_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80
+      - ${PUBLIC_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443
+    environment:
+      DOMAIN: ${DOMAIN:?Set the public domain}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set administrator email}
+    volumes:
+      - ./infra/hosting/Caddyfile:/etc/caddy/Caddyfile:ro
+      - https-data:/data
+      - https-config:/config
+    security_opt: [no-new-privileges:true]
+    networks:
+      private: {ipv4_address: 172.29.43.254}
+
+networks:
+  private:
+    ipam:
+      config: [{subnet: 172.29.43.0/24}]
+volumes:
+  private-ca:
+  private-tls:
+  postgres-data:
+  document-data:
+  scanner-data:
+  https-data:
+  https-config:

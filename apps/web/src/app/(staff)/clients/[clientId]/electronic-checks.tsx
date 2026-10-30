@@ -65,7 +65,7 @@ export function ElectronicChecks({
 
   return (
     <section aria-labelledby="electronic-checks-heading" className="region">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="flex justify-between items-center">
         <h2 id="electronic-checks-heading">Electronic verification checks</h2>
         <button
           className="button button-secondary"
@@ -83,8 +83,8 @@ export function ElectronicChecks({
         <form
           aria-label="Record electronic verification check"
           onSubmit={handleRecordCheck}
-          className="card"
-          style={{ marginTop: '1rem', marginBottom: '1.5rem' }}
+          className="card mt-4 mb-6"
+
         >
           <h3>Record electronic check result</h3>
           <div className="form-grid">

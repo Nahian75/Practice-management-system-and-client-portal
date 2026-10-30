@@ -1,0 +1,10 @@
+{
+  admin off
+}
+localhost {
+  tls internal
+  reverse_proxy web:10000 {
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto https
+  }
+}

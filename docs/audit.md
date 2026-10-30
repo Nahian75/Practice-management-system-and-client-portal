@@ -49,10 +49,12 @@ Each module adds its events as it is built. Required by the engineering rules:
 | Junk or oversized entries | Check constraints on every column |
 | An action succeeds but its audit entry is lost | `AuditService.record` accepts the caller's transaction, so the action and its audit entry commit or roll back together |
 
-**Not yet covered:** a database superuser can still disable triggers. Detecting
-that needs tamper evidence outside the database's control (a hash chain
-anchored externally, or shipping events to write-once storage). Planned
-before production.
+**Privileged database compromise:** a superuser can disable triggers. Independent
+Ed25519-signed checkpoints and write-once storage tooling are now available in
+`infra/hosting/audit-checkpoint.mjs`; see [security operations](security-operations.md).
+This protection requires separate credentials, a trusted initial checkpoint,
+scheduled runs and alerts. It is not active merely because the script exists,
+and cannot detect every change before the independent observer sees it.
 
 ## Rules for callers
 

@@ -33,6 +33,15 @@ const minimal = {
 };
 
 describe('loadEnv', () => {
+  it('validates retained keys before a versioned deployment can start', () => {
+    const purposes=['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT'] as const;
+    const previous=Object.fromEntries(purposes.map((purpose,index)=>[purpose,{'1':Buffer.alloc(32,30+index).toString('base64')}]));
+    expect(loadEnv({...minimal,ENCRYPTION_KEY_VERSION:'2',PREVIOUS_ENCRYPTION_KEYS:JSON.stringify(previous)}).ENCRYPTION_KEY_VERSION).toBe(2);
+    expect(()=>loadEnv({...minimal,ENCRYPTION_KEY_VERSION:'2'})).toThrow(InvalidEnvError);
+    expect(()=>loadEnv({...minimal,PREVIOUS_ENCRYPTION_KEYS:'not-json'})).toThrow(InvalidEnvError);
+    expect(()=>loadEnv({...minimal,ENCRYPTION_KEY_VERSION:'2',PREVIOUS_ENCRYPTION_KEYS:JSON.stringify({...previous,TOTP:{'2':TOTP_KEY}})})).toThrow(InvalidEnvError);
+    expect(loadEnv({...minimal,PREVIOUS_ENCRYPTION_KEYS:''}).PREVIOUS_ENCRYPTION_KEYS).toEqual({});
+  });
   it('applies safe defaults for optional settings', () => {
     expect(loadEnv(minimal)).toEqual({
       NODE_ENV: 'development',

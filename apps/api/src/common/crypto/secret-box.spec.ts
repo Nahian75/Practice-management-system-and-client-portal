@@ -7,6 +7,16 @@ const SECRET = randomBytes(20);
 const ACCOUNT = '0192a3b4-0000-7000-8000-000000000001';
 
 describe('SecretBox', () => {
+  it('reads retained versions while all new writes use the current key',()=>{
+    const old=randomBytes(32),current=randomBytes(32);
+    const sealed=new SecretBox(old,1).seal(SECRET,ACCOUNT);
+    const rotated=new SecretBox(current,2,new Map([[1,old]]));
+    expect(rotated.open(sealed,ACCOUNT)).toEqual(SECRET);
+    const fresh=rotated.seal(SECRET,ACCOUNT);
+    expect(fresh.keyVersion).toBe(2);
+    expect(()=>new SecretBox(old,1).open(fresh,ACCOUNT)).toThrow(SecretBoxError);
+    expect(()=>rotated.open(sealed,'wrong-context')).toThrow(SecretBoxError);
+  });
   it('opens what it sealed', () => {
     expect(box.open(box.seal(SECRET, ACCOUNT), ACCOUNT).equals(SECRET)).toBe(true);
   });

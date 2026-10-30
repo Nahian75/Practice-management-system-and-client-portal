@@ -1,0 +1,329 @@
+{
+  "auditDate": "2026-10-30",
+  "timezone": "Asia/Dhaka",
+  "scope": "local working tree, source review, isolated test databases; no independent production assessment",
+  "gitBase": "864feb0806e9ac32a4caf5d3c51e729851c684b7",
+  "workingTreeHasChanges": true,
+  "completedChecks": {
+    "apiTypecheck": true,
+    "webTypecheck": true,
+    "apiBuild": true,
+    "webBuildBeforeAccessibilityRepair": true,
+    "productionHygieneContentCheck": true,
+    "hostingUnitTests": {
+      "passed": 4,
+      "failed": 0
+    },
+    "dependencyAdvisories": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "dependencyAge": {
+      "passed": true,
+      "packages": 346,
+      "recordedExceptions": 37
+    },
+    "apiFullExistingDatabase": {
+      "success": false,
+      "numTotalTests": 2092,
+      "numPassedTests": 2082,
+      "numFailedTests": 10,
+      "numPendingTests": 0
+    },
+    "apiFailedFilesFreshDatabase": {
+      "success": true,
+      "numTotalTests": 142,
+      "numPassedTests": 142,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "webBuildAfterAccessibilityRepair": true
+  },
+  "routeInventory": {
+    "declaredRoutes": 356,
+    "missingAccessPolicies": 0,
+    "missingResponseSchemas": 0,
+    "note": "Source metadata inventory, not proof of every authorization decision."
+  },
+  "databaseInspection": {
+    "runtimeRole": "pms_app",
+    "runtimeSuperuser": false,
+    "runtimeBypassRls": false,
+    "applicationTables": 181,
+    "tablesWithRls": 0,
+    "scope": "single-firm architecture; shared multi-practice SaaS not implemented"
+  },
+  "secretScanning": {
+    "tool": "Gitleaks 8.30.1",
+    "officialArchiveChecksumVerified": true,
+    "reachableCommits": 137,
+    "historyFindingsAfterRepositoryIgnoreRules": 0,
+    "gitVisibleTextFiles": 775,
+    "currentSourceFindings": 2,
+    "verifiedNonSecretFindings": [
+      {
+        "file": "apps/api/src/auth/passwords/breached-password-checker.spec.ts",
+        "line": 72,
+        "classification": "deliberate test password; documented false positive"
+      },
+      {
+        "file": "docs/database-design.html",
+        "line": 3,
+        "classification": "adjacent migration identifiers, not a credential"
+      }
+    ],
+    "scopeExclusions": [
+      "ignored local secrets/data",
+      "binary exports/archives",
+      "CI account logs"
+    ]
+  },
+  "workingTreeCharacters": {
+    "files": 775,
+    "findings": []
+  },
+  "resetFailureInjection": {
+    "kind": "service-level fault injection with synthetic in-memory dependencies; not a live exploit",
+    "scenarios": [
+      {
+        "failureInjectedAt": "hash",
+        "requestFailed": true,
+        "resetOpen": false,
+        "passwordChanged": false,
+        "oldSessionActive": true,
+        "auditWritten": false
+      },
+      {
+        "failureInjectedAt": "revocation",
+        "requestFailed": true,
+        "resetOpen": false,
+        "passwordChanged": true,
+        "oldSessionActive": true,
+        "auditWritten": false
+      }
+    ]
+  },
+  "apiInitialFailedCases": [
+    {
+      "file": "reconciliation.controller.spec.ts",
+      "test": "bank statement and reconciliation API runs import, exact matching, fixed preparation and separate Compliance sign-off"
+    },
+    {
+      "file": "matters.controller.spec.ts",
+      "test": "Matters POST /matter-supervision-takeovers (step 8e) when the supervising partner can no longer act records the takeover without its reason, and tells compliance by matter reference only"
+    },
+    {
+      "file": "invitations.controller.spec.ts",
+      "test": "Invitations sending emails a link that carries the token after #, so it never reaches a server log"
+    },
+    {
+      "file": "invitations.controller.spec.ts",
+      "test": "Invitations sending creates the account as invited, unable to sign in"
+    },
+    {
+      "file": "invitations.controller.spec.ts",
+      "test": "Invitations sending stores only a hash of the token"
+    },
+    {
+      "file": "invitations.controller.spec.ts",
+      "test": "Invitations sending records who sent the invitation"
+    },
+    {
+      "file": "invitations.controller.spec.ts",
+      "test": "Invitations sending refuses to re-invite an invited client as staff"
+    },
+    {
+      "file": "reconciliation.migration.exclusive.spec.ts",
+      "test": "bank statement and reconciliation database rules holds the Compliance role used by an in-progress finance check"
+    },
+    {
+      "file": "reconciliation.migration.exclusive.spec.ts",
+      "test": "bank statement and reconciliation database rules prepares a server-calculated fixed snapshot and requires separate active Compliance sign-off"
+    },
+    {
+      "file": "reconciliation.migration.exclusive.spec.ts",
+      "test": "bank statement and reconciliation database rules requires explanations for every unmatched item and each non-zero difference"
+    }
+  ],
+  "browserInitial": {
+    "stats": {
+      "startTime": "2026-10-30T16:05:45.844Z",
+      "duration": 767335.333,
+      "expected": 77,
+      "skipped": 5,
+      "unexpected": 15,
+      "flaky": 0
+    },
+    "failedCases": [
+      {
+        "file": "clients.spec.ts",
+        "line": 98,
+        "title": "finds another person's client by name, but cannot open it, nor take it over as a fee earner",
+        "status": "unexpected"
+      },
+      {
+        "file": "clients.spec.ts",
+        "line": 117,
+        "title": "asks for at least 2 characters to search",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 25,
+        "title": "adds a document to a matter and downloads exactly what was added",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 48,
+        "title": "shows the API's reason for a refused file, and stores nothing",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 71,
+        "title": "passes a file larger than the usual 10 MB request limit through to the API whole",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 81,
+        "title": "adds a new version, then withdraws the document: kept, but no longer listed or downloaded",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 107,
+        "title": "shares a document with the client, then stops sharing it",
+        "status": "unexpected"
+      },
+      {
+        "file": "finance.spec.ts",
+        "line": 174,
+        "title": "shows immutable statement matching and gives reconciliation sign-off only to Compliance",
+        "status": "unexpected"
+      },
+      {
+        "file": "hr.spec.ts",
+        "line": 24,
+        "title": "shows every staff member the safe People area without granting the HR workspace",
+        "status": "unexpected"
+      },
+      {
+        "file": "matters.spec.ts",
+        "line": 15,
+        "title": "a fee earner opens a matter with a clear conflict check, and finds it again",
+        "status": "unexpected"
+      },
+      {
+        "file": "matters.spec.ts",
+        "line": 54,
+        "title": "a possible conflict holds the matter until its supervising partner clears it with a reason",
+        "status": "unexpected"
+      },
+      {
+        "file": "portal-access.spec.ts",
+        "line": 16,
+        "title": "invites an individual client at the address on record, then ends their access",
+        "status": "unexpected"
+      },
+      {
+        "file": "portal-access.spec.ts",
+        "line": 38,
+        "title": "offers each of an organisation's contacts with an email address, and says how to add a missing one",
+        "status": "unexpected"
+      },
+      {
+        "file": "sign-in.spec.ts",
+        "line": 54,
+        "title": "signs in with a password and an authenticator code, and signs out",
+        "status": "unexpected"
+      },
+      {
+        "file": "sign-in.spec.ts",
+        "line": 143,
+        "title": "has no accessibility problems axe can find on the sign-in and home pages",
+        "status": "unexpected"
+      }
+    ]
+  },
+  "browserAffectedRetest": {
+    "stats": {
+      "startTime": "2026-10-30T16:20:12.405Z",
+      "duration": 273587.494,
+      "expected": 42,
+      "skipped": 0,
+      "unexpected": 4,
+      "flaky": 0
+    },
+    "failedCases": [
+      {
+        "file": "clients.spec.ts",
+        "line": 98,
+        "title": "finds another person's client by name, but cannot open it, nor take it over as a fee earner",
+        "status": "unexpected"
+      },
+      {
+        "file": "clients.spec.ts",
+        "line": 118,
+        "title": "asks for at least 2 characters to search",
+        "status": "unexpected"
+      },
+      {
+        "file": "documents.spec.ts",
+        "line": 25,
+        "title": "adds a document to a matter and downloads exactly what was added",
+        "status": "unexpected"
+      },
+      {
+        "file": "matters.spec.ts",
+        "line": 15,
+        "title": "a fee earner opens a matter with a clear conflict check, and finds it again",
+        "status": "unexpected"
+      }
+    ]
+  },
+  "independentClosureSignoff": false,
+  "browserClientSelectorFinalRetest": {
+    "stats": {
+      "startTime": "2026-10-30T16:25:05.690Z",
+      "duration": 22259.368,
+      "expected": 3,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "result": "Passed setup and both scoped client-search cases; permission assertions preserved."
+  },
+  "remainingReproducedBrowserFailures": [
+    "Document upload/download/reload: style-src-attr CSP violations",
+    "Matter creation/navigation/reload: style-src-attr CSP violations"
+  ],
+  "localPreview": {
+    "apiHealth": "ok",
+    "webSignInHttpStatus": 200,
+    "webCspHeaderPresent": true,
+    "url": "http://localhost:3000"
+  },
+  "releaseArchive": {
+    "path": "docs/stass-hosting-release.tar.gz",
+    "sha256": "b4df7cd3fda717d919ed89739ca8ae373c117c8ce15596b31123375ea8e0e8eb",
+    "note": "Source archive updated for verified CSS changes; not approved or deployed for production."
+  },
+  "controlRegisterStatusCounts": {
+    "PARTIAL": 142,
+    "NOT_REVIEWED": 41,
+    "NOT_APPLICABLE_PROPOSED": 7,
+    "OPEN_FINDING": 33,
+    "SCOPE_DECISION": 31,
+    "LOCAL_EVIDENCE": 11,
+    "EXTERNAL_EVIDENCE": 25,
+    "LOCAL_REPAIR_VERIFIED": 3
+  },
+  "trackedObservations": 14,
+  "productionSignoff": false
+}

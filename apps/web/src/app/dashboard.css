@@ -1,0 +1,128 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Dashboard rhythm: 8, 16, 24, 32, 48 and 64px. Borders and focus rings are optical details. */
+.practice-dashboard { @apply space-y-8 text-slate-900; overflow-wrap: anywhere; }
+.practice-dashboard h1, .practice-dashboard h2, .practice-dashboard h3 { @apply m-0 text-slate-900; }
+.practice-dashboard a { @apply text-slate-800 no-underline; }
+.ops-heading { @apply grid items-end gap-8 border-b border-slate-300 pb-8 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]; }
+.ops-kicker { @apply block text-xs leading-4 font-semibold tracking-widest uppercase text-slate-600; }
+.practice-dashboard .ops-heading h1 { @apply my-4 text-4xl leading-tight font-bold tracking-tight lg:text-5xl; }
+.ops-heading p { @apply m-0 max-w-xl text-base leading-6 text-slate-600; }
+.ops-heading-side { @apply flex flex-wrap items-center gap-4 md:flex-col md:items-end; }
+.ops-edition { @apply inline-flex min-h-8 items-center gap-4 rounded-full border border-slate-300 bg-slate-200 px-4 py-2 text-xs leading-4 font-medium text-slate-700; }
+.ops-edition > span { @apply text-base leading-4; }
+.ops-button { @apply inline-flex min-h-12 items-center justify-between gap-8 rounded-lg border border-slate-800 bg-slate-800 px-6 py-4 text-sm leading-4 font-semibold shadow-sm; }
+.practice-dashboard .ops-button { @apply text-slate-50; }
+.ops-button:hover { @apply bg-slate-700; }
+.ops-metrics { @apply grid gap-4 sm:grid-cols-2 xl:grid-cols-4; }
+.ops-metric { @apply flex min-w-0 flex-col rounded-2xl border border-slate-300 bg-slate-50 p-6 shadow-sm; }
+.ops-metric:hover { @apply border-slate-500 bg-slate-200; }
+.ops-tone-primary { @apply border-slate-800 bg-slate-800; }
+.practice-dashboard .ops-tone-primary { @apply text-slate-50; }
+.ops-tone-primary:hover { @apply border-slate-700 bg-slate-700; }
+.ops-tone-attention { @apply border-amber-300 bg-amber-50; }
+.ops-tone-attention:hover { @apply border-amber-500 bg-amber-100; }
+.ops-metric-top { @apply flex items-start justify-between gap-4 text-xs leading-4 font-semibold; }
+.ops-metric-top > span:last-child { @apply text-base; }
+.ops-metric > strong { @apply my-6 block text-4xl leading-none font-bold tracking-tight tabular-nums; }
+.ops-metric-note { @apply mt-auto block text-xs leading-4 text-slate-600; }
+.ops-tone-primary .ops-metric-note { @apply text-slate-200; }
+.ops-work-grid { @apply grid items-start gap-8 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]; }
+.ops-panel { @apply min-w-0 overflow-hidden rounded-2xl border border-slate-300 bg-slate-50 shadow-sm; }
+.ops-panel-heading { @apply flex min-h-16 flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-6 py-4; }
+.practice-dashboard .ops-panel-heading h2 { @apply text-base leading-6 font-semibold; }
+.ops-panel-heading > a { @apply inline-flex min-h-12 items-center gap-2 whitespace-nowrap text-sm leading-4 font-semibold; }
+.ops-panel-heading > a:hover { @apply underline underline-offset-4; }
+.ops-empty { @apply p-8; }
+.ops-empty-symbol { @apply mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-300 bg-slate-200 text-2xl leading-8 font-medium text-slate-600; }
+.practice-dashboard .ops-empty h3 { @apply mb-4 max-w-sm text-xl leading-8 font-semibold tracking-tight; }
+.ops-empty p { @apply m-0 max-w-sm text-sm leading-6 text-slate-600; }
+.ops-text-link { @apply mt-6 inline-flex min-h-12 items-center gap-4 text-sm leading-4 font-semibold; }
+.ops-text-link:hover { @apply underline underline-offset-4; }
+.ops-count { @apply inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-slate-200 px-2 py-2 text-xs leading-4 font-semibold; }
+.ops-inbox { @apply bg-slate-50; }
+.ops-inbox-footer { @apply flex min-h-16 items-center justify-between gap-4 border-t border-slate-200 px-6 py-4 text-sm leading-4 font-semibold; }
+.ops-inbox-footer:hover { @apply bg-slate-200; }
+.ops-notice-list { @apply m-0 list-none p-0; }
+.ops-notice-list li { @apply border-b border-slate-200 p-6 last:border-b-0; }
+.ops-notice-list a { @apply mt-2 flex min-h-12 items-center justify-between gap-4 text-sm leading-6 font-semibold; }
+.ops-notice-list a:hover { @apply underline underline-offset-4; }
+.ops-reference { @apply block text-xs leading-4 font-medium text-slate-600; }
+.ops-table-scroll { @apply overflow-x-auto; }
+.ops-table { @apply w-full border-collapse text-left text-sm leading-6; }
+.ops-table caption { @apply border-b border-slate-200 px-6 py-4 text-left text-xs leading-4 text-slate-600; }
+.ops-table th { @apply border-b border-slate-200 bg-slate-200 px-6 py-4 text-xs leading-4 font-semibold text-slate-700; }
+.ops-table td { @apply border-b border-slate-200 px-6 py-4 align-top; }
+.ops-table tbody tr:last-child td { @apply border-b-0; }
+.ops-table td:first-child a { @apply my-2 flex min-h-12 min-w-40 items-center font-semibold; }
+.ops-table td:first-child a:hover { @apply underline underline-offset-4; }
+.ops-table tbody tr:hover { @apply bg-slate-100; }
+.ops-client-name { @apply block text-xs leading-4 text-slate-600; }
+.ops-status { @apply inline-block rounded-lg border border-slate-300 px-2 py-2 text-xs leading-4 font-medium; }
+.ops-status-open { @apply border-emerald-300 bg-emerald-50 text-emerald-800; }
+.ops-status-awaiting_clearance { @apply border-amber-300 bg-amber-50 text-amber-900; }
+.ops-status-closed { @apply bg-slate-200 text-slate-700; }
+.ops-actions { @apply grid overflow-hidden rounded-2xl border border-slate-300 bg-slate-50 shadow-sm md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]; }
+.ops-actions-title { @apply flex flex-col justify-between gap-8 border-b border-slate-300 bg-slate-800 p-8 md:border-r md:border-b-0; }
+.practice-dashboard .ops-actions-title h2 { @apply text-2xl leading-8 font-semibold tracking-tight text-slate-50; }
+.ops-actions-title .ops-kicker { @apply text-slate-300; }
+.ops-action-list > a { @apply flex min-h-24 items-center justify-between gap-6 border-b border-slate-200 px-8 py-6 last:border-b-0; }
+.ops-action-list > a:hover { @apply bg-slate-200; }
+.ops-action-list strong { @apply block text-base leading-6 font-semibold; }
+.ops-action-list small { @apply mt-2 block text-sm leading-6 text-slate-600; }
+.ops-action-list > a > span:last-child { @apply text-2xl leading-8 text-slate-500; }
+.ops-footnote { @apply m-0 max-w-none text-xs leading-4 text-slate-600; }
+.ops-heading > div, .ops-action-list, .ops-action-list > a > span:first-child { min-width: 0; }
+.ops-action-list > a > span:last-child, .ops-notice-list a > span:last-child { flex-shrink: 0; }
+.practice-dashboard a:focus-visible,
+.practice-dashboard .ops-table-scroll:focus-visible { outline: 2px solid #334155 !important; outline-offset: 4px !important; box-shadow: 0 0 0 4px #e2e8f0 !important; }
+.practice-dashboard .ops-table-scroll:focus-visible { outline-offset: -4px !important; }
+
+/* The surrounding workspace uses the same slate palette and eight-point rhythm. */
+.staff-shell:has(.practice-dashboard) { background: #f1f5f9; }
+.staff-shell:has(.practice-dashboard) > .header { background: #0f172a; }
+.staff-shell:has(.practice-dashboard) .header-primary,
+.staff-shell:has(.practice-dashboard) .header-nav-shell { background: #0f172a; }
+.staff-shell:has(.practice-dashboard) .header-name,
+.staff-shell:has(.practice-dashboard) .header-user-tag { color: #f8fafc; }
+.staff-shell:has(.practice-dashboard) .header-product,
+.staff-shell:has(.practice-dashboard) .header-user-label { color: #cbd5e1; }
+.staff-shell:has(.practice-dashboard) .nav a { min-height: 48px; gap: 16px; padding: 16px; border: 0; border-radius: 8px; color: #cbd5e1; font-weight: 500; line-height: 16px; }
+.staff-shell:has(.practice-dashboard) .nav a:hover { background: #1e293b; color: #f8fafc; }
+.staff-shell:has(.practice-dashboard) .nav a[aria-current='page'] { background: #334155; color: #f8fafc; box-shadow: none; }
+.staff-shell:has(.practice-dashboard) .header-actions { padding: 24px 8px 0; gap: 16px; border-color: #475569; }
+.staff-shell:has(.practice-dashboard) .header .link-button { min-height: 48px; padding: 8px 16px; border: 1px solid #64748b; border-radius: 8px; color: #f8fafc; background: #1e293b; }
+.staff-shell:has(.practice-dashboard) .phase-banner { background: #f8fafc; border-color: #cbd5e1; }
+.staff-shell:has(.practice-dashboard) .phase-tag { padding: 8px 16px; border-radius: 8px; color: #334155; background: #e2e8f0; }
+.staff-shell:has(.practice-dashboard) .page-guide { margin-bottom: 32px; }
+.staff-shell:has(.practice-dashboard) .page-guide details { border-color: #cbd5e1; border-radius: 16px; }
+.staff-shell:has(.practice-dashboard) .page-guide summary { gap: 16px; padding: 16px 24px; background: #f8fafc; }
+.staff-shell:has(.practice-dashboard) .guide-icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 8px; background: #e2e8f0; color: #334155; }
+.staff-shell:has(.practice-dashboard) .guide-summary strong,
+.staff-shell:has(.practice-dashboard) .guide-toggle { color: #334155; }
+.staff-shell:has(.practice-dashboard) .guide-summary { gap: 8px 16px; }
+.staff-shell:has(.practice-dashboard) .guide-content { padding: 24px; }
+.staff-shell:has(.practice-dashboard) .footer { border-color: #cbd5e1; background: #f8fafc; }
+.staff-shell:has(.practice-dashboard) > .main { padding: 32px 24px 48px; }
+.staff-shell:has(.practice-dashboard) .phase-banner-inner,
+.staff-shell:has(.practice-dashboard) .footer-inner { padding-inline: 24px; }
+
+@media (min-width: 72rem) {
+  .staff-shell:has(.practice-dashboard) { grid-template-columns: 248px minmax(0, 1fr); }
+  .staff-shell:has(.practice-dashboard) > .header { padding: 32px 16px; }
+  .staff-shell:has(.practice-dashboard) .header-brand-wrap { gap: 16px; padding: 0 8px 32px; }
+  .staff-shell:has(.practice-dashboard) .header-product { margin-left: 64px; }
+  .staff-shell:has(.practice-dashboard) .nav ul { gap: 8px; }
+  .staff-shell:has(.practice-dashboard) > .main { padding-inline: 48px; }
+  .staff-shell:has(.practice-dashboard) .phase-banner-inner,
+  .staff-shell:has(.practice-dashboard) .footer-inner { padding-inline: 48px; }
+}
+@media (max-width: 40rem) {
+  .practice-dashboard .ops-heading h1 { font-size: 32px; line-height: 40px; }
+  .ops-empty, .ops-actions-title { padding: 24px; }
+  .ops-action-list > a { padding: 24px; }
+}
+@media print {
+  .ops-panel, .ops-metric, .ops-actions { box-shadow: none; break-inside: avoid; }
+}

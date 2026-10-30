@@ -1,0 +1,16 @@
+# Local integration fixture only. Production uses compose.hosting.yaml by itself.
+services:
+  tls-init:
+    environment: {TLS_EXTRA_NAMES: smtp}
+  smtp:
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    environment:
+      MP_DISABLE_VERSION_CHECK: 'true'
+      MP_SMTP_TLS_CERT: /certs/smtp/server.crt
+      MP_SMTP_TLS_KEY: /certs/smtp/server.key
+      MP_SMTP_REQUIRE_STARTTLS: 'true'
+    volumes: [private-tls:/certs:ro]
+    depends_on:
+      tls-init: {condition: service_completed_successfully}
+    ports: [127.0.0.1:18025:8025]
+    networks: [private]

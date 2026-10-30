@@ -1,112 +1,63 @@
-# Disaster Recovery & Encrypted Backup Policy
+# Recovery runbook
 
-**Current state (2026-10-14):** Production design approved (Review C6, F3, Deployment step 19c).
-Applies to hosted production environments in accordance with SRA Code of Conduct,
-UK GDPR Article 32 (Security of Processing), and Legal Professional Privilege (LPP).
+Status: local backup/restore tooling is implemented. Production backups, replication,
+immutable storage, actual recovery times and officer sign-off need provider evidence.
+Previous statements that these were already deployed were design intentions.
 
----
+## Before live records
 
-## 1. Recovery Objectives (RPO & RTO)
+- [ ] Assign recovery owner/deputy; approve RPO/RTO targets. Suggested starting
+  targets are 15 minutes and four hours, subject to a real provider drill.
+- [ ] Enable encrypted backups and point-in-time recovery. Record retention,
+  region, encryption-key recovery and independent access controls.
+- [ ] Back up private objects and every required application key version.
+  Database backups alone cannot recover documents or keys.
+- [ ] Configure independent signed audit/disposal checkpoints following
+  [security operations](security-operations.md); alert on failed/missed runs.
+- [ ] Perform a provider restore drill and record actual recovery timestamp,
+  elapsed time, object integrity, disposal review and named approval.
 
-| Metric | Target | Rationale & Mechanism |
-|---|---|---|
-| **RPO (Recovery Point Objective)** | **≤ 15 minutes** | Managed PostgreSQL continuous Write-Ahead Log (WAL) archiving to secondary object storage, supplemented by synchronous replica in secondary Availability Zone (AZ). |
-| **RTO (Recovery Time Objective)** | **≤ 4 hours** | Automated multi-AZ failover (< 60s for zone failure); full cold-site restore runbook from immutable encrypted snapshots (< 4 hours for catastrophic multi-zone outage). |
+## Local regression drill
 
----
+With local services running and API tests having populated pms_test, run
+`node scripts/restore-drill.mjs`. It only accepts a loopback pms_test source,
+exports a consistent snapshot, encrypts a logical dump with AES-256-GCM, restores
+into a randomly named scratch database, compares every application table's count
+and content hash, then removes that scratch database. Evidence is in
+logs/restore-drill/evidence.json. Its temporary key is not retained: this is a
+regression exercise, not a usable production backup or proof of production RPO.
 
-## 2. Storage & Backup Encryption (Review C6)
+## Production recovery
 
-### Storage at Rest
-1. **Host Disks:** All primary databases, web servers, and temporary volumes employ AES-256 hardware/kernel-level block encryption (LUKS on Linux, managed KMS-encrypted EBS/Managed Disks).
-2. **Encrypted S3 Object Storage:** SeaweedFS/S3 document and evidence stores enforce server-side encryption (SSE-KMS) with dedicated customer-managed keys (CMKs) in addition to envelope application-level encryption (`DOCUMENT_ENCRYPTION_KEY`, `HR_ENCRYPTION_KEY`, `SUSPICION_ENCRYPTION_KEY`).
+1. Declare an incident, preserve evidence and isolate the affected deployment.
+   Prepare a quarantined restore target with traffic, mail, payments, workers and
+   outbound integrations disabled. Preserve the last good copy.
+2. Use the provider's supported PITR/restore procedure and recorded identifiers.
+   For self-managed physical PostgreSQL recovery, restore_command and recovery
+   targets belong in PostgreSQL configuration. recovery.signal is an EMPTY marker
+   file. Logical pg_dump backups instead use pg_restore. Follow the installed
+   [PostgreSQL documentation](https://www.postgresql.org/docs/current/continuous-archiving.html).
+3. Restore matching code and all required key versions. Verify integrity and the
+   recovery timestamp before applying reviewed migrations. Restore private objects
+   and check decryption, object versions and access policies.
+4. Obtain the latest independently signed disposal journal and offline public key.
+   Run `node infra/hosting/verify-restored-disposals.mjs checkpoint.json` with
+   RESTORE_DATABASE_URL, AUDIT_VERIFY_KEY_PEM and AUDIT_DEPLOYMENT_ID supplied
+   securely. Failure, stale journals, unknown categories or resurrected identifiers
+   require continued quarantine.
+5. This verifier DETECTS known resurrected rows; it does not replay disposals.
+   The compliance officer must establish journal completeness through the incident,
+   review post-checkpoint disposals and approve category-specific row/object removal.
+   retention:sweep checks current eligibility; it does NOT replay historical disposal.
+   Where replay is needed, prepare a reviewed incident-specific transaction and
+   object-removal plan, preserving only approved content-free tombstones. Do not
+   enable traffic until completeness and removal are independently verified.
+6. Verify accounts, revoked sessions, permissions, audit continuity, balances,
+   document hashes and integrations using synthetic records. Private API liveness
+   is /health; readiness is /ready. Public proxy paths are /api/health and /api/ready.
+7. Recovery owner and compliance officer record evidence and approve release.
+   Re-enable traffic/integrations gradually and monitor. Rotate compromised secrets
+   without losing decryption keys needed for retained records and backups.
 
-### Backup Encryption & Off-Site Replication
-1. **Air-Gapped & Immutable:** Daily PostgreSQL physical base backups and WAL archives stream directly to a hardened, access-restricted secondary bucket with **Object Lock (Compliance Mode / WORM)** enabled to prevent ransomware destruction or tampering.
-2. **Encryption Keys:** Backups are encrypted with asymmetrical GPG keys / AWS KMS keys whose decrypt permission is restricted to emergency break-glass disaster recovery roles.
-3. **UK Jurisdiction:** Backups reside strictly within UK/EEA data centers:
-   - Primary: UK South (London / England).
-   - Secondary DR Backup Target: UK West (Cardiff / Wales) or EU West (Dublin / Ireland).
-
----
-
-## 3. Retention & Disposal Replay Rule
-
-> [!CRITICAL]
-> **A backup restore must never resurrect lawfully disposed personal data.**
-> Under UK GDPR Article 17 and MLR 2017 Regulation 40, personal data disposed of under
-> AML or HR retention procedures must not be returned to live circulation via a database restore.
-
-### Post-Restore Disposal Replay Procedure
-Following any restore from a backup image:
-1. **Network Quarantine:** The restored database remains quarantined; external traffic to the API and Web apps is blocked.
-2. **Audit Extraction:** The system inspects immutable audit entries in `app.audit_events` created between the backup timestamp and the outage:
-   - `action = 'aml.retention_disposed'`
-   - `action = 'hr.retention_disposed'`
-3. **Tombstone Replay:** For every disposal recorded after the backup point:
-   - Live CDD, matter, individual, or HR personal data rows are purged.
-   - Content-free cryptographic tombstones are reapplied.
-   - S3 object deletion verification is re-executed.
-4. **Supervisory Sign-Off:** The Compliance Officer (COLP/MLRO) and Lead Partner verify that no disposed personal data is live before DNS traffic is routed to the restored instance.
-
----
-
-## 4. Backup Lifecycle & Schedules
-
-| Backup Type | Frequency | Retention Window | Immutability |
-|---|---|---|---|
-| **Continuous WAL** | Every 15 min | 14 days | Append-only, strict IAM lock |
-| **Daily Full Snapshot** | Every 24 hours (02:00 UTC) | 30 days | Object Lock (30-day WORM) |
-| **Weekly Snapshot** | Sundays | 90 days | Object Lock (90-day WORM) |
-| **Monthly Snapshot** | 1st of month | 12 months | Object Lock (1-year WORM) |
-
----
-
-## 5. Restoration Runbook (Verification Drill)
-
-### Step 1: Prepare Isolated Restoration Environment
-```bash
-# Provision isolated VPC/staging database target
-export RESTORE_TARGET_HOST="10.0.99.10"
-export RESTORE_POINT_IN_TIME="2026-10-14 01:00:00+00"
-```
-
-### Step 2: Restore PostgreSQL Base Image & Replay WAL
-```bash
-# Fetch encrypted base backup and decrypt via KMS
-aws s3 cp s3://pms-backups-immutable/base-2026-10-14.tar.gz.enc - | \
-  gpg --decrypt --batch --passphrase-file /etc/pms/dr-key | \
-  tar -xz -C /var/lib/postgresql/data
-
-# Configure recovery.signal with target recovery point
-cat <<EOF > /var/lib/postgresql/data/recovery.signal
-restore_command = 'aws s3 cp s3://pms-backups-immutable/wal/%f %p'
-recovery_target_time = '${RESTORE_POINT_IN_TIME}'
-recovery_target_action = 'promote'
-EOF
-```
-
-### Step 3: Run Database Migrations & Validation
-```bash
-# Start PostgreSQL in recovery mode and verify consistency
-systemctl start postgresql
-npm run --prefix apps/api migrate
-```
-
-### Step 4: Replay Post-Backup Retention Disposals
-```bash
-# Execute automated disposal replay verification script
-npm run --prefix apps/api retention:sweep
-```
-
-### Step 5: Verify Integrity & Release
-```bash
-# Run read-only healthcheck suite
-curl -f http://127.0.0.1:3001/api/health
-```
-
----
-
-## 6. Drill Schedule
-
-A full cold-site restore drill is conducted **every 6 months** by the technical team and recorded in `docs/reviews/`. Results, RTO/RPO achieved, and sign-offs are submitted to the firm's Risk and Compliance Committee.
+Repeat the provider drill at least every six months and after material changes.
+A green local drill does not prove production RPO/RTO or disposal completeness.

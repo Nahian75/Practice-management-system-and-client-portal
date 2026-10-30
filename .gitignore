@@ -47,3 +47,11 @@ Thumbs.db
 
 # Local demo login details: this computer only, never committed.
 DEMO-LOGIN.txt
+
+# Generated local presentations and screenshots can contain account details.
+/docs/*.html
+/docs/*.pdf
+/docs/*.zip
+/docs/*.tar.gz
+/docs/ui-design-assets/
+/docs/manage-ui-assets/

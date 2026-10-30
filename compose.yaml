@@ -63,6 +63,7 @@ services:
     environment:
       # Report a file it could not fully scan (past its size, depth or count limits) instead of calling it clean (review D3).
       CLAMD_CONF_AlertExceedsMax: "yes"
+      TZ: UTC
     ports:
       - "127.0.0.1:3310:3310"
     volumes:

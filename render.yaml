@@ -1,0 +1,114 @@
+# Managed deployment: see docs/render-hosting.md before creating this Blueprint.
+# Create a paid PostgreSQL 18 database first and supply its EXTERNAL URL below.
+services:
+  - type: web
+    name: stass
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./infra/hosting/render-web.Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/ready
+    envVars:
+      - key: API_HOST
+        fromService:
+          type: pserv
+          name: stass-api
+          property: host
+
+  - type: pserv
+    name: stass-api
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./infra/hosting/render-api.Dockerfile
+    dockerContext: .
+    preDeployCommand: node /app/infra/hosting/cloud-bootstrap.mjs
+    envVars:
+      - key: PORT
+        value: '3001'
+      - key: CLOUD_ROOT_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY_VERSION
+        value: '1'
+      - key: CLOUD_ADMIN_DATABASE_URL
+        sync: false
+      - key: CLOUD_APP_BASE_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_NAME
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: DOCUMENTS_S3_ENDPOINT
+        sync: false
+      - key: DOCUMENTS_S3_REGION
+        value: auto
+      - key: DOCUMENTS_S3_BUCKET
+        sync: false
+      - key: DOCUMENTS_S3_ACCESS_KEY
+        sync: false
+      - key: DOCUMENTS_S3_SECRET_KEY
+        sync: false
+      - key: CLAMAV_HOST
+        fromService:
+          type: pserv
+          name: stass-scanner
+          property: host
+      - key: SANCTIONS_LIST_URL
+        value: https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv
+
+  - type: pserv
+    name: stass-scanner
+    runtime: image
+    region: frankfurt
+    plan: pro
+    image:
+      url: clamav/clamav:1.5.4@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    envVars:
+      - key: PORT
+        value: '3310'
+      - key: TZ
+        value: UTC
+    disk:
+      name: scanner-definitions
+      mountPath: /var/lib/clamav
+      sizeGB: 5
+
+  - type: cron
+    name: stass-security-cleanup
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./infra/hosting/render-api.Dockerfile
+    dockerContext: .
+    dockerCommand: node /app/infra/hosting/cloud-runtime.mjs retention
+    schedule: '0 2 * * *'
+    envVars:
+      - key: CLOUD_ROOT_KEY
+        fromService: {type: pserv, name: stass-api, envVarKey: CLOUD_ROOT_KEY}
+      - key: ENCRYPTION_KEY_VERSION
+        fromService: {type: pserv, name: stass-api, envVarKey: ENCRYPTION_KEY_VERSION}
+      - key: CLOUD_ADMIN_DATABASE_URL
+        fromService: {type: pserv, name: stass-api, envVarKey: CLOUD_ADMIN_DATABASE_URL}
+      - key: CLOUD_APP_BASE_URL
+        fromService: {type: pserv, name: stass-api, envVarKey: CLOUD_APP_BASE_URL}
+      - key: SMTP_URL
+        fromService: {type: pserv, name: stass-api, envVarKey: SMTP_URL}
+      - key: MAIL_FROM_ADDRESS
+        fromService: {type: pserv, name: stass-api, envVarKey: MAIL_FROM_ADDRESS}
+      - key: DOCUMENTS_S3_ENDPOINT
+        fromService: {type: pserv, name: stass-api, envVarKey: DOCUMENTS_S3_ENDPOINT}
+      - key: DOCUMENTS_S3_REGION
+        fromService: {type: pserv, name: stass-api, envVarKey: DOCUMENTS_S3_REGION}
+      - key: DOCUMENTS_S3_BUCKET
+        fromService: {type: pserv, name: stass-api, envVarKey: DOCUMENTS_S3_BUCKET}
+      - key: DOCUMENTS_S3_ACCESS_KEY
+        fromService: {type: pserv, name: stass-api, envVarKey: DOCUMENTS_S3_ACCESS_KEY}
+      - key: DOCUMENTS_S3_SECRET_KEY
+        fromService: {type: pserv, name: stass-api, envVarKey: DOCUMENTS_S3_SECRET_KEY}
+      - key: CLAMAV_HOST
+        fromService: {type: pserv, name: stass-scanner, property: host}

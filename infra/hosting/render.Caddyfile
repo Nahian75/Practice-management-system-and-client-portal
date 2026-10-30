@@ -1,0 +1,49 @@
+{
+  admin off
+  auto_https off
+  servers {
+    # Render terminates public TLS and supplies X-Forwarded-For through its private ingress.
+    trusted_proxies static private_ranges
+    trusted_proxies_strict
+    client_ip_headers X-Forwarded-For
+  }
+}
+:{$PORT:10000} {
+  header {
+    -Server
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+  }
+  @uploads path_regexp upload ^/api/(matters/[^/]+/documents|documents/[^/]+/versions|clients/[^/]+/cdd/[^/]+/evidence|compliance/restricted-reports|hr/people/[^/]+/files)$
+  handle @uploads {
+    request_body {
+      max_size 52MB
+    }
+    uri strip_prefix /api
+    reverse_proxy {$API_URL} {
+      header_up X-Forwarded-For {client_ip}
+      header_up X-Forwarded-Proto https
+    }
+  }
+  handle /api/* {
+    request_body {
+      max_size 1MB
+    }
+    uri strip_prefix /api
+    reverse_proxy {$API_URL} {
+      header_up X-Forwarded-For {client_ip}
+      header_up X-Forwarded-Proto https
+    }
+  }
+  handle {
+    request_body {
+      max_size 1MB
+    }
+    reverse_proxy 127.0.0.1:3000 {
+      header_up X-Forwarded-For {client_ip}
+      header_up X-Forwarded-Proto https
+    }
+  }
+}

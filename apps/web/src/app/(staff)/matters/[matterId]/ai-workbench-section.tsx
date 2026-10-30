@@ -215,44 +215,36 @@ export function AiWorkbenchSection({
   };
 
   return (
-    <section aria-labelledby="ai-workbench-heading" className="card" style={{ marginTop: '2rem', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1.5rem', background: '#ffffff' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+    <section aria-labelledby="ai-workbench-heading"  className={["card","ai-rule-1"].join(" ")}>
+      <div className={["ai-rule-2"].join(" ")}>
         <div>
-          <h2 id="ai-workbench-heading" style={{ margin: 0, fontSize: '1.35rem', color: '#0f172a' }}>
+          <h2 id="ai-workbench-heading" className={["ai-rule-3"].join(" ")}>
             Legal Drafting Assistant & AI Workbench
           </h2>
-          <p className="secondary" style={{ margin: '0.25rem 0 0', fontSize: '0.9rem' }}>
-            SRA Code Paras 1.4 & 2.1 compliant: AI generates unapproved drafts under fee earner supervision.
+          <p  className={["secondary","ai-rule-4"].join(" ")}>
+            AI output is an unapproved draft. A responsible fee earner must verify sources, accuracy and confidentiality before use.
           </p>
         </div>
 
         {metrics && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: '0.85rem', color: '#475569' }}>Matter Token Budget:</span>
-            <div style={{ width: '100px', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(100, metrics.percentUsed)}%`, height: '100%', background: metrics.percentUsed > 80 ? '#ef4444' : '#0284c7' }} />
+          <div className={["ai-rule-5"].join(" ")}>
+            <span className={["ai-rule-6"].join(" ")}>Matter Token Budget:</span>
+            <div className={["ai-rule-7"].join(" ")}>
+              <progress className={metrics.percentUsed > 80 ? 'ai-budget-progress ai-budget-high' : 'ai-budget-progress'} value={Math.max(0, Math.min(100, metrics.percentUsed))} max={100} aria-label="AI token budget used" />
             </div>
-            <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{metrics.tokensUsedThisMonth.toLocaleString()} tokens</strong>
+            <strong className={["ai-rule-8"].join(" ")}>{metrics.tokensUsedThisMonth.toLocaleString()} tokens</strong>
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="AI Workbench navigation" style={{ display: 'flex', gap: '0.5rem', margin: '1.25rem 0', borderBottom: '1px solid #e2e8f0' }}>
+      <div role="tablist" aria-label="AI Workbench navigation" className={["ai-rule-9"].join(" ")}>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'generate'}
           onClick={() => setActiveTab('generate')}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'generate' ? '2px solid #0284c7' : '2px solid transparent',
-            color: activeTab === 'generate' ? '#0284c7' : '#64748b',
-            fontWeight: activeTab === 'generate' ? 600 : 400,
-            cursor: 'pointer',
-          }}
+          className={["ai-rule-16",(activeTab === 'generate' ? "ai-rule-10" : "ai-rule-11"),(activeTab === 'generate' ? "ai-rule-12" : "ai-rule-13"),(activeTab === 'generate' ? "ai-rule-14" : "ai-rule-15")].join(" ")}
         >
           Drafting Assistant
         </button>
@@ -266,15 +258,7 @@ export function AiWorkbenchSection({
               void loadDraftDetails(selectedDraftId);
             }
           }}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'review' ? '2px solid #0284c7' : '2px solid transparent',
-            color: activeTab === 'review' ? '#0284c7' : '#64748b',
-            fontWeight: activeTab === 'review' ? 600 : 400,
-            cursor: 'pointer',
-          }}
+          className={["ai-rule-16",(activeTab === 'review' ? "ai-rule-10" : "ai-rule-11"),(activeTab === 'review' ? "ai-rule-12" : "ai-rule-13"),(activeTab === 'review' ? "ai-rule-14" : "ai-rule-15")].join(" ")}
         >
           Drafts & Review ({draftsList.length})
         </button>
@@ -283,7 +267,7 @@ export function AiWorkbenchSection({
       {/* GENERATION TAB */}
       {activeTab === 'generate' && (
         <div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+          <div className={["ai-rule-17"].join(" ")}>
             <button
               type="button"
               className={`button ${action === 'summarise' ? '' : 'button-secondary'}`}
@@ -314,7 +298,7 @@ export function AiWorkbenchSection({
             </button>
           </div>
 
-          <form onSubmit={handleGenerate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form onSubmit={handleGenerate} className={["ai-rule-18"].join(" ")}>
             {generateErrors && (
               <div className="notice notice-error" role="alert">
                 {generateErrors.map((err, i) => (
@@ -324,13 +308,13 @@ export function AiWorkbenchSection({
             )}
 
             <div>
-              <label htmlFor="ai-title" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>
+              <label htmlFor="ai-title" className={["ai-rule-19"].join(" ")}>
                 Draft Title
               </label>
               <input
                 id="ai-title"
                 type="text"
-                className="input"
+                
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={
@@ -343,52 +327,52 @@ export function AiWorkbenchSection({
                         : 'e.g. Attendance Note: Telephone conference with Client'
                 }
                 required
-                style={{ width: '100%' }}
+                className={["input","ai-rule-20"].join(" ")}
               />
             </div>
 
             {action !== 'attendance' ? (
               <div>
-                <label htmlFor="ai-instruction" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>
+                <label htmlFor="ai-instruction" className={["ai-rule-19"].join(" ")}>
                   Fee Earner Instructions
                 </label>
                 <textarea
                   id="ai-instruction"
-                  className="input"
+                  
                   rows={4}
                   value={instruction}
                   onChange={(e) => setInstruction(e.target.value)}
                   placeholder="Specify particular issues to focus on, legal questions to analyse, or key deadlines to extract..."
                   required
-                  style={{ width: '100%', fontFamily: 'inherit' }}
+                  className={["input","ai-rule-21"].join(" ")}
                 />
               </div>
             ) : (
               <div>
-                <label htmlFor="ai-raw-notes" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>
+                <label htmlFor="ai-raw-notes" className={["ai-rule-19"].join(" ")}>
                   Raw Notes / Dictation
                 </label>
                 <textarea
                   id="ai-raw-notes"
-                  className="input"
+                  
                   rows={6}
                   value={rawNotes}
                   onChange={(e) => setRawNotes(e.target.value)}
                   placeholder="Paste dictated transcript or quick phone jottings here..."
                   required
-                  style={{ width: '100%', fontFamily: 'inherit' }}
+                  className={["input","ai-rule-21"].join(" ")}
                 />
               </div>
             )}
 
             {documents.length > 0 && (
               <div>
-                <span style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem' }}>
+                <span className={["ai-rule-22"].join(" ")}>
                   Attach Context Matter Documents (Grounded Citations)
                 </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', padding: '0.5rem', borderRadius: '4px' }}>
+                <div className={["ai-rule-23"].join(" ")}>
                   {documents.map((doc) => (
-                    <label key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                    <label key={doc.id} className={["ai-rule-24"].join(" ")}>
                       <input
                         type="checkbox"
                         checked={selectedDocIds.includes(doc.id)}
@@ -412,14 +396,14 @@ export function AiWorkbenchSection({
 
       {/* REVIEW TAB */}
       {activeTab === 'review' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 300px) 1fr', gap: '1.5rem' }}>
+        <div className={["ai-rule-25"].join(" ")}>
           {/* Drafts List Column */}
-          <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '1rem' }}>
-            <h3 style={{ fontSize: '1rem', marginTop: 0 }}>Matter Drafts</h3>
+          <div className={["ai-rule-26"].join(" ")}>
+            <h3 className={["ai-rule-27"].join(" ")}>Matter Drafts</h3>
             {draftsList.length === 0 ? (
-              <p className="secondary" style={{ fontSize: '0.9rem' }}>No AI drafts generated yet.</p>
+              <p  className={["secondary","ai-rule-28"].join(" ")}>No AI drafts generated yet.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className={["ai-rule-29"].join(" ")}>
                 {draftsList.map((d) => {
                   const isSelected = d.id === selectedDraftId;
                   return (
@@ -427,45 +411,17 @@ export function AiWorkbenchSection({
                       key={d.id}
                       type="button"
                       onClick={() => void loadDraftDetails(d.id)}
-                      style={{
-                        textAlign: 'left',
-                        padding: '0.75rem',
-                        borderRadius: '6px',
-                        border: isSelected ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                        background: isSelected ? '#f0f9ff' : '#ffffff',
-                        cursor: 'pointer',
-                      }}
+                      className={["ai-rule-34",(isSelected ? "ai-rule-30" : "ai-rule-31"),(isSelected ? "ai-rule-32" : "ai-rule-33")].join(" ")}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                        <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{d.title}</strong>
+                      <div className={["ai-rule-35"].join(" ")}>
+                        <strong className={["ai-rule-36"].join(" ")}>{d.title}</strong>
                         <span
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '0.15rem 0.4rem',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                            background:
-                              d.reviewDecision === 'accepted'
-                                ? '#dcfce7'
-                                : d.reviewDecision === 'modified'
-                                  ? '#dbeafe'
-                                  : d.reviewDecision === 'rejected'
-                                    ? '#fee2e2'
-                                    : '#fef3c7',
-                            color:
-                              d.reviewDecision === 'accepted'
-                                ? '#166534'
-                                : d.reviewDecision === 'modified'
-                                  ? '#1e40af'
-                                  : d.reviewDecision === 'rejected'
-                                    ? '#991b1b'
-                                    : '#92400e',
-                          }}
+                          className={["ai-rule-45",(d.reviewDecision === 'accepted' ? "ai-rule-37" : (d.reviewDecision === 'modified' ? "ai-rule-38" : (d.reviewDecision === 'rejected' ? "ai-rule-39" : "ai-rule-40"))),(d.reviewDecision === 'accepted' ? "ai-rule-41" : (d.reviewDecision === 'modified' ? "ai-rule-42" : (d.reviewDecision === 'rejected' ? "ai-rule-43" : "ai-rule-44")))].join(" ")}
                         >
                           {d.reviewStatus === 'reviewed' ? d.reviewDecision : 'Pending'}
                         </span>
                       </div>
-                      <span className="secondary" style={{ fontSize: '0.8rem' }}>{d.draftType.replace('_', ' ')}</span>
+                      <span  className={["secondary","ai-rule-46"].join(" ")}>{d.draftType.replace('_', ' ')}</span>
                     </button>
                   );
                 })}
@@ -482,13 +438,13 @@ export function AiWorkbenchSection({
             )}
 
             {!isLoadingDraft && activeDraftDetail && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className={["ai-rule-18"].join(" ")}>
                 {/* SRA Warning Banner */}
-                <div style={{ background: '#fffbeb', borderLeft: '4px solid #f59e0b', padding: '0.75rem 1rem', borderRadius: '4px' }}>
-                  <strong style={{ color: '#92400e', display: 'block', marginBottom: '0.25rem' }}>
+                <div className={["ai-rule-47"].join(" ")}>
+                  <strong className={["ai-rule-48"].join(" ")}>
                     SRA Warning Notice: Unverified AI Output
                   </strong>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f' }}>
+                  <p className={["ai-rule-49"].join(" ")}>
                     This text was generated by AI. All case citations, statutory references, and factual assertions must be independently verified against primary matter files prior to client dispatch.
                   </p>
                 </div>
@@ -503,11 +459,11 @@ export function AiWorkbenchSection({
 
                 {/* Structured Citations */}
                 {activeDraftDetail.structuredCitations.length > 0 && (
-                  <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Linked Grounding Citations</h4>
-                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                  <div className={["ai-rule-50"].join(" ")}>
+                    <h4 className={["ai-rule-51"].join(" ")}>Linked Grounding Citations</h4>
+                    <ul className={["ai-rule-52"].join(" ")}>
                       {activeDraftDetail.structuredCitations.map((c, i) => (
-                        <li key={i} style={{ marginBottom: '0.25rem' }}>
+                        <li key={i} className={["ai-rule-53"].join(" ")}>
                           <strong>{c.documentTitle}</strong> {c.pageNumber ? `(p. ${c.pageNumber})` : ''}: <em>&ldquo;{c.quote}&rdquo;</em>
                         </li>
                       ))}
@@ -516,30 +472,21 @@ export function AiWorkbenchSection({
                 )}
 
                 {/* Side-by-Side / Diff Viewer */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className={["ai-rule-54"].join(" ")}>
                   <div>
-                    <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem', color: '#64748b' }}>
+                    <label className={["ai-rule-55"].join(" ")}>
                       Original AI Draft (Read-Only)
                     </label>
                     <textarea
                       readOnly
                       rows={12}
                       value={activeDraftDetail.generatedText}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        fontSize: '0.85rem',
-                        fontFamily: 'monospace',
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        color: '#334155',
-                      }}
+                      className={["ai-rule-56"].join(" ")}
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="ai-editor" style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem', color: '#0f172a' }}>
+                    <label htmlFor="ai-editor" className={["ai-rule-57"].join(" ")}>
                       Fee Earner Edited & Approved Version
                     </label>
                     <textarea
@@ -547,22 +494,15 @@ export function AiWorkbenchSection({
                       rows={12}
                       value={editedText}
                       onChange={(e) => setEditedText(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        fontSize: '0.85rem',
-                        fontFamily: 'inherit',
-                        border: '1px solid #0284c7',
-                        borderRadius: '4px',
-                      }}
+                      className={["ai-rule-58"].join(" ")}
                     />
                   </div>
                 </div>
 
                 {/* Promotion options */}
-                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Promotion Options Upon Approval</span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                <div className={["ai-rule-59"].join(" ")}>
+                  <span className={["ai-rule-60"].join(" ")}>Promotion Options Upon Approval</span>
+                  <label className={["ai-rule-61"].join(" ")}>
                     <input
                       type="checkbox"
                       checked={promoteToDoc}
@@ -573,15 +513,15 @@ export function AiWorkbenchSection({
                   {promoteToDoc && (
                     <input
                       type="text"
-                      className="input"
+                      
                       value={promoteToDocTitle}
                       onChange={(e) => setPromoteToDocTitle(e.target.value)}
                       placeholder="Official Document Title"
-                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      className={["input","ai-rule-62"].join(" ")}
                     />
                   )}
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <label className={["ai-rule-61"].join(" ")}>
                     <input
                       type="checkbox"
                       checked={promoteToTask}
@@ -592,39 +532,39 @@ export function AiWorkbenchSection({
                   {promoteToTask && (
                     <input
                       type="text"
-                      className="input"
+                      
                       value={promoteToTaskTitle}
                       onChange={(e) => setPromoteToTaskTitle(e.target.value)}
                       placeholder="Follow-up Task Title"
-                      style={{ width: '100%', fontSize: '0.85rem' }}
+                      className={["input","ai-rule-62"].join(" ")}
                     />
                   )}
                 </div>
 
                 {/* Feedback reason input for rejection or modification */}
                 <div>
-                  <label htmlFor="ai-feedback" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                  <label htmlFor="ai-feedback" className={["ai-rule-63"].join(" ")}>
                     Review / Audit Feedback Notes (Required if rejecting)
                   </label>
                   <input
                     id="ai-feedback"
                     type="text"
-                    className="input"
+                    
                     value={feedbackReason}
                     onChange={(e) => setFeedbackReason(e.target.value)}
                     placeholder="e.g. Corrected statutory limitation period; verified all primary authorities..."
-                    style={{ width: '100%', fontSize: '0.85rem' }}
+                    className={["input","ai-rule-62"].join(" ")}
                   />
                 </div>
 
                 {/* Review Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div className={["ai-rule-64"].join(" ")}>
                   <button
                     type="button"
-                    className="button"
+                    
                     disabled={isSubmittingReview}
                     onClick={() => void handleReviewDecision('accepted')}
-                    style={{ background: '#16a34a', borderColor: '#16a34a' }}
+                    className={["button","ai-rule-65"].join(" ")}
                   >
                     ✅ Accept As-Is & Promote
                   </button>
@@ -638,10 +578,10 @@ export function AiWorkbenchSection({
                   </button>
                   <button
                     type="button"
-                    className="button button-secondary"
+                    
                     disabled={isSubmittingReview}
                     onClick={() => void handleReviewDecision('rejected')}
-                    style={{ color: '#dc2626' }}
+                    className={["button button-secondary","ai-rule-66"].join(" ")}
                   >
                     ❌ Reject Draft
                   </button>

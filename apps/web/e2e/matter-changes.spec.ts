@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { follow, noAxeViolations } from './support/checks';
 import { openMatter } from './support/matters';
 import { apiSessionFor, signedInStaff, signIn } from './support/session';

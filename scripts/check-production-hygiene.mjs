@@ -76,8 +76,8 @@ if (existsSync(nginxProxyPath) && existsSync(caddyProxyPath)) {
 const drPath = resolve(rootDir, 'docs/disaster-recovery.md');
 if (existsSync(drPath)) {
   const drContent = readFileSync(drPath, 'utf8');
-  if (drContent.includes('RPO') && drContent.includes('RTO') && drContent.includes('Tombstone Replay')) {
-    reportPass('Disaster Recovery runbook contains RPO/RTO targets and tombstone replay rule (Review C6)');
+  if (['RPO','RTO','quarantin','verify-restored-disposals.mjs','does NOT replay historical disposal','EMPTY marker'].every(term=>drContent.includes(term))) {
+    reportPass('Recovery runbook records targets, quarantine, disposal verification and correct recovery configuration');
   } else {
     reportIssue('Disaster recovery documentation missing required RPO/RTO or tombstone replay rules');
   }

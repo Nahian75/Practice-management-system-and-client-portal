@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
-import type { APIRequestContext } from '@playwright/test';
+import {expect, type APIRequestContext} from '@playwright/test';
 import { E2E_AML_ENCRYPTION_KEY, E2E_FINANCE_ENCRYPTION_KEY, E2E_MAIL_ENCRYPTION_KEY,
   E2E_HR_ENCRYPTION_KEY, E2E_SUSPICION_ENCRYPTION_KEY, E2E_WEB_URL } from '../../playwright.config';
 import { e2eDatabaseUrl } from './database.mjs';
@@ -25,8 +25,10 @@ export async function createStaff(request: APIRequestContext, roles: string[] = 
   const { email, displayName, token } = await inviteStaff(roles);
   const password = `quiet-harbour-${randomUUID()}`;
   const passwordStep = await request.post('/api/auth/invitations/password', { data: { token, password } });
+  expect(passwordStep.status()).toBe(200);
   const { twoFactor } = (await passwordStep.json()) as { twoFactor: { secret: string } };
   const complete = await request.post('/api/auth/invitations/complete', { data: { token, code: totp(twoFactor.secret) } });
+  expect(complete.status()).toBe(200);
   const { backupCodes } = (await complete.json()) as { backupCodes: string[] };
 
   return { email, displayName, password, secret: twoFactor.secret, backupCodes };

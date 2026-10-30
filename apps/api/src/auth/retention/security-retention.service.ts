@@ -57,6 +57,7 @@ export class SecurityRetentionService {
         ${outboxDays}::integer
       )
     `.execute(this.db);
+    await sql`SELECT app.prune_api_request_limits()`.execute(this.db);
 
     const row = result.rows[0] ?? {
       purged_sessions: 0,

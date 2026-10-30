@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
-import { Source_Sans_3 } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { appName } from '@/config';
 import './globals.css';
-
-// Downloaded when the app is built and served from this site: no request to
-// Google, or anyone else, when a page is viewed.
-const sans = Source_Sans_3({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
+import './interface.css';
+import './dashboard.css';
+import './sign-in.css';
+import './manage.css';
+import './reference-theme.css';
+import './ai-workspaces.css';
 
 // Every page is rendered per request: each needs its own nonce for the
 // Content Security Policy, and nothing signed-in may be cached.
@@ -23,7 +24,7 @@ export function generateMetadata(): Metadata {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en-GB" className={sans.variable}>
+    <html lang="en-GB">
       <body>
         <a className="skip-link" href="#main">
           Skip to main content

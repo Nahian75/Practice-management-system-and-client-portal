@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext } from './support/test';
 import { noAxeViolations } from './support/checks';
 import { apiSessionFor, signIn, signedInStaff } from './support/session';
 
@@ -23,7 +23,7 @@ async function engage(hr: APIRequestContext, personId: string, jobTitle: string)
 
 test('shows every staff member the safe People area without granting the HR workspace', async ({ page, request }) => {
   await signedInStaff(page, request, ['fee_earner']);
-  await page.getByRole('link', { name: 'People', exact: true }).click();
+  await page.getByRole('link', { name: 'Team directory', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'People' })).toBeVisible();
   await expect(page.getByRole('table', { name: 'Active staff directory' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'HR workspace' })).toHaveCount(0);

@@ -19,8 +19,8 @@ const payloadSchema = z.strictObject({
 export class MailCipher {
   private readonly box: SecretBox;
 
-  constructor(key: Buffer, keyVersion: number) {
-    this.box = new SecretBox(key, keyVersion);
+  constructor(key: Buffer, keyVersion: number, previousKeys:ReadonlyMap<number,Buffer> = new Map()) {
+    this.box = new SecretBox(key, keyVersion,previousKeys);
   }
 
   seal(message: MailMessage, metadata: MailEnvelopeMetadata): SealedSecret {

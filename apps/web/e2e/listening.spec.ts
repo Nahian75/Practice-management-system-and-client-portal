@@ -1,6 +1,6 @@
 import { connect } from 'node:net';
 import { networkInterfaces } from 'node:os';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/test';
 import packageJson from '../package.json' with { type: 'json' };
 
 const PORT = 3100;

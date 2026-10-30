@@ -196,8 +196,8 @@ export function ConflictManagement({
       {errors && <ErrorSummary messages={errors} />}
 
       {/* Aliases Section */}
-      <div style={{ marginTop: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="mt-6">
+        <div className="flex justify-between items-center">
           <h3>Client aliases and trading names</h3>
           <button
             type="button"
@@ -209,7 +209,7 @@ export function ConflictManagement({
         </div>
 
         {openAliasForm && (
-          <form onSubmit={handleAddAlias} className="form-card" style={{ marginTop: '0.75rem' }}>
+          <form onSubmit={handleAddAlias} className="form-card mt-4" >
             <div className="field">
               <label htmlFor="alias-name">Name</label>
               <input id="alias-name" name="name" type="text" required maxLength={200} />
@@ -235,7 +235,7 @@ export function ConflictManagement({
         {aliases.length === 0 ? (
           <p className="secondary">No aliases recorded.</p>
         ) : (
-          <table className="table" style={{ marginTop: '0.5rem' }}>
+          <table className="table mt-2" >
             <thead>
               <tr>
                 <th scope="col">Name</th>
@@ -261,8 +261,8 @@ export function ConflictManagement({
       </div>
 
       {/* Connected Persons & Counterparties */}
-      <div style={{ marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="mt-8">
+        <div className="flex justify-between items-center">
           <h3>Connected persons and counterparties</h3>
           <button
             type="button"
@@ -274,7 +274,7 @@ export function ConflictManagement({
         </div>
 
         {openConnectedForm && (
-          <form onSubmit={handleAddConnectedPerson} className="form-card" style={{ marginTop: '0.75rem' }}>
+          <form onSubmit={handleAddConnectedPerson} className="form-card mt-4" >
             <div className="field">
               <label htmlFor="cp-name">Full name</label>
               <input id="cp-name" name="name" type="text" required maxLength={200} />
@@ -308,7 +308,7 @@ export function ConflictManagement({
         {connectedPersons.length === 0 ? (
           <p className="secondary">No connected persons or counterparties recorded.</p>
         ) : (
-          <table className="table" style={{ marginTop: '0.5rem' }}>
+          <table className="table mt-2" >
             <thead>
               <tr>
                 <th scope="col">Name</th>
@@ -334,8 +334,8 @@ export function ConflictManagement({
       </div>
 
       {/* Conflict Checks & Decisions */}
-      <div style={{ marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="mt-8">
+        <div className="flex justify-between items-center">
           <h3>Conflict search records</h3>
           <button
             type="button"
@@ -347,7 +347,7 @@ export function ConflictManagement({
         </div>
 
         {openCheckForm && (
-          <form onSubmit={handleRunCheck} className="form-card" style={{ marginTop: '0.75rem' }}>
+          <form onSubmit={handleRunCheck} className="form-card mt-4" >
             <div className="field">
               <label htmlFor="check-names">Names to check (one per line or comma separated)</label>
               <textarea
@@ -367,18 +367,18 @@ export function ConflictManagement({
         {checks.length === 0 ? (
           <p className="secondary">No conflict checks run for this client.</p>
         ) : (
-          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="mt-4 flex flex-col gap-4">
             {checks.map((check) => {
               const checkDecisions = decisions.filter((d) => d.checkId === check.id);
               const latestDecision = checkDecisions[0];
               const isClear = check.matchCount === 0;
 
               return (
-                <div key={check.id} className="card" style={{ padding: '1rem', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div key={check.id} className="card p-4 border border-slate-300" >
+                  <div className="flex justify-between items-start">
                     <div>
                       <strong>Search run on {formatDate(check.createdAt)}</strong> by {check.requestedBy.displayName}
-                      <p className="secondary" style={{ margin: '0.25rem 0' }}>
+                      <p className="secondary my-2 mx-0" >
                         Names checked: {check.names.join(', ')}
                       </p>
                     </div>
@@ -407,7 +407,7 @@ export function ConflictManagement({
 
                   {/* Matches Table */}
                   {check.matches.length > 0 && (
-                    <div style={{ marginTop: '0.75rem' }}>
+                    <div className="mt-4">
                       <table className="table">
                         <thead>
                           <tr>
@@ -436,21 +436,16 @@ export function ConflictManagement({
                   {/* Decision info or form */}
                   {latestDecision && (
                     <div
-                      style={{
-                        marginTop: '0.75rem',
-                        padding: '0.75rem',
-                        background: 'var(--surface-sunken)',
-                        borderRadius: '4px',
-                      }}
+                      className="mt-4 p-4 bg-slate-100 rounded"
                     >
-                      <p style={{ margin: 0 }}>
+                      <p className="m-0">
                         <strong>Decision by {latestDecision.decidedBy.displayName} on {formatDate(latestDecision.decidedAt)}:</strong>{' '}
                         {latestDecision.rationale}
                       </p>
                       {latestDecision.safeguards.length > 0 && (
-                        <div style={{ marginTop: '0.5rem' }}>
+                        <div className="mt-2">
                           <span className="secondary">Safeguards established:</span>
-                          <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+                          <ul className="mt-2 mr-0 mb-0 ml-4 p-0">
                             {latestDecision.safeguards.map((sg, i) => (
                               <li key={i}>{sg}</li>
                             ))}
@@ -461,12 +456,12 @@ export function ConflictManagement({
                   )}
 
                   {!isClear && (
-                    <div style={{ marginTop: '0.75rem' }}>
+                    <div className="mt-4">
                       {activeDecisionCheckId === check.id ? (
                         <form
                           onSubmit={(e) => handleRecordDecision(e, check.id)}
-                          className="form-card"
-                          style={{ marginTop: '0.5rem' }}
+                          className="form-card mt-2"
+
                         >
                           <h4>Record conflict decision</h4>
                           <div className="field">
@@ -500,7 +495,7 @@ export function ConflictManagement({
                               placeholder="e.g. Information barrier erected&#10;Separate partner supervision"
                             />
                           </div>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div className="flex gap-2">
                             <button type="submit" disabled={saving} className="button primary">
                               {saving ? 'Recording…' : 'Record decision'}
                             </button>

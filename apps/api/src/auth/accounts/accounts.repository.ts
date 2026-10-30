@@ -25,8 +25,8 @@ export class AccountsRepository {
       .executeTakeFirst();
   }
 
-  findById(accountId: string) {
-    return this.db
+  findById(accountId: string, executor: Kysely<Database> = this.db) {
+    return executor
       .selectFrom('accounts')
       .select(['id', 'kind', 'email', 'display_name', 'status'])
       .where('id', '=', accountId)
@@ -42,8 +42,8 @@ export class AccountsRepository {
     return id;
   }
 
-  async setPassword(accountId: string, passwordHash: string, at: Date): Promise<void> {
-    await this.db
+  async setPassword(accountId: string, passwordHash: string, at: Date, executor: Kysely<Database> = this.db): Promise<void> {
+    await executor
       .updateTable('accounts')
       .set({ password_hash: passwordHash, password_changed_at: at })
       .where('id', '=', accountId)

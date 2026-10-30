@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { noAxeViolations, randomName, unique } from './support/checks';
 import { signedInStaff } from './support/session';
 import { createStaff, emailedToken } from './support/staff';
@@ -24,14 +24,14 @@ test('invites an individual client at the address on record, then ends their acc
   await noAxeViolations(page);
   await page.getByRole('button', { name: `Invite ${client.name} to the portal` }).click();
 
-  await expect(page.getByRole('status')).toContainText(`${client.name} has been given access`);
+  await expect(page.getByRole('region', { name: 'Portal access' }).getByRole('status')).toContainText(`${client.name} has been given access`);
   await expect(page.getByRole('row', { name: new RegExp(`${client.name} ${email} Invited, not yet set up`) })).toBeVisible();
   await expect(page.getByRole('button', { name: `Invite ${client.name} to the portal` })).toHaveCount(0);
   expect(await emailedToken(email, '/accept-invitation')).toMatch(/^[A-Za-z0-9_-]{43}$/);
   await noAxeViolations(page);
 
   await page.getByRole('button', { name: `End access for ${client.name}` }).click();
-  await expect(page.getByRole('status')).toContainText(`${client.name} can no longer see this client in the portal.`);
+  await expect(page.getByRole('region', { name: 'Portal access' }).getByRole('status')).toContainText(`${client.name} can no longer see this client in the portal.`);
   await expect(page.getByText('Nobody can see this client in the portal yet.')).toBeVisible();
 });
 
@@ -45,7 +45,7 @@ test("offers each of an organisation's contacts with an email address, and says 
   await page.goto(`/clients/${clientId}`);
 
   await expect(page.getByRole('button', { name: 'Invite Kim Ray to the portal' })).toBeVisible();
-  await expect(page.getByText('Lee Fox has no email address on record.')).toBeVisible();
+  await expect(page.getByText('Lee Fox has no email address on record.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Add one to invite them' })).toHaveAttribute('href', new RegExp(`/clients/${clientId}/contacts/`));
 });
 

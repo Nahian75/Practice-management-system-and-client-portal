@@ -1,7 +1,6 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { SecretBox, type SealedSecret } from '../common/crypto/secret-box.js';
 
-const CURRENT_FINANCE_KEY_VERSION = 1;
 const FINGERPRINT_DOMAIN = 'stass.finance.bank-account.fingerprint.v1';
 
 export interface BankDetails {
@@ -20,9 +19,9 @@ export class BankAccountCipher {
   private readonly box: SecretBox;
   private readonly fingerprintKey: Buffer;
 
-  constructor(key: Buffer) {
-    this.box = new SecretBox(key, CURRENT_FINANCE_KEY_VERSION);
-    this.fingerprintKey = createHmac('sha256', key).update(FINGERPRINT_DOMAIN).digest();
+  constructor(key: Buffer,version=1,previousKeys:ReadonlyMap<number,Buffer> = new Map()) {
+    this.box = new SecretBox(key, version,previousKeys);
+    this.fingerprintKey = createHmac('sha256', previousKeys.get(1)??key).update(FINGERPRINT_DOMAIN).digest();
   }
 
   seal(details: BankDetails): SealedBankDetails {

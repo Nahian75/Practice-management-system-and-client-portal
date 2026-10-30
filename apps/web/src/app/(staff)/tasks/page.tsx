@@ -1,0 +1,15 @@
+import Link from 'next/link';
+import { apiGet } from '@/lib/api';
+import { NoAccess } from '@/components/no-access';
+import { WorkspaceHeading,WorkspaceEmpty } from '@/components/workspace-page';
+import { TASK_PRIORITY_LABELS,TASK_STATUS_LABELS } from '@/lib/tasks';
+import type { WorkspacePage,WorkTask } from '@/lib/workspace';
+import { formatCalendarDate } from '@/lib/format';
+export const metadata={title:'Tasks'};
+export default async function TasksPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const raw=await searchParams;const status=typeof raw.status==='string'&&['all','completed','cancelled'].includes(raw.status)?raw.status:'open';
+ const query={status,q:typeof raw.q==='string'?raw.q.slice(0,100):'',assignee:raw.assignee==='me'?'me':'all',before:typeof raw.before==='string'?raw.before:undefined};
+ const result=await apiGet<WorkspacePage<WorkTask>>('/workspace/tasks',query);if(result.status===403)return <NoAccess what="tasks"/>;
+ if(!result.body)return <p role="alert">Tasks could not be loaded. <Link href="/tasks">Reset filters and try again</Link>.</p>;
+ return <><WorkspaceHeading title="Tasks" description="Keep track of work across your matter teams." action="New task" href="/tasks/new"/><nav className="workspace-tabs" aria-label="Task status">{['open','completed','cancelled','all'].map(tab=><Link key={tab} href={`/tasks?status=${tab}`} aria-current={status===tab?'page':undefined}>{tab==='open'?'Outstanding':tab[0]!.toUpperCase()+tab.slice(1)}</Link>)}</nav><form className="workspace-filters"><input type="hidden" name="status" value={status}/><label>Search tasks<input name="q" type="search" defaultValue={query.q} placeholder="Search by task name" maxLength={100}/></label><label>Assigned to<select name="assignee" defaultValue={query.assignee}><option value="all">All visible team tasks</option><option value="me">Me</option></select></label><button className="button button-secondary">Apply filters</button></form>{result.body.items.length?<div className="workspace-table-wrap"><table className="table"><thead><tr><th>Task</th><th>Matter</th><th>Assigned to</th><th>Due date</th><th>Priority</th><th>Status</th></tr></thead><tbody>{result.body.items.map(task=><tr key={task.id}><td><Link href={`/tasks/${task.id}`}>{task.title}</Link></td><td><Link href={`/matters/${task.matterId}`}>{task.matterReference}</Link><span className="workspace-cell-sub">{task.matterTitle}</span></td><td>{task.assignee}</td><td>{task.dueOn?formatCalendarDate(task.dueOn):'No due date'}</td><td><span className={`workspace-status ${task.priority}`}>{TASK_PRIORITY_LABELS[task.priority]}</span></td><td>{TASK_STATUS_LABELS[task.status]}</td></tr>)}</tbody></table></div>:<WorkspaceEmpty title="No tasks in this view" href="/tasks/new" action="Create a task">Choose another filter or add a task to a matter. Tasks remain limited to your matter teams.</WorkspaceEmpty>}{result.body.next&&<div className="workspace-pagination"><Link href={`/tasks?${new URLSearchParams({...query,before:result.body.next} as Record<string,string>)}`}>Older tasks →</Link></div>}</>;
+}

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect, test as setup } from '@playwright/test';
+import { expect, test as setup } from './support/test';
 import { isoDay } from './support/compliance';
 import { apiSessionFor } from './support/session';
 

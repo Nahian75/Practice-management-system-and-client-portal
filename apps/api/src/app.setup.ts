@@ -8,6 +8,8 @@ import { StrictSchemaSerializerInterceptor } from './common/serialization/strict
 import { StrictSchemaValidationPipe } from './common/validation/strict-schema-validation.pipe.js';
 import { ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
+import { DATABASE } from './database/database.module.js';
+import { AccountRateGuard, RequestLimiter } from './common/http/request-limiter.js';
 
 export function configureApp(app: NestExpressApplication): void {
   // Which proxies may report the client's address. Empty means none: the
@@ -21,10 +23,12 @@ export function configureApp(app: NestExpressApplication): void {
     next();
   });
   app.enableCsrfProtection();
+  const limiter = new RequestLimiter(app.get(DATABASE));
+  app.use(limiter.middleware);
 
   // app.get throws if AuthModule is not loaded, so the app cannot start without the
   // guards. Order matters: the PermissionGuard reads the session the SessionGuard checked.
-  app.useGlobalGuards(app.get(SessionGuard), app.get(PermissionGuard));
+  app.useGlobalGuards(app.get(SessionGuard), new AccountRateGuard(limiter), app.get(PermissionGuard));
   app.useGlobalPipes(new StrictSchemaValidationPipe());
   app.useGlobalInterceptors(new StrictSchemaSerializerInterceptor(app.get(Reflector)));
   app.useGlobalFilters(new AllExceptionsFilter());

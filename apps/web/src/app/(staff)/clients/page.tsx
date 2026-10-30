@@ -6,6 +6,7 @@ import { apiGet } from '@/lib/api';
 import type { ClientSummary } from '@/lib/clients';
 import { CLIENT_KIND_LABELS } from '@/lib/format';
 import { ClientSearch } from './client-search';
+import {WorkspaceHeading} from '@/components/workspace-page';
 
 export const metadata: Metadata = { title: 'Clients' };
 
@@ -25,14 +26,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const clients = body?.clients ?? [];
   return (
     <>
-      <h1>Clients</h1>
-      <div className="actions">
-        <Link className="button" href="/clients/new">
-          Create a client
-        </Link>
-      </div>
-
-      <ClientSearch />
+      <WorkspaceHeading title="Contacts" description="Client records, people and organisations connected to your practice." action="New contact" href="/clients/new"/>
+      <nav className="workspace-tabs" aria-label="Contact views"><Link href="/clients" aria-current="page">Your clients</Link><Link href="/people">Team directory</Link></nav>
+      <details className="workspace-card"><summary>Find a client across the firm</summary><ClientSearch/></details>
 
       <hr className="rule" />
       <h2>Your clients</h2>

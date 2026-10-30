@@ -1,17 +1,17 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './support/test';
 import { createStaff, nextTotp, type TestStaff } from './support/staff';
 
 async function signInWithPassword(page: Page, staff: TestStaff, password = staff.password) {
   await page.goto('/sign-in');
   await page.getByLabel('Email address').fill(staff.email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Continue' }).click();
 }
 
 async function enterCode(page: Page, code: string) {
   await page.getByLabel('Security code').fill(code);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
 }
 
 test('sends someone who is not signed in to the sign-in page', async ({ page }) => {
@@ -19,6 +19,36 @@ test('sends someone who is not signed in to the sign-in page', async ({ page }) 
 
   await expect(page).toHaveURL(/\/sign-in$/);
   await expect(page).toHaveTitle('Sign in – Stass');
+});
+
+test('lets the user reveal a password without losing its value', async ({ page }) => {
+  await page.goto('/sign-in');
+  const password = page.getByLabel('Password', { exact: true });
+  await password.fill('synthetic-password-for-visibility');
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(password).toHaveValue('synthetic-password-for-visibility');
+  await page.getByRole('button', { name: 'Hide password' }).click();
+  await expect(password).toHaveAttribute('type', 'password');
+});
+
+test('offers a retry after a connection failure and keeps the entered email', async ({ page }) => {
+  await page.goto('/sign-in');
+  await page.route('**/api/auth/sign-in', route => route.abort());
+  await page.getByLabel('Email address').fill('synthetic@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('synthetic-password-for-network-test');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('We could not connect');
+  await expect(page.getByLabel('Email address')).toHaveValue('synthetic@example.com');
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeEnabled();
+});
+
+test('keeps the sign-in form usable on a narrow screen', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/sign-in');
+  await expect(page.getByRole('heading', { name: 'Sign in to your account' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('signs in with a password and an authenticator code, and signs out', async ({ page, request }) => {
@@ -29,8 +59,8 @@ test('signs in with a password and an authenticator code, and signs out', async 
   await enterCode(page, await nextTotp(staff.secret));
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-  await expect(page.getByText(`You are signed in as ${staff.displayName}.`)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
+  await expect(page.locator('.header-user-tag')).toContainText(staff.displayName);
 
   const signedOut = page.waitForResponse('**/api/auth/sign-out');
   await page.getByRole('button', { name: 'Sign out' }).click();
@@ -46,7 +76,7 @@ test('signs in with a backup code', async ({ page, request }) => {
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[0] ?? '');
 
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
 });
 
 test("shows the API's message for a wrong password, and moves focus to it", async ({ page, request }) => {
@@ -102,7 +132,7 @@ test('keeps nothing in browser storage, and the session cookie out of reach of s
   const staff = await createStaff(request);
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[1] ?? '');
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
 
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
   expect(await page.evaluate(() => document.cookie)).toBe('');
@@ -117,6 +147,6 @@ test('has no accessibility problems axe can find on the sign-in and home pages',
   const staff = await createStaff(request);
   await signInWithPassword(page, staff);
   await enterCode(page, staff.backupCodes[2] ?? '');
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Personal Dashboard' })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
 });
