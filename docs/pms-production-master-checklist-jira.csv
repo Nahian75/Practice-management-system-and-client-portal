@@ -1,4 +1,4 @@
-﻿Summary,Issue Type,Priority,Labels,Description
+Summary,Issue Type,Priority,Labels,Description
 "[THR-001] Inventory domains, routes, APIs, admin consoles, WebSockets, uploads, webhooks, workers, object stores and third parties; name each owner and exposure.",Task,Highest,pms-section-1,"Control ID: THR-001
 Section: 1. Threat Modeling & Hacker Attack Surface Defense
 Module: 1.1 Scope, assets and abuse cases

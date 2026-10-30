@@ -22,6 +22,8 @@
 !infra/
 !infra/hosting/
 !infra/hosting/**
+!infra/aws/
+!infra/aws/**
 **/*.spec.ts
 **/*.test.ts
 **/.env*

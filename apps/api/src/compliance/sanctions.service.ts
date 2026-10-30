@@ -1,4 +1,6 @@
 import { Readable } from 'node:stream';
+import {sql} from 'kysely';
+import {ScheduledJobs} from '../common/jobs/scheduled-jobs.js';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { Inject, Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -22,10 +24,8 @@ interface Importer { actor: AuditActor; accountId: string | null; context?: Requ
 
 @Injectable()
 export class SanctionsService {
-  private readonly logger = new Logger(SanctionsService.name);
-
   constructor(private readonly records: SanctionsRepository, private readonly audit: AuditService,
-    private readonly screening: SanctionsScreeningService, @Inject(ENV) private readonly env: Env) {}
+    @Inject(ENV) private readonly env: Env) {}
 
   status() { return this.records.status(); }
 
@@ -52,22 +52,11 @@ export class SanctionsService {
         await this.audit.record({ actor: by.actor, action: 'aml.sanctions_list_activated', outcome: 'success',
           resource: { type: 'aml_sanctions_list', id: list.id },
           metadata: { version: list.version, designations: list.designationCount }, ...by.context }, trx);
+        await sql`SELECT app.wake_scheduled_job('sanctions-rescreen')`.execute(trx);
       }
       return { outcome: imported.changed ? 'imported' as const : 'unchanged' as const, list };
     });
-    if (result?.outcome === 'imported') this.rescreenInBackground();
     return result ?? { outcome: 'refused', reason: 'older_report' };
-  }
-
-  /**
-   * Every newly activated list is screened against every client with an open matter.
-   * It runs after the import is committed, outside the request; tests screen clients directly.
-   */
-  private rescreenInBackground(): void {
-    if (this.env.NODE_ENV === 'test') return;
-    this.screening.rescreenAll()
-      .then((count) => this.logger.log(`Rescreened ${count} clients against the new sanctions list`))
-      .catch(() => this.logger.error('Rescreening against the new sanctions list failed'));
   }
 
   /** Downloads the official list from SANCTIONS_LIST_URL. A failure leaves the last good version active. */
@@ -107,10 +96,11 @@ export class SanctionsRefresher implements OnModuleInit, OnApplicationShutdown {
   private running: Promise<void> | undefined;
   private stopping = false;
 
-  constructor(private readonly sanctions: SanctionsService, @Inject(ENV) private readonly env: Env) {}
+  constructor(private readonly sanctions: SanctionsService, @Inject(ENV) private readonly env: Env,
+    private readonly jobs:ScheduledJobs,private readonly screening:SanctionsScreeningService) {}
 
   onModuleInit(): void {
-    if (this.env.NODE_ENV === 'test' || !this.env.SANCTIONS_LIST_URL) return;
+    if (this.env.NODE_ENV === 'test') return;
     this.run();
   }
 
@@ -121,18 +111,24 @@ export class SanctionsRefresher implements OnModuleInit, OnApplicationShutdown {
   }
 
   private run(): void {
-    const running = this.sanctions.refresh()
-      .then((result) => {
-        if (result.outcome === 'refused') this.logger.warn(`Sanctions list refresh refused: ${result.reason}`);
-      })
+    const running = this.runCoordinated()
       .catch(() => this.logger.error('Sanctions list refresh failed'))
       .finally(() => {
         if (this.running === running) this.running = undefined;
         if (!this.stopping) {
-          this.timer = setTimeout(() => this.run(), REFRESH_INTERVAL_MS);
+          this.timer = setTimeout(() => this.run(), 30_000);
           this.timer.unref();
         }
       });
     this.running = running;
+  }
+
+  private async runCoordinated():Promise<void>{
+    if(this.env.SANCTIONS_LIST_URL)await this.jobs.runDue('sanctions-refresh',REFRESH_INTERVAL_MS/1000,async()=>{
+      const result=await this.sanctions.refresh();
+      if(result.outcome==='refused')this.logger.warn(`Sanctions list refresh refused: ${result.reason}`);
+      return result.outcome!=='refused';
+    });
+    await this.jobs.runDue('sanctions-rescreen',60,async()=>{await this.screening.rescreenAll(true);return true;});
   }
 }

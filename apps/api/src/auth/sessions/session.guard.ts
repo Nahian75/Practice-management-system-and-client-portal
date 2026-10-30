@@ -10,7 +10,7 @@ import type { Request } from 'express';
 import { AuditService } from '../../audit/audit.service.js';
 import { requestContext } from '../../common/http/request-context.js';
 import { ACCESS_KEY, type Access } from './access.decorators.js';
-import { attachSession, auditActorFor } from './authenticated-session.js';
+import { attachSession, auditActorFor, sessionOf } from './authenticated-session.js';
 import { readSessionToken } from './session-cookie.js';
 import { SessionsService } from './sessions.service.js';
 
@@ -45,7 +45,7 @@ export class SessionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const session = await this.sessions.resolve(readSessionToken(request));
+    const session = sessionOf(request) ?? await this.sessions.resolve(readSessionToken(request));
 
     // A session still waiting for its 2FA code is not signed in.
     if (!session || session.stage !== 'authenticated') {

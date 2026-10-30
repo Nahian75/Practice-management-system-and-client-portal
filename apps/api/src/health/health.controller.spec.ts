@@ -43,4 +43,10 @@ describe('GET /health', () => {
 
     expect(response.status).toBe(404);
   });
+
+  it('withdraws readiness while draining without marking liveness down',async()=>{
+    app.get(ReadinessService).beforeApplicationShutdown();
+    expect((await request(app.getHttpServer()).get('/ready')).status).toBe(503);
+    expect((await request(app.getHttpServer()).get('/health')).status).toBe(200);
+  });
 });

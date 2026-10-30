@@ -71,6 +71,25 @@ failed server reads show a safe retry page instead of empty record lists/sign-ou
 
 ## Production handoff
 
+For multiple app replicas, use the [AWS scaling runbook](../infra/aws/README.md).
+All replicas must share the database, bucket and encryption key versions. Use
+direct/session-persistent PostgreSQL connections for scheduled-job advisory locks.
+Set DATABASE_POOL_MAX, DATABASE_REPLICA_LIMIT (including deployment surge),
+DATABASE_CONNECTION_BUDGET and DATABASE_RESERVED_CONNECTIONS together. The API
+rejects insufficient configured/server/role capacity at startup.
+
+Authenticated staff share a bounded network budget of 12,000 requests/minute/IP
+and retain 300/minute/account limits. Anonymous requests retain 600/minute/IP,
+authentication POSTs 600/minute/IP and recovery 20/ten minutes/IP. Failed-login
+controls remain separate. Keep edge protection; these are application quotas,
+not a promise that every allowed request can be served at production latency.
+
+Apply migrations once before enabling a service release. Sanctions refresh and
+rescreen scheduling use durable due times and exclusive database session locks;
+worker death releases ownership when PostgreSQL detects disconnection. Monitor
+freshness, retries and database connectivity. Readiness becomes unavailable during
+shutdown, allowing a load balancer to drain the instance.
+
 - [ ] Run GitHub security checks successfully and require them in branch protection.
   Committed CodeQL, Trivy, dependency/secret scans, SBOM and provenance jobs are not
   evidence that CI has passed.

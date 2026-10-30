@@ -3,13 +3,15 @@ import { HttpException, ServiceUnavailableException, type CanActivate, type Exec
 import type { NextFunction, Request, Response } from 'express';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../database/schema.js';
-import { sessionOf } from '../../auth/sessions/authenticated-session.js';
+import { attachSession, sessionOf } from '../../auth/sessions/authenticated-session.js';
+import { SessionsService } from '../../auth/sessions/sessions.service.js';
+import { readSessionToken } from '../../auth/sessions/session-cookie.js';
 import { normaliseAddress } from './request-context.js';
 
 export class RequestLimiter {
-  constructor(private readonly db: Kysely<Database>) {}
+  constructor(private readonly db: Kysely<Database>,private readonly sessions:SessionsService) {}
 
-  async consume(scope: 'general' | 'authentication' | 'recovery' | 'account', subject: string) {
+  async consume(scope: 'network' | 'general' | 'authentication' | 'recovery' | 'account', subject: string) {
     const key = createHash('sha256').update(`stass-api-limit:${scope}:${subject}`).digest();
     const { rows } = await sql<{ allowed: boolean; retry_after: number }>`
       SELECT * FROM app.consume_api_request_limit(${scope},${key})`.execute(this.db);
@@ -22,15 +24,23 @@ export class RequestLimiter {
     const address = normaliseAddress(request.ip || request.socket.remoteAddress || 'unknown');
     // IPv6 neighbours share the same /64, as in the sign-in limiter.
     const subject = address.includes(':') ? ipv6Network(address) : address;
-    const scopes: ('general'|'authentication'|'recovery')[] = ['general'];
-    if (request.path.startsWith('/auth/')) scopes.push('authentication');
-    if (request.path.startsWith('/auth/password-reset/') || request.path.startsWith('/auth/invitations/')) scopes.push('recovery');
     try {
+      // Bound all sources before doing a session lookup. A cookie alone never
+      // qualifies for the shared-office budget: resolve active authentication.
+      const network=await this.consume('network',subject);
+      if(!network.allowed){this.reject(response,network.retry_after);return;}
+      const token=readSessionToken(request);
+      const session=token?await this.sessions.resolve(token):undefined;
+      const authenticated=session?.stage==='authenticated';
+      if(authenticated)attachSession(request,session);
+      const scopes: ('general'|'authentication'|'recovery')[] = authenticated?[]:['general'];
+      // Session/permission reads are normal app traffic, not password guessing.
+      if(request.method==='POST'&&request.path.startsWith('/auth/'))scopes.push('authentication');
+      if(request.path.startsWith('/auth/password-reset/')||request.path.startsWith('/auth/invitations/'))scopes.push('recovery');
       for (const scope of scopes) {
         const result = await this.consume(scope, subject);
         if (!result.allowed) {
-          response.setHeader('Retry-After', String(result.retry_after));
-          response.status(429).json({ statusCode: 429, message: 'Too many requests. Try again later.' });
+          this.reject(response,result.retry_after);
           return;
         }
       }
@@ -40,6 +50,11 @@ export class RequestLimiter {
       response.status(503).json({ statusCode: 503, message: 'Service temporarily unavailable' });
     }
   };
+
+  private reject(response:Response,retryAfter:number):void{
+    response.setHeader('Retry-After',String(retryAfter));
+    response.status(429).json({statusCode:429,message:'Too many requests. Try again later.'});
+  }
 }
 
 function ipv6Network(address: string): string {

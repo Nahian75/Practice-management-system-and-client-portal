@@ -33,6 +33,11 @@ const minimal = {
 };
 
 describe('loadEnv', () => {
+  it('bounds replica pools to a declared database connection budget',()=>{
+    expect(loadEnv({...minimal,DATABASE_POOL_MAX:'5',DATABASE_REPLICA_LIMIT:'4',DATABASE_CONNECTION_BUDGET:'40',DATABASE_RESERVED_CONNECTIONS:'20'}).DATABASE_POOL_MAX).toBe(5);
+    expect(()=>loadEnv({...minimal,DATABASE_POOL_MAX:'10',DATABASE_REPLICA_LIMIT:'4',DATABASE_CONNECTION_BUDGET:'40'})).toThrow(InvalidEnvError);
+    expect(()=>loadEnv({...minimal,DATABASE_POOL_MAX:'1'})).toThrow(InvalidEnvError);
+  });
   it('validates retained keys before a versioned deployment can start', () => {
     const purposes=['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT'] as const;
     const previous=Object.fromEntries(purposes.map((purpose,index)=>[purpose,{'1':Buffer.alloc(32,30+index).toString('base64')}]));

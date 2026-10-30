@@ -1,0 +1,279 @@
+{
+  "date": "2026-10-31",
+  "scope": "Synthetic isolated local validation, no AWS resources created",
+  "api": {
+    "passed": 2116,
+    "failed": 0
+  },
+  "subsequentReminderSuite": {
+    "passed": 5,
+    "failed": 0
+  },
+  "browser": {
+    "passed": 99,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0
+  },
+  "awsContractTests": {
+    "passed": 2,
+    "failed": 0
+  },
+  "cloudFormationLintPassed": true,
+  "productionHygienePassed": true,
+  "securitySourceGuardPassed": true,
+  "workingTreeHiddenCharacterFindings": 0,
+  "container": {
+    "apiBuilt": true,
+    "publicRdsCertificatesVerified": 114,
+    "compiledSchedulerPresent": true,
+    "verificationNetwork": "none"
+  },
+  "localPreview": {
+    "migrationsApplied": [
+      "0079_scalable_request_budgets",
+      "0080_durable_scheduled_jobs"
+    ],
+    "apiReadinessStatus": 200,
+    "webSignInStatus": 200
+  },
+  "load": {
+    "date": "2026-10-30T20-57-25.714Z",
+    "environment": {
+      "node": "v24.16.0",
+      "cpu": "AMD Ryzen 5 5600 6-Core Processor              ",
+      "logicalCpuCount": 12,
+      "hostMemoryGiB": 31.9,
+      "apiPoolMax": 5,
+      "replicas": 2
+    },
+    "virtualUsers": 100,
+    "counts": {
+      "accounts": 303,
+      "clients": 2100,
+      "matters": 100,
+      "tasks": 1000,
+      "calendar_events": 1000
+    },
+    "results": [
+      {
+        "name": "100 real password + MFA logins (10 concurrent)",
+        "requests": 100,
+        "durationSeconds": 1.52,
+        "requestsPerSecond": 65.57,
+        "p50Ms": 141.1,
+        "p95Ms": 233.8,
+        "p99Ms": 246.3,
+        "maxMs": 247.6,
+        "statuses": {
+          "200": 100
+        },
+        "validResponses": 100,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793393874217,
+        "endedAt": 1793393875742
+      },
+      {
+        "name": "10 active users, one request/user/second",
+        "requests": 150,
+        "durationSeconds": 15.13,
+        "requestsPerSecond": 9.91,
+        "p50Ms": 17.2,
+        "p95Ms": 29.3,
+        "p99Ms": 37.4,
+        "maxMs": 40,
+        "statuses": {
+          "200": 132,
+          "201": 18
+        },
+        "validResponses": 150,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793393884007,
+        "endedAt": 1793393899139
+      },
+      {
+        "name": "25 active users, one request/user/second",
+        "requests": 750,
+        "durationSeconds": 30.32,
+        "requestsPerSecond": 24.74,
+        "p50Ms": 30.3,
+        "p95Ms": 47.7,
+        "p99Ms": 72.9,
+        "maxMs": 87.1,
+        "statuses": {
+          "200": 657,
+          "201": 93
+        },
+        "validResponses": 750,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793393899140,
+        "endedAt": 1793393929460
+      },
+      {
+        "name": "50 active users, one request/user/second",
+        "requests": 1500,
+        "durationSeconds": 30.31,
+        "requestsPerSecond": 49.49,
+        "p50Ms": 43.8,
+        "p95Ms": 76.7,
+        "p99Ms": 100.3,
+        "maxMs": 176.1,
+        "statuses": {
+          "200": 1314,
+          "201": 186
+        },
+        "validResponses": 1500,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793393929462,
+        "endedAt": 1793393959770
+      },
+      {
+        "name": "100 active users, one request/user/second",
+        "requests": 6000,
+        "durationSeconds": 60.74,
+        "requestsPerSecond": 98.79,
+        "p50Ms": 46.7,
+        "p95Ms": 70.8,
+        "p99Ms": 96,
+        "maxMs": 134.1,
+        "statuses": {
+          "200": 5252,
+          "201": 748
+        },
+        "validResponses": 6000,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793393959771,
+        "endedAt": 1793394020507
+      },
+      {
+        "name": "100 concurrent API callers, bounded unpaced burst",
+        "requests": 2000,
+        "durationSeconds": 3.01,
+        "requestsPerSecond": 664.89,
+        "p50Ms": 140.3,
+        "p95Ms": 194.2,
+        "p99Ms": 230.4,
+        "maxMs": 260.9,
+        "statuses": {
+          "200": 1752,
+          "201": 248
+        },
+        "validResponses": 2000,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793394020510,
+        "endedAt": 1793394023518
+      },
+      {
+        "name": "100 active users during drained API replacement",
+        "requests": 2000,
+        "durationSeconds": 20.45,
+        "requestsPerSecond": 97.81,
+        "p50Ms": 18.5,
+        "p95Ms": 68.2,
+        "p99Ms": 91.8,
+        "maxMs": 144.1,
+        "statuses": {
+          "200": 1752,
+          "201": 248
+        },
+        "validResponses": 2000,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793394023519,
+        "endedAt": 1793394043966
+      },
+      {
+        "name": "100 read-only callers during abrupt API loss (fixture GET retries)",
+        "requests": 1200,
+        "durationSeconds": 12.33,
+        "requestsPerSecond": 97.32,
+        "p50Ms": 25.7,
+        "p95Ms": 75.3,
+        "p99Ms": 85.4,
+        "maxMs": 101.5,
+        "statuses": {
+          "200": 1200
+        },
+        "validResponses": 1200,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793394043968,
+        "endedAt": 1793394056299
+      },
+      {
+        "name": "25 concurrent server-rendered dashboards",
+        "requests": 150,
+        "durationSeconds": 30.11,
+        "requestsPerSecond": 4.98,
+        "p50Ms": 787.3,
+        "p95Ms": 1081.8,
+        "p99Ms": 1096.6,
+        "maxMs": 1104.1,
+        "statuses": {
+          "200": 150
+        },
+        "validResponses": 150,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793394056301,
+        "endedAt": 1793394086415
+      },
+      {
+        "name": "20 x 1 MiB scanned/encrypted uploads, concurrency 10; downloads hash-verified",
+        "requests": 20,
+        "durationSeconds": 0.89,
+        "requestsPerSecond": 22.47,
+        "p50Ms": 288.8,
+        "p95Ms": 329.7,
+        "p99Ms": 330.5,
+        "maxMs": 330.5,
+        "statuses": {
+          "201": 20
+        },
+        "validResponses": 20,
+        "invalidResponses": 0,
+        "passed": true,
+        "startedAt": 1793394086418,
+        "endedAt": 1793394087308
+      }
+    ],
+    "replicaReplacementVerified": true,
+    "abruptReplicaLossExercised": true,
+    "balancerSemantics": "Local fixture probes at 250 ms and retries GET/HEAD only before sending response headers; not AWS ALB timing or retry guarantees",
+    "abuseLimitEnforced": true,
+    "crossUserMatterDenied": true,
+    "criticalDependenciesReady": true
+  },
+  "nat": {
+    "scope": "100 synthetic authenticated staff share one IP; seven requests each over seven seconds",
+    "testSessionsSeeded": true,
+    "crossReplicaDocumentVerified": true,
+    "requests": 700,
+    "statuses": {
+      "200": 700
+    },
+    "validBusinessResponses": 700,
+    "throttled": 0,
+    "unexpectedServerErrors": 0,
+    "durationSeconds": 7.228,
+    "anonymousIpLimit": 600,
+    "authenticatedNetworkLimit": 12000,
+    "accountLimit": 300,
+    "windowSeconds": 60,
+    "allThrottlesHaveRetryAfter": true,
+    "interpretation": "Verified office users share the bounded network allowance while retaining individual account limits. Anonymous and recovery budgets are tested separately."
+  },
+  "limitations": [
+    "Short closed-loop exercise on shared local hardware; not AWS sizing certification",
+    "Local fixture probes and safe-read retries differ from AWS ALB",
+    "Real cloud autoscaling, scanner cold startup, network partition, RDS failover and long soak remain staging gates",
+    "Mixed-version Next.js asset retention/version routing must be verified before rolling production releases",
+    "SMTP remains at least once; one isolated firm per stack; direct PostgreSQL connections required"
+  ]
+}

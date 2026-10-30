@@ -14,7 +14,8 @@ const types: pg.CustomTypesConfig = {
 };
 
 export function createDatabase<Schema>(connectionString: string, maxConnections = MAX_POOL_CONNECTIONS): Kysely<Schema> {
-  const pool = new pg.Pool({ connectionString, max: maxConnections, types, connectionTimeoutMillis: 3000 });
+  const pool = new pg.Pool({ connectionString, max: maxConnections, types, connectionTimeoutMillis: 3000,
+    keepAlive:true,keepAliveInitialDelayMillis:10000,idleTimeoutMillis:30000 });
 
   // An idle connection can drop (database restart, network blip). Without a
   // listener, pg rethrows that error and the whole process exits.

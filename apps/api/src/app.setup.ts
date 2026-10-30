@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { PermissionGuard } from './auth/permissions/permission.guard.js';
 import { SessionGuard } from './auth/sessions/session.guard.js';
+import { SessionsService } from './auth/sessions/sessions.service.js';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter.js';
 import { StrictSchemaSerializerInterceptor } from './common/serialization/strict-schema-serializer.interceptor.js';
 import { StrictSchemaValidationPipe } from './common/validation/strict-schema-validation.pipe.js';
@@ -23,7 +24,7 @@ export function configureApp(app: NestExpressApplication): void {
     next();
   });
   app.enableCsrfProtection();
-  const limiter = new RequestLimiter(app.get(DATABASE));
+  const limiter = new RequestLimiter(app.get(DATABASE),app.get(SessionsService));
   app.use(limiter.middleware);
 
   // app.get throws if AuthModule is not loaded, so the app cannot start without the

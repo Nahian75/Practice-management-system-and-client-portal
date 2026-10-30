@@ -171,6 +171,18 @@ describe('task reminder service', () => {
       .where('resource_id', '=', taskId).where('kind', '=', 'task_reminder').execute()).toEqual([]);
   });
 
+  it('two replica services create one reminder and one queued email',async()=>{
+    const taskId=await addTask(),other=createDatabase<Database>(testAppDatabaseUrl(),2);
+    try{
+      const audit=new AuditService(new AuditRepository(other));
+      const outbox=new MailOutbox(new MailOutboxRepository(other),cipher,{send:vi.fn()} as Mailer,audit);
+      const replica=new TaskReminderService(new NotificationsRepository(other),audit,new TaskMailService(outbox,testEnv()));
+      await Promise.all([reminders.run(startsOn),replica.run(startsOn)]);
+      expect(await db.selectFrom('notifications').select('id').where('task_id','=',taskId).where('kind','=','task_due_today').execute()).toHaveLength(1);
+      expect(await db.selectFrom('email_outbox').select('id').where('resource_id','=',taskId).where('kind','=','task_reminder').execute()).toHaveLength(1);
+    }finally{await other.destroy();}
+  });
+
   it('recognises assignment and reminder email that is still current', async () => {
     const taskId = await addTask();
 

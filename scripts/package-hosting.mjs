@@ -7,6 +7,8 @@ mkdirSync(join(root,'logs'),{recursive:true});
 const stage=mkdtempSync(join(root,'logs','hosting-release-'));
 const paths=['.dockerignore','.gitignore','.gitattributes','.npmrc','Dockerfile','host.sh','compose.hosting.yaml','render.yaml','package.json','package-lock.json','dependency-age-exceptions.json','README.md','apps/api/package.json','apps/api/tsconfig.json','apps/api/tsconfig.build.json','apps/api/src','apps/api/migrations','apps/web/package.json','apps/web/tsconfig.json','apps/web/next.config.ts','apps/web/postcss.config.mjs','apps/web/src','apps/web/public','infra/hosting','infra/proxy','scripts/setup-hosting.mjs','scripts/package-hosting.mjs','scripts/check-dependency-age.mjs','scripts/check-production-hygiene.mjs','docs/clio-manage-design-and-features.md','docs/easy-hosting.md','docs/render-hosting.md','docs/deployment.md','docs/disaster-recovery.md','docs/security.md'];
 paths.push('docs/security-operations.md','docs/reviews/2026-10-30-security-remediation.md','docs/reviews/2026-10-30-security-remediation-controls.csv','docs/reviews/2026-10-30-security-remediation-evidence.json','scripts/check-security-source.mjs','scripts/check-sarif.mjs');
+paths.push('infra/aws','scripts/scaling/check-aws-parameters.mjs','docs/reviews/2026-10-31-scalability-remediation.md','docs/reviews/2026-10-31-scalability-evidence.json');
+paths.push('docs/reviews/2026-10-31-local-load-test.md','docs/reviews/2026-10-31-local-load-test-evidence.json');
 function include(path){
  const name=basename(path);
  if(lstatSync(path).isSymbolicLink())throw new Error('Release packaging refuses source symlinks: '+name);

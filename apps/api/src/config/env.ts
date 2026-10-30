@@ -70,6 +70,10 @@ const envSchema = z
       try{return JSON.parse(value) as unknown;}catch{ctx.addIssue({code:'custom',message:'must be valid key-ring JSON'});return z.NEVER;}
     }).pipe(z.partialRecord(z.enum(['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT']),z.record(z.string().regex(/^[1-9]\d?$/),encryptionKeySchema))).optional(),
     NODE_ENV: nodeEnvSchema,
+    DATABASE_POOL_MAX:z.coerce.number().int().min(2).max(100).optional(),
+    DATABASE_REPLICA_LIMIT:z.coerce.number().int().min(1).max(100).optional(),
+    DATABASE_CONNECTION_BUDGET:z.coerce.number().int().min(2).max(10000).optional(),
+    DATABASE_RESERVED_CONNECTIONS:z.coerce.number().int().min(0).max(9999).optional(),
     HOST: z.string().min(1).default('127.0.0.1'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z.enum(LOG_LEVELS).default('log'),
@@ -111,6 +115,10 @@ const envSchema = z
   })
   .superRefine(requireVerifiedTlsInProduction('DATABASE_URL'))
   .superRefine((env, ctx) => {
+    if(env.DATABASE_CONNECTION_BUDGET!==undefined&&
+       (env.DATABASE_POOL_MAX??10)*(env.DATABASE_REPLICA_LIMIT??1)+(env.DATABASE_RESERVED_CONNECTIONS??20)>env.DATABASE_CONNECTION_BUDGET){
+      ctx.addIssue({code:'custom',path:['DATABASE_CONNECTION_BUDGET'],message:'must cover every replica pool plus reserved connections'});
+    }
     const version=env.ENCRYPTION_KEY_VERSION??1;
     for(const purpose of ['TOTP','MAIL','FINANCE','AML','SUSPICION','HR','DOCUMENT'] as const){
       const previous=env.PREVIOUS_ENCRYPTION_KEYS?.[purpose]??{};

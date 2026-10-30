@@ -149,6 +149,7 @@ The end-to-end suite builds both applications, recreates an isolated `pms_e2e` d
 - [HR](docs/hr.md)
 - [AI module](docs/ai.md) and [AI security](docs/ai-security.md)
 - [Deployment](docs/deployment.md) and [disaster recovery](docs/disaster-recovery.md)
+- [AWS horizontal and vertical scaling setup](infra/aws/README.md) and [local scaling validation](docs/reviews/2026-10-31-scalability-remediation.md)
 
 ## Security
 

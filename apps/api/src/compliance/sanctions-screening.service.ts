@@ -52,11 +52,11 @@ export class SanctionsScreeningService {
   }
 
   /** Screens every client with an open matter against the active list, in batches. */
-  async rescreenAll(): Promise<number> {
+  async rescreenAll(pendingOnly=false): Promise<number> {
     let after: string | null = null;
     let count = 0;
     for (;;) {
-      const clients = await this.records.clientsToRescreen(after);
+      const clients = await this.records.clientsToRescreen(after,pendingOnly);
       if (clients.length === 0) return count;
       for (const clientId of clients) {
         try {

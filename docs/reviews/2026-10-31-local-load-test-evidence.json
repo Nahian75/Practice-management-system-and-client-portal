@@ -1,0 +1,353 @@
+{
+  "date": "2026-10-30T20-11-54.315Z",
+  "scope": "isolated local pms_e2e, synthetic staff, production builds; app/database/generator share hardware",
+  "gitCommit": "aa053d154063b3f23dbe6a2d8949e841710b55cd",
+  "environment": {
+    "node": "v24.16.0",
+    "cpu": "AMD Ryzen 5 5600 6-Core Processor              ",
+    "logicalCpuCount": 12,
+    "hostMemoryGiB": 31.9,
+    "apiPoolMax": 10,
+    "dockerLogicalCpuCount": 12,
+    "dockerMemoryGiB": 15.6
+  },
+  "virtualUsers": 100,
+  "counts": {
+    "accounts": 303,
+    "clients": 2100,
+    "matters": 100,
+    "tasks": 1000,
+    "calendar_events": 1000
+  },
+  "results": [
+    {
+      "name": "100 real password + MFA logins (10 concurrent)",
+      "requests": 100,
+      "durationSeconds": 1.41,
+      "requestsPerSecond": 70.92,
+      "p50Ms": 121,
+      "p95Ms": 280.2,
+      "p99Ms": 326.5,
+      "maxMs": 331.2,
+      "statuses": {
+        "200": 100
+      },
+      "validResponses": 100,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391147925,
+      "endedAt": 1793391149335
+    },
+    {
+      "name": "10 active users, one request/user/second",
+      "requests": 150,
+      "durationSeconds": 15.15,
+      "requestsPerSecond": 9.9,
+      "p50Ms": 18.2,
+      "p95Ms": 43.2,
+      "p99Ms": 49.6,
+      "maxMs": 50.3,
+      "statuses": {
+        "200": 132,
+        "201": 18
+      },
+      "validResponses": 150,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391156875,
+      "endedAt": 1793391172028
+    },
+    {
+      "name": "25 active users, one request/user/second",
+      "requests": 750,
+      "durationSeconds": 30.29,
+      "requestsPerSecond": 24.76,
+      "p50Ms": 29.6,
+      "p95Ms": 44.7,
+      "p99Ms": 51.2,
+      "maxMs": 54.2,
+      "statuses": {
+        "200": 657,
+        "201": 93
+      },
+      "validResponses": 750,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391172029,
+      "endedAt": 1793391202316
+    },
+    {
+      "name": "50 active users, one request/user/second",
+      "requests": 1500,
+      "durationSeconds": 30.32,
+      "requestsPerSecond": 49.47,
+      "p50Ms": 53.2,
+      "p95Ms": 171.3,
+      "p99Ms": 187.4,
+      "maxMs": 204.6,
+      "statuses": {
+        "200": 1314,
+        "201": 186
+      },
+      "validResponses": 1500,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391202317,
+      "endedAt": 1793391232636
+    },
+    {
+      "name": "100 active users, one request/user/second",
+      "requests": 6000,
+      "durationSeconds": 60.65,
+      "requestsPerSecond": 98.93,
+      "p50Ms": 55.9,
+      "p95Ms": 175.6,
+      "p99Ms": 284.5,
+      "maxMs": 354.4,
+      "statuses": {
+        "200": 5252,
+        "201": 748
+      },
+      "validResponses": 6000,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391232637,
+      "endedAt": 1793391293285
+    },
+    {
+      "name": "100 concurrent API callers, bounded unpaced burst",
+      "requests": 2000,
+      "durationSeconds": 3.55,
+      "requestsPerSecond": 563.54,
+      "p50Ms": 166.9,
+      "p95Ms": 216.2,
+      "p99Ms": 247.7,
+      "maxMs": 289.7,
+      "statuses": {
+        "200": 1752,
+        "201": 248
+      },
+      "validResponses": 2000,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391293288,
+      "endedAt": 1793391296837
+    },
+    {
+      "name": "25 concurrent server-rendered dashboards",
+      "requests": 150,
+      "durationSeconds": 30.11,
+      "requestsPerSecond": 4.98,
+      "p50Ms": 675,
+      "p95Ms": 1003.7,
+      "p99Ms": 1006.2,
+      "maxMs": 1006.3,
+      "statuses": {
+        "200": 150
+      },
+      "validResponses": 150,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391296838,
+      "endedAt": 1793391326948
+    },
+    {
+      "name": "20 x 1 MiB scanned/encrypted uploads, concurrency 10; downloads hash-verified",
+      "requests": 20,
+      "durationSeconds": 1.43,
+      "requestsPerSecond": 14,
+      "p50Ms": 297.9,
+      "p95Ms": 880.9,
+      "p99Ms": 882,
+      "maxMs": 882,
+      "statuses": {
+        "201": 20
+      },
+      "validResponses": 20,
+      "invalidResponses": 0,
+      "passed": true,
+      "startedAt": 1793391326950,
+      "endedAt": 1793391328379
+    }
+  ],
+  "resource": {
+    "api": {
+      "samples": 187,
+      "maxRssMiB": 274,
+      "maxCpuPercentOneCore": 320,
+      "maxEventLoopP95Ms": 35
+    },
+    "web": {
+      "samples": 181,
+      "maxRssMiB": 256,
+      "maxCpuPercentOneCore": 75,
+      "maxEventLoopP95Ms": 4329
+    }
+  },
+  "abuseLimitEnforced": true,
+  "crossUserMatterDenied": true,
+  "criticalDependenciesReady": true,
+  "limitations": [
+    "Short local exercise, not AWS capacity certification",
+    "Closed-loop clients; slow responses reduce offered load",
+    "Only 25 concurrent SSR dashboards; no browser JS/render timing",
+    "No long soak, multi-instance scaling, failover, billing ledger load or external network latency",
+    "Separate per-user synthetic IPs; no office-NAT throughput scenario",
+    "Setup uses protected fixture functions; actual password/MFA login is exercised",
+    "Rate limits remain enabled; throttled requests are reported separately from server errors",
+    "Shared-office scenario measured separately with fixture-seeded sessions; it does not benchmark concurrent office password/MFA logins",
+    "Peak process telemetry includes startup; use per-phase figures to assess measured workload"
+  ],
+  "sharedIpProbe": {
+    "scope": "100 synthetic authenticated staff share one IP; seven requests each over seven seconds",
+    "testSessionsSeeded": true,
+    "requests": 700,
+    "statuses": {
+      "200": 600,
+      "429": 100
+    },
+    "validBusinessResponses": 600,
+    "throttled": 100,
+    "unexpectedServerErrors": 0,
+    "durationSeconds": 8.436,
+    "configuredGeneralIpLimit": 600,
+    "windowSeconds": 60,
+    "allThrottlesHaveRetryAfter": true,
+    "interpretation": "Shared-IP quotas can throttle legitimate office users before the server reaches its processing limit. This is a capacity/configuration finding, not a server crash."
+  },
+  "userFacingDate": "2026-10-31",
+  "userFacingTimeZone": "Asia/Dhaka",
+  "provisionalTarget": "All expected business responses valid and p95 under 2000 ms; not a production capacity certification",
+  "countingNotes": {
+    "authentication": "100 complete password+MFA journeys; 200 HTTP POSTs; latency is both steps combined",
+    "uploads": "20 upload HTTP requests plus 20 verified downloads; upload latency only, duration includes downloads",
+    "dashboards": "Full server-rendered HTML requests; internal API fan-out and browser asset/JS execution not counted as external requests"
+  },
+  "perPhaseResources": {
+    "api": [
+      {
+        "name": "100 real password + MFA logins (10 concurrent)",
+        "samples": 1,
+        "meanCpuPercentOneCore": 281,
+        "maxRssMiB": 240,
+        "maxIntervalEventLoopP95Ms": 31
+      },
+      {
+        "name": "10 active users, one request/user/second",
+        "samples": 15,
+        "meanCpuPercentOneCore": 11,
+        "maxRssMiB": 270,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "25 active users, one request/user/second",
+        "samples": 30,
+        "meanCpuPercentOneCore": 8,
+        "maxRssMiB": 274,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "50 active users, one request/user/second",
+        "samples": 30,
+        "meanCpuPercentOneCore": 10,
+        "maxRssMiB": 184,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "100 active users, one request/user/second",
+        "samples": 60,
+        "meanCpuPercentOneCore": 16,
+        "maxRssMiB": 251,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "100 concurrent API callers, bounded unpaced burst",
+        "samples": 4,
+        "meanCpuPercentOneCore": 82,
+        "maxRssMiB": 252,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "25 concurrent server-rendered dashboards",
+        "samples": 30,
+        "meanCpuPercentOneCore": 9,
+        "maxRssMiB": 260,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "20 x 1 MiB scanned/encrypted uploads, concurrency 10; downloads hash-verified",
+        "samples": 1,
+        "meanCpuPercentOneCore": 61,
+        "maxRssMiB": 263,
+        "maxIntervalEventLoopP95Ms": 35
+      }
+    ],
+    "web": [
+      {
+        "name": "100 real password + MFA logins (10 concurrent)",
+        "samples": 1,
+        "meanCpuPercentOneCore": 8,
+        "maxRssMiB": 116,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "10 active users, one request/user/second",
+        "samples": 15,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 99,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "25 active users, one request/user/second",
+        "samples": 30,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 99,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "50 active users, one request/user/second",
+        "samples": 30,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 98,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "100 active users, one request/user/second",
+        "samples": 60,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 98,
+        "maxIntervalEventLoopP95Ms": 32
+      },
+      {
+        "name": "100 concurrent API callers, bounded unpaced burst",
+        "samples": 4,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 98,
+        "maxIntervalEventLoopP95Ms": 33
+      },
+      {
+        "name": "25 concurrent server-rendered dashboards",
+        "samples": 30,
+        "meanCpuPercentOneCore": 15,
+        "maxRssMiB": 256,
+        "maxIntervalEventLoopP95Ms": 148
+      },
+      {
+        "name": "20 x 1 MiB scanned/encrypted uploads, concurrency 10; downloads hash-verified",
+        "samples": 1,
+        "meanCpuPercentOneCore": 0,
+        "maxRssMiB": 256,
+        "maxIntervalEventLoopP95Ms": 32
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "LOAD-001",
+      "priority": "Before rollout to a shared office network",
+      "status": "OPEN",
+      "description": "600 requests/minute per IP can throttle legitimate shared-office traffic. Probe returned 600 valid responses and 100 HTTP 429s across 700 requests, with no server errors.",
+      "nextStep": "Design separate anonymous and authenticated abuse budgets, preserve account limits and edge protection, then test both office-NAT capacity and abuse resistance. Do not remove throttling."
+    }
+  ]
+}

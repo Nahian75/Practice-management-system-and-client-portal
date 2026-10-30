@@ -27,6 +27,7 @@ COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/migrations ./apps/api/migrations
 COPY infra/hosting ./infra/hosting
+COPY infra/aws/rds-ca.crt ./infra/aws/rds-ca.crt
 WORKDIR /app/apps/api
 USER node
 EXPOSE 3001

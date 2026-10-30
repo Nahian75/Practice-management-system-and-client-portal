@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import {ScheduledJobsModule} from '../common/jobs/scheduled-jobs.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { DatabaseModule } from '../database/database.module.js';
@@ -23,7 +24,7 @@ import { RetentionRepository } from './retention.repository.js';
 import { RetentionService } from './retention.service.js';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule],
+  imports: [DatabaseModule, AuditModule, AuthModule, DocumentsModule,ScheduledJobsModule],
   controllers: [ComplianceController, SanctionsController, MoneyStatusController, RestrictedReportsController,
     RetentionController, RestrictedExportsController],
   providers: [ComplianceRepository, ComplianceService, AmlEvidenceVault, AmlEvidenceIntake, ComplianceDataCipher,

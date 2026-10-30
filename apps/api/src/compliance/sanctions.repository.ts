@@ -217,7 +217,8 @@ export class SanctionsRepository {
       ? { id: row.licence_id, limitPence: row.limit_pence, usedPence: row.used_pence, expiresOn: row.licence_expires_on } : null };
   }
 
-  async clientsToRescreen(after: string | null): Promise<string[]> {
+  async clientsToRescreen(after: string | null,pendingOnly=false): Promise<string[]> {
+    if(pendingOnly)return (await sql<{id:string}>`SELECT id FROM app.aml_pending_rescreen_clients(${after}::uuid,200) AS id`.execute(this.db)).rows.map(row=>row.id);
     return (await sql<{ id: string }>`select id from app.aml_clients_to_rescreen(${after}::uuid, 200) as id`.execute(this.db))
       .rows.map((row) => row.id);
   }

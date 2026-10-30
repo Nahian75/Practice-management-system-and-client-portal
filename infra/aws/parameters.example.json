@@ -1,0 +1,82 @@
+[
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": "vpc-00000000000000000"
+  },
+  {
+    "ParameterKey": "PublicSubnetA",
+    "ParameterValue": "subnet-00000000000000001"
+  },
+  {
+    "ParameterKey": "PublicSubnetB",
+    "ParameterValue": "subnet-00000000000000002"
+  },
+  {
+    "ParameterKey": "PrivateSubnetA",
+    "ParameterValue": "subnet-00000000000000003"
+  },
+  {
+    "ParameterKey": "PrivateSubnetB",
+    "ParameterValue": "subnet-00000000000000004"
+  },
+  {
+    "ParameterKey": "DatabaseSecurityGroupId",
+    "ParameterValue": "sg-00000000000000000"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "demo.example.test"
+  },
+  {
+    "ParameterKey": "CertificateArn",
+    "ParameterValue": "arn:aws:acm:eu-west-2:000000000000:certificate/REPLACE"
+  },
+  {
+    "ParameterKey": "ApiImage",
+    "ParameterValue": "000000000000.dkr.ecr.eu-west-2.amazonaws.com/stass-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "ParameterKey": "GatewayImage",
+    "ParameterValue": "000000000000.dkr.ecr.eu-west-2.amazonaws.com/stass-gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "ParameterKey": "RuntimeSecretArn",
+    "ParameterValue": "arn:aws:secretsmanager:eu-west-2:000000000000:secret:runtime-REPLACE"
+  },
+  {
+    "ParameterKey": "MigrationSecretArn",
+    "ParameterValue": "arn:aws:secretsmanager:eu-west-2:000000000000:secret:migration-REPLACE"
+  },
+  {
+    "ParameterKey": "SecretsKmsKeyArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "EnableService",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "MaxReplicas",
+    "ParameterValue": "4"
+  },
+  {
+    "ParameterKey": "PoolMax",
+    "ParameterValue": "5"
+  },
+  {
+    "ParameterKey": "DatabaseConnectionBudget",
+    "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "TaskCpu",
+    "ParameterValue": "1024"
+  },
+  {
+    "ParameterKey": "TaskMemory",
+    "ParameterValue": "4096"
+  },
+  {
+    "ParameterKey": "AlarmTopicArn",
+    "ParameterValue": "arn:aws:sns:eu-west-2:000000000000:REPLACE"
+  }
+]
