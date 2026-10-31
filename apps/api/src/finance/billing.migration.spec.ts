@@ -47,6 +47,7 @@ describe('bill database rules', () => {
   let accounts: TestAccount;
   let matterId: string;
   let clientId: string;
+  let clientName: string;
   let timeEntryId: string;
   let today: string;
 
@@ -70,7 +71,7 @@ describe('bill database rules', () => {
     return account;
   }
 
-  async function openMatter(withAddress = true): Promise<{ matterId: string; clientId: string }> {
+  async function openMatter(withAddress = true): Promise<{ matterId: string; clientId: string; clientName: string }> {
     const givenNames = uniqueName();
     const familyName = uniqueName();
     const client = await db.transaction().execute(async (trx) => {
@@ -103,7 +104,7 @@ describe('bill database rules', () => {
       return row;
     });
     await clearMatterForTests(db, matter.id);
-    return { matterId: matter.id, clientId: client.id };
+    return { matterId: matter.id, clientId: client.id, clientName: `${givenNames} ${familyName}` };
   }
 
   async function addTime(targetMatter = matterId): Promise<string> {
@@ -183,7 +184,7 @@ describe('bill database rules', () => {
     partner = await staffWith('partner');
     feeEarner = await staffWith('fee_earner');
     accounts = await staffWith('accounts');
-    ({ matterId, clientId } = await openMatter());
+    ({ matterId, clientId, clientName } = await openMatter());
     timeEntryId = await addTime();
   });
 
@@ -269,7 +270,7 @@ describe('bill database rules', () => {
         reference: expect.stringMatching(/^INV-\d{6,}$/),
         matter_reference: expect.stringMatching(/^C-\d{6,}\/\d{3,}$/),
         client_reference: expect.stringMatching(/^C-\d{6,}$/),
-        client_name: expect.stringMatching(/^Jamie /),
+        client_name: clientName,
         supplier_name: 'Stass Legal LLP',
         net_pence: '12500',
         vat_pence: '2000',
