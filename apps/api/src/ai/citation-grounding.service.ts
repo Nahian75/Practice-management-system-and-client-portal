@@ -81,7 +81,7 @@ export class CitationGroundingService {
         continue;
       }
 
-      // 1. Direct exact normalized substring match
+      // Direct exact normalized substring match.
       if (docNormalizedText.includes(quoteNormalized)) {
         verifiedCount++;
         verifiedDetails.push({
@@ -92,28 +92,16 @@ export class CitationGroundingService {
         continue;
       }
 
-      // 2. High-confidence fuzzy word match (> 80% word overlap in document)
+      // Fuzzy matches require at least 85% of quote words to occur in the document.
       const quoteWords = quoteNormalized.split(' ').filter(Boolean);
       let matchedWords = 0;
-      for (const w of quoteWords) {
-        if (docNormalizedText.includes(w)) matchedWords++;
+      for (const word of quoteWords) {
+        if (docNormalizedText.includes(word)) matchedWords++;
       }
       const wordMatchRatio = quoteWords.length > 0 ? matchedWords / quoteWords.length : 0;
-
-      if (wordMatchRatio >= 0.85) {
-        verifiedCount++;
-        verifiedDetails.push({
-          ...citation,
-          verified: true,
-          matchSimilarity: wordMatchRatio,
-        });
-      } else {
-        verifiedDetails.push({
-          ...citation,
-          verified: false,
-          matchSimilarity: wordMatchRatio,
-        });
-      }
+      const verified = wordMatchRatio >= 0.85;
+      if (verified) verifiedCount++;
+      verifiedDetails.push({ ...citation, verified, matchSimilarity: wordMatchRatio });
     }
 
     const unverifiedCount = citations.length - verifiedCount;

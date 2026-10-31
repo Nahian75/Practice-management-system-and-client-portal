@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { appName } from '@/config';
 import './globals.css';
 import './interface.css';
-import './dashboard.css';
+import './tailwind.css';
 import './sign-in.css';
 import './manage.css';
 import './reference-theme.css';

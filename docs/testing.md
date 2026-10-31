@@ -1,5 +1,7 @@
 # Testing
 
+Latest cleanup run (31 October 2026): 101 browser tests, 47 focused AI tests and 10 script tests passed; both applications passed type checks and builds. The full API run finished with 2,094 passed and 44 failed tests across 9 files. Email delivery and reconciliation fixture failures were also observed during baseline checks. The all-files hidden-character check reports an existing BOM in `docs/requirements/combined-checklist-source.txt`. See the [cleanup review](reviews/2026-10-31-code-cleanup.md) for commands and limits. Older verification counts below describe their original runs.
+
 **Current state (2026-10-14):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules,
 the security-reviewed Finance steps 14a to 14f and Compliance steps 15a to 15f,
@@ -368,11 +370,12 @@ npm run test:e2e -w @practice/web   # builds the web app, recreates and migrates
 
 ## AI and Security Retention fixtures
 
-- **AI Unit & Semantic Suites (`apps/api/src/ai/*.spec.ts`):** 66 tests verify
+- **AI Unit & Semantic Suites (`apps/api/src/ai/*.spec.ts`):** These suites verify
   UK PII redaction (`redaction.service.spec.ts`), XML delimiter encapsulation
   and prompt injection detection (`prompt-builder.service.spec.ts`), document chunking
-  with overlap (`document-chunker.service.spec.ts`), Jaccard word-level citation
-  grounding verification (`citation-grounding.service.spec.ts`), structured chronology
+  with overlap (`document-chunker.service.spec.ts`), normalized exact and fuzzy citation
+  grounding verification, including the inclusive 85% threshold and mixed-result totals
+  (`citation-grounding.service.spec.ts`), structured chronology
   extraction (`chronology-extractor.service.spec.ts`), attendance note structuring
   (`attendance-notes.service.spec.ts`), and HTTP drafting controller endpoints
   (`ai.controller.spec.ts`).

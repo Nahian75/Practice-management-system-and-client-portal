@@ -1,5 +1,7 @@
 # AI Security
 
+Verification update (31 October 2026): the cleanup preserved the existing citation matching behavior and regulatory warnings. The related citation, controller and adversarial suites passed 47 tests. This focused result does not establish that the full application suite passes; see the [cleanup review](reviews/2026-10-31-code-cleanup.md) for failures and limits.
+
 **Current state (2026-10-14):** First-version design approved ([ai.md](ai.md)).
 Steps 18a to 18f establish strict security controls for generative AI and legal
 drafting assistance in a UK legal practice.
@@ -105,6 +107,6 @@ Conducted on 2026-10-14 covering automated adversarial penetration tests (`apps/
 ### 6. Vector 6: Grounding, Hallucination Mitigation & SRA Compliance
 - **Threat:** Hallucinated case citations or fabricated clauses misleading clients or courts (SRA Code of Conduct paras 1.4, 2.1, 3.2).
 - **Verification Result:** PASS (Audited citation grounding).
-  - `CitationGroundingService` validates quoted excerpts against matter source documents using exact and fuzzy Jaccard word-overlap matching.
+  - `CitationGroundingService` compares normalized excerpts against the referenced source document: exact substring matching first, then a fallback requiring at least 85% of quote words to occur as substrings in that document. This is not a Jaccard calculation or a substitute for human verification of meaning and factual accuracy.
   - Unverified citations flag compliance audit warnings (`ai.citation_unverified`), append statutory cautionary notices to the draft, and display highlighted visual warnings in the staff web workbench.
 

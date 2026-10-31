@@ -1,5 +1,7 @@
 # Web app
 
+Cleanup update (31 October 2026): the unused `StatusTag` component, its unused style variants and two superseded dashboard style implementations were removed. `src/app/tailwind.css` retains the Tailwind theme and utility imports, in the same layout import position. The active dashboard continues to use `reference-theme.css`; shared workspace rules remain in `manage.css`. The production build, strict type check and all 101 browser tests passed. See the [cleanup review](reviews/2026-10-31-code-cleanup.md).
+
 **Current state (2026-10-13):** The staff app screens through Finance step
 14f, Compliance step 15f and People / HR step 16f, and portal administration are built. Portal step 11d adds the
 read-only client screens, using the same secure pass-through and a separate

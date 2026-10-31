@@ -82,6 +82,27 @@ describe('CitationGroundingService (Step 18c)', () => {
     expect(result.verifiedCitations[0]?.verified).toBe(false);
   });
 
+  it('preserves the inclusive 85% fuzzy threshold and mixed citation totals', () => {
+    const matchingWords = Array.from({ length: 20 }, (_, index) => `term${index}`);
+    const context = [{ id: 'threshold-document', title: 'Threshold', content: matchingWords.join(' ') }];
+    const citations = [17, 16].map((matchCount) => ({
+      sourceDocumentId: 'threshold-document',
+      documentTitle: 'Threshold',
+      quote: [...matchingWords.slice(0, matchCount), ...Array<string>(20 - matchCount).fill('absent')].join(' '),
+    }));
+
+    const result = service.verifyCitations(citations, context);
+
+    expect(result.verifiedCitations.map(({ verified, matchSimilarity }) => ({ verified, matchSimilarity }))).toEqual([
+      { verified: true, matchSimilarity: 0.85 },
+      { verified: false, matchSimilarity: 0.8 },
+    ]);
+    expect(result.grounded).toBe(false);
+    expect(result.verificationScore).toBe(0.5);
+    expect(result.unverifiedCount).toBe(1);
+    expect(result.hallucinationWarning).toContain('1 of 2 citation(s)');
+  });
+
   it('returns grounded: true when empty citation array is provided', () => {
     const result = service.verifyCitations([], mockContext);
     expect(result.grounded).toBe(true);

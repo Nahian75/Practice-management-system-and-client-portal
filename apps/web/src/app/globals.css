@@ -25,16 +25,12 @@
   --colour-focus: #fbbf24;
   --colour-tag-green-bg: #dcfae6;
   --colour-tag-green-text: #05603a;
-  --colour-tag-blue-bg: #dbeafe;
-  --colour-tag-blue-text: #1e40af;
   --colour-tag-yellow-bg: #fef0c7;
   --colour-tag-yellow-text: #92400e;
   --colour-tag-red-bg: #fee4e2;
   --colour-tag-red-text: #b42318;
   --colour-tag-grey-bg: #e9edf3;
   --colour-tag-grey-text: #475467;
-  --colour-tag-purple-bg: #ede9fe;
-  --colour-tag-purple-text: #5b21b6;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 1rem;
@@ -1003,12 +999,6 @@ input[type='file'].input {
   white-space: nowrap;
 }
 
-.tag-blue {
-  background: var(--colour-tag-blue-bg);
-  color: var(--colour-tag-blue-text);
-}
-
-.tag-green,
 .tag-success,
 .badge-success,
 .status-success {
@@ -1016,29 +1006,21 @@ input[type='file'].input {
   color: var(--colour-tag-green-text);
 }
 
-.tag-yellow,
 .tag-warning,
 .badge-warning {
   background: var(--colour-tag-yellow-bg);
   color: var(--colour-tag-yellow-text);
 }
 
-.tag-red,
 .tag-danger,
 .badge-danger {
   background: var(--colour-tag-red-bg);
   color: var(--colour-tag-red-text);
 }
 
-.tag-grey,
 .badge {
   background: var(--colour-tag-grey-bg);
   color: var(--colour-tag-grey-text);
-}
-
-.tag-purple {
-  background: var(--colour-tag-purple-bg);
-  color: var(--colour-tag-purple-text);
 }
 
 .notification-list,

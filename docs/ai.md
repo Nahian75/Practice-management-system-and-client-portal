@@ -1,5 +1,7 @@
 # Artificial Intelligence and Legal Drafting Assistant
 
+Cleanup update (31 October 2026): citation verification now uses one result-building branch for fuzzy matches. Matching behavior is unchanged: a normalized exact substring matches directly; otherwise at least 85% of the normalized quote words must occur as substrings in the normalized source document. This fallback is not a Jaccard calculation or proof of factual accuracy. A focused regression test covers the inclusive threshold and mixed-result totals. See the [cleanup review](reviews/2026-10-31-code-cleanup.md).
+
 **Current state (2026-10-14):** Step 18a is built: provider-neutral architecture,
 governance schema (`app.ai_*`), permissions (`ai.use`, `ai.manage_config`, `ai.audit`),
 immutability triggers, matter access enforcement (`app.assert_matter_ai_access`),

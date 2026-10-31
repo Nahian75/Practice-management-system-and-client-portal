@@ -1,5 +1,7 @@
 # Clio Manage reference and Stass implementation
 
+Cleanup update, 31 October 2026: superseded dashboard styles and the unused status-tag component have been removed. The current reference dashboard and workspace layouts are unchanged; Tailwind imports now live in `apps/web/src/app/tailwind.css`. All 101 browser tests passed. See the [cleanup review](reviews/2026-10-31-code-cleanup.md) for the complete validation results and outstanding failures.
+
 Update, 31 October 2026: persistent cross-device timers and matter expense/disbursement recording with fixed receipt references and duplicate-safe invoice links are implemented. See the [expense review](reviews/2026-10-31-expenses.md) and [integration tracker](requirements/combined-feature-checklist.md). The earlier validation counts below remain historical.
 
 Reference reviewed: 30 October 2026. Scope: **Clio Manage first**, as selected by the project owner. Clio Grow, Clio Draft, Clio Work and enterprise products are separate future decisions.
