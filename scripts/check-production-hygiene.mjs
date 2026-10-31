@@ -83,6 +83,27 @@ if (existsSync(drPath)) {
   }
 }
 
+// 5. Keep every production Node image inside the engine range enforced by npm.
+const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
+const engineRange = /^(?:>=)(\d+) <(\d+)$/.exec(packageJson.engines?.node ?? '');
+const nodeDockerfiles = ['Dockerfile', 'infra/hosting/render-api.Dockerfile', 'infra/hosting/render-web.Dockerfile'];
+if (!engineRange) {
+  reportIssue('package.json must declare a simple supported Node major range');
+} else {
+  const minimum = Number(engineRange[1]);
+  const maximum = Number(engineRange[2]);
+  const unsupported = nodeDockerfiles.filter((file) => {
+    const source = readFileSync(resolve(rootDir, file), 'utf8');
+    const images = [...source.matchAll(/^FROM node:(\d+)\.[^\s@]+@sha256:[a-f0-9]{64}/gm)];
+    return images.length === 0 || images.some((match) => Number(match[1]) < minimum || Number(match[1]) >= maximum);
+  });
+  if (unsupported.length > 0) {
+    reportIssue(`Production Node images must satisfy ${packageJson.engines.node}: ${unsupported.join(', ')}`);
+  } else {
+    reportPass(`Production Node images satisfy ${packageJson.engines.node} and are digest-pinned`);
+  }
+}
+
 // eslint-disable-next-line no-console
 console.log('');
 if (issuesFound > 0) {
