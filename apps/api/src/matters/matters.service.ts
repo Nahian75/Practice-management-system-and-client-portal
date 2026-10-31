@@ -7,6 +7,8 @@ import { permissionsFor, STAFF_ROLES } from '../auth/permissions/permissions.js'
 import { SearchQuota } from '../clients/search-quota.js';
 import type { RequestContext } from '../common/http/request-context.js';
 import type { ConflictMatchRow, Database, MatterStatus, MatterTeamRole, MatterType } from '../database/schema.js';
+import type { DocumentSummary } from '../documents/documents.repository.js';
+import { DocumentsService, type DownloadResult } from '../documents/documents.service.js';
 import type { Colleague, ConflictCheck, Matter, MatterSummary, NewMatter } from './matter.js';
 import { MattersRepository } from './matters.repository.js';
 
@@ -35,17 +37,28 @@ export interface ComplianceAccess {
   accessedBy: { accountId: string; displayName: string };
   reason: string;
   accessedAt: Date;
+  /** The one version downloaded, when the access was a download. */
+  document: { id: string; title: string; version: number } | null;
 }
 
 export type ComplianceAccessesResult =
   | { outcome: 'listed'; accesses: ComplianceAccess[] }
   | { outcome: 'not_found' | 'not_supervisor' };
 
-export type ComplianceAccessResult = { outcome: 'accessed'; matter: Matter } | { outcome: 'not_found' | 'limited' };
+export type ComplianceAccessResult = { outcome: 'accessed'; matter: Matter; documents: DocumentSummary[] } | { outcome: 'not_found' | 'limited' };
+export type ComplianceDownloadResult = DownloadResult | { outcome: 'limited' };
 
-type ComplianceAccessOutcome =
-  | { kind: 'accessed'; details: Matter; supervisorId: string }
-  | { kind: 'not_found' }
+/** What a compliance access is recorded against. */
+interface AccessTarget {
+  matterId: string;
+  reference: string;
+  documentVersionId?: string;
+  metadata?: Record<string, string | number>;
+}
+
+type ComplianceAccessOutcome<Refusal> =
+  | { kind: 'accessed'; accessId: string; target: AccessTarget; supervisorId: string }
+  | { kind: 'refused'; refusal: Refusal }
   | { kind: 'limited'; alert: boolean };
 
 export type EditResult = 'updated' | 'not_found' | 'closed';
@@ -71,6 +84,7 @@ export class MattersService {
     private readonly audit: AuditService,
     private readonly quota: SearchQuota,
     private readonly notices: SecurityNoticesService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /**
@@ -492,35 +506,80 @@ export class MattersService {
   /**
    * Compliance opens a matter they are not on, read-only, by recording a
    * reason. Each look is a new access: nothing lasting is granted. The matter
-   * is read through the access record, and the supervising partner is told.
+   * and its documents are read through the access record, and the
+   * supervising partner is told.
    */
   async accessWithReason(matterReference: string, reason: string, by: MatterActor): Promise<ComplianceAccessResult> {
-    const outcome = await this.matters.transaction(async (trx): Promise<ComplianceAccessOutcome> => {
+    const access = await this.recordComplianceAccess<'not_found'>(reason, by, async (trx) => {
+      const matter = await this.matters.findByReference(matterReference, trx);
+      return matter ? { matterId: matter.id, reference: matter.reference } : 'not_found';
+    });
+    if (access.outcome !== 'accessed') {
+      return { outcome: access.outcome };
+    }
+    const matter = await this.matters.findByComplianceAccess(access.matterId, access.accessId);
+    if (!matter) {
+      throw new Error('Matter not readable through its own access');
+    }
+    return { outcome: 'accessed', matter, documents: await this.documents.listThroughComplianceAccess(access.matterId, access.accessId) };
+  }
+
+  /**
+   * Compliance downloads one version of a document on a matter they are not
+   * on, with a reason for this download alone. The download is its own
+   * compliance access, naming the version, and is read through it.
+   */
+  async downloadWithReason(documentId: string, number: number, reason: string, by: MatterActor): Promise<ComplianceDownloadResult> {
+    const access = await this.recordComplianceAccess(reason, by, async (trx) => {
+      const version = await this.matters.findDocumentVersion(documentId, number, trx);
+      if (!version) {
+        return 'not_found';
+      }
+      if (version.withdrawn) {
+        return 'withdrawn';
+      }
+      return { matterId: version.matter_id, reference: version.reference, documentVersionId: version.id, metadata: { documentId, version: number } };
+    });
+    if (access.outcome !== 'accessed') {
+      return { outcome: access.outcome };
+    }
+    return this.documents.download(documentId, number, by, access.accessId);
+  }
+
+  /**
+   * Records one compliance access with its reason, within the hourly limit,
+   * and audits it. Once committed, the supervising partner is told.
+   */
+  private async recordComplianceAccess<Refusal extends 'not_found' | 'withdrawn'>(
+    reason: string,
+    by: MatterActor,
+    find: (trx: Kysely<Database>) => Promise<AccessTarget | Refusal>,
+  ): Promise<{ outcome: 'accessed'; accessId: string; matterId: string } | { outcome: Refusal | 'limited' }> {
+    const outcome = await this.matters.transaction(async (trx): Promise<ComplianceAccessOutcome<Refusal>> => {
       const allowance = await this.complianceAllowance(by, trx);
       if (!allowance.allowed) {
         return { kind: 'limited', alert: allowance.newlyLimited };
       }
-      const matter = await this.matters.findByReference(matterReference, trx);
-      if (!matter) {
-        return { kind: 'not_found' };
+      const target = await find(trx);
+      if (typeof target === 'string') {
+        return { kind: 'refused', refusal: target };
       }
-      const accessId = await this.matters.recordComplianceAccess({ matterId: matter.id, accessedBy: by.accountId, reason }, trx);
+      const accessId = await this.matters.recordComplianceAccess(
+        { matterId: target.matterId, accessedBy: by.accountId, reason, documentVersionId: target.documentVersionId },
+        trx,
+      );
       await this.audit.record(
         {
           actor: by.actor,
           action: 'matter.accessed_with_reason',
           outcome: 'success',
-          resource: { type: 'matter', id: matter.id },
-          metadata: { accessId },
+          resource: { type: 'matter', id: target.matterId },
+          metadata: { accessId, ...target.metadata },
           ...by.context,
         },
         trx,
       );
-      const details = await this.matters.findByComplianceAccess(matter.id, accessId, trx);
-      if (!details) {
-        throw new Error('Matter not readable through its own access');
-      }
-      return { kind: 'accessed', details, supervisorId: (await this.matters.supervisor(matter.id, trx)).accountId };
+      return { kind: 'accessed', accessId, target, supervisorId: (await this.matters.supervisor(target.matterId, trx)).accountId };
     });
 
     switch (outcome.kind) {
@@ -529,15 +588,16 @@ export class MattersService {
           await this.notices.complianceAccessLimitReached({ accountId: by.accountId, limit: COMPLIANCE_ACCESSES_PER_HOUR });
         }
         return { outcome: 'limited' };
-      case 'not_found':
-        return { outcome: 'not_found' };
+      case 'refused':
+        return { outcome: outcome.refusal };
       case 'accessed':
         await this.notices.complianceAccessed({
-          matterReference: outcome.details.reference,
+          matterReference: outcome.target.reference,
           supervisorId: outcome.supervisorId,
           accessedBy: by.accountId,
+          downloaded: outcome.target.documentVersionId !== undefined,
         });
-        return { outcome: 'accessed', matter: outcome.details };
+        return { outcome: 'accessed', accessId: outcome.accessId, matterId: outcome.target.matterId };
     }
   }
 
@@ -586,6 +646,10 @@ export class MattersService {
         accessedBy: { accountId: access.accessed_by, displayName: access.display_name },
         reason: access.reason,
         accessedAt: access.accessed_at,
+        document:
+          access.document_id === null || access.document_title === null || access.document_version === null
+            ? null
+            : { id: access.document_id, title: access.document_title, version: access.document_version },
       })),
     };
   }

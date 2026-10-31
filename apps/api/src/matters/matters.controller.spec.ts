@@ -863,7 +863,7 @@ describe('Matters', () => {
 
       expect(listed.status).toBe(200);
       expect(listed.body.accesses).toEqual([
-        { id: expect.any(String), accessedBy: { accountId: officer.id, displayName: expect.any(String) }, reason: REASON, accessedAt: expect.any(String) },
+        { id: expect.any(String), accessedBy: { accountId: officer.id, displayName: expect.any(String) }, reason: REASON, accessedAt: expect.any(String), document: null },
       ]);
       expect((await as(token).get(`/matters/${matterId}/compliance-accesses`)).status).toBe(403);
       const otherPartner = await staffWith('partner');

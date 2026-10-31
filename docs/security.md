@@ -98,8 +98,9 @@ git config core.hooksPath .githooks
 
 **Limits:**
 - A local hook can be skipped with `git commit --no-verify`. The same scan
-  will run in CI so a skipped hook cannot let a secret reach the main branch.
-  Not yet in place: CI does not exist yet.
+  runs in CI (`.github/workflows/ci.yml`) over the whole history on every push
+  and pull request, so a skipped hook cannot let a secret reach the main branch
+  unnoticed. Protect `main` on GitHub so a red check blocks the merge.
 - A false positive is handled by adding its fingerprint to `.gitleaksignore`,
   which is reviewed like any other change.
 
@@ -120,8 +121,8 @@ editing tool turned an escape sequence into the real character.
   Write it as an escape sequence instead (for example `\u202E` in code).
 - `npm run check:hidden-characters` checks every committed file.
 
-**Limits:** skipped by `git commit --no-verify`, like the secret scan; CI will
-run it too once CI exists.
+**Limits:** skipped by `git commit --no-verify`, like the secret scan; CI
+runs it on every push and pull request.
 
 ## Dependencies
 

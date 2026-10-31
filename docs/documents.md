@@ -9,8 +9,8 @@ staff web app (see [web.md](web.md)). The client portal now lists and
 downloads only the latest versions of shared documents. The
 documents and portal security reviews are complete. Portal review P4 made the
 automatic unshare and its audit event agree during a simultaneous share and
-withdrawal. Compliance access to documents, through the
-matter's compliance access, is not built yet.
+withdrawal. Compliance reaches documents through the matter's compliance
+access, with a reason for each download (migration `0076`).
 
 The files of a matter: letters, contracts, evidence, identity documents,
 emails. Documents come before the client portal, so clients have something to
@@ -190,13 +190,14 @@ the matter's team, and a document you may not see answers 404.
 | POST | `/documents/:id/withdrawal` | `documents.withdraw` + uploader or supervising partner, open matter | `{reason}` (10 to 500 characters) → 204. Final. 403 neither the uploader nor the supervising partner, 404 not on the team, 409 already withdrawn, matter closed, or changed meanwhile. Afterwards the document is not listed, its versions answer 410, and `GET /documents/:id` shows who withdrew it, when and why |
 | PUT | `/documents/:id/client-sharing` | `documents.share` + team | Shares it with the client → 204. Repeating it records nothing. 404 not on the team; 409 withdrawn or changed meanwhile |
 | DELETE | `/documents/:id/client-sharing` | `documents.share` + team | Stops sharing it → 204, with the same idempotence and refusals. A closed matter is allowed because clients can see closed matters |
+| POST | `/documents/:id/versions/:number/compliance-downloads` | `matters.access_with_reason` (compliance) | `{reason}` (10 to 500 characters) → the file, sent exactly as the team's download. Each download is its own compliance access naming the version: recorded, emailed to the supervising partner, and counted in the 30 an hour. 400 no reason, 404 no such version, 410 withdrawn, 429 over the limit. Gives nothing lasting: compliance still gets 403 from the team's download |
 | GET | `/portal/matters/:id/documents` | Client account + live portal link | Shared and unwithdrawn documents only, with the latest version's metadata; earlier versions and staff identities are not returned |
 | GET | `/portal/documents/:id/content` | Client account + live portal link | The latest shared version only, as an attachment. Recorded as `document.downloaded` with the client account as actor |
 
 ## Audit
 
 `document.added` (document id, version, type, size), `document.version_added`,
-`document.downloaded` (document id, version), `document.withdrawn`,
+`document.downloaded` (document id, version, and the compliance access id when downloaded with a reason), `document.withdrawn`,
 `document.shared`, `document.unshared`, `document.refused` (reason: too large, type, macros, active content, unscannable,
 malware, scanner unavailable, over the allowance, and so on), `document.upload_limited`.
 Never file names, titles or contents: like client names, they can be personal

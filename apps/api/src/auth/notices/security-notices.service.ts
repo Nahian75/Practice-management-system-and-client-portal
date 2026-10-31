@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, type Clock } from '../../common/time/clock.js';
-import type { StaffRole } from '../../database/schema.js';
-import type { Database } from '../../database/schema.js';
 import type { Kysely } from 'kysely';
+import { CLOCK, type Clock } from '../../common/time/clock.js';
+import type { Database, StaffRole } from '../../database/schema.js';
 import { MailOutbox } from '../../mail/mail-outbox.js';
 import { AccountsRepository } from '../accounts/accounts.repository.js';
 import { SENSITIVE_ROLES } from '../permissions/permissions.js';
@@ -165,16 +164,18 @@ export class SecurityNoticesService {
    * reason is not in the email; the partner reads it in the app, where the
    * accesses are listed.
    */
-  async complianceAccessed(access: { matterReference: string; supervisorId: string; accessedBy: string }): Promise<void> {
+  async complianceAccessed(access: { matterReference: string; supervisorId: string; accessedBy: string; downloaded: boolean }): Promise<void> {
     const when = this.clock.now().toUTCString();
     const officer = await this.accounts.findById(access.accessedBy);
     if (!officer) {
       return;
     }
-    await this.notify(access.supervisorId, `Compliance opened ${access.matterReference}`, (name) => [
+    const subject = access.downloaded ? `Compliance downloaded a document from ${access.matterReference}` : `Compliance opened ${access.matterReference}`;
+    const action = access.downloaded ? 'downloaded a document from matter' : 'opened matter';
+    await this.notify(access.supervisorId, subject, (name) => [
       `Hello ${name},`,
       '',
-      `${officer.display_name}, who holds the compliance role, opened matter ${access.matterReference} on ${when}.`,
+      `${officer.display_name}, who holds the compliance role, ${action} ${access.matterReference} on ${when}.`,
       '',
       'You are told because you supervise the matter. The reason given is shown with',
       "the matter's compliance accesses.",
@@ -286,6 +287,38 @@ export class SecurityNoticesService {
   private async changedBy(accountId: string | null): Promise<string> {
     const account = accountId ? await this.accounts.findById(accountId) : undefined;
     return account ? `by ${account.display_name}` : 'by the system';
+  }
+
+  /**
+   * Emails the day's audit checkpoint to every compliance holder, in the
+   * caller's transaction. Kept outside the database, it shows later whether
+   * the log up to that seal was changed (docs/audit.md).
+   */
+  async auditCheckpoint(checkpoint: { londonDate: string; seq: string; hash: string }, trx: Kysely<Database>): Promise<void> {
+    for (const recipientId of await this.roles.activeHolders('compliance', trx)) {
+      const account = await this.accounts.findById(recipientId, trx);
+      if (!account) {
+        continue;
+      }
+      const lines = [
+        `Hello ${account.display_name},`,
+        '',
+        `This is the audit log checkpoint for ${checkpoint.londonDate}.`,
+        '',
+        `Seal number: ${checkpoint.seq}`,
+        `Fingerprint: ${checkpoint.hash}`,
+        '',
+        'Keep this email. It lets the firm prove later that nobody changed or deleted',
+        'audit entries up to this point. To check, an administrator runs:',
+        '',
+        `  npm run audit:verify -w @practice/api -- --checkpoint ${checkpoint.seq}:${checkpoint.hash}`,
+      ];
+      await this.outbox.enqueueInTransaction(
+        { to: account.email, subject: `Audit log checkpoint for ${checkpoint.londonDate}`, text: lines.join('\n') },
+        { kind: 'security_notice', recipientAccountId: account.id },
+        trx,
+      );
+    }
   }
 
   private async notify(accountId: string, subject: string, lines: (name: string) => string[], executor?: Kysely<Database>): Promise<void> {

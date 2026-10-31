@@ -318,6 +318,23 @@ export class MattersRepository {
     return trx.selectFrom('matters').select(['id', 'reference']).where('reference', '=', reference).executeTakeFirst();
   }
 
+  /** One version of any matter's document, for compliance to record an access to before downloading it. */
+  findDocumentVersion(documentId: string, number: number, trx: Kysely<Database>) {
+    return trx
+      .selectFrom('document_versions')
+      .innerJoin('documents', 'documents.id', 'document_versions.document_id')
+      .innerJoin('matters', 'matters.id', 'documents.matter_id')
+      .select(['document_versions.id', 'documents.matter_id', 'matters.reference'])
+      .select(({ exists, selectFrom }) =>
+        exists(selectFrom('document_withdrawals').select('document_withdrawals.id').whereRef('document_withdrawals.document_id', '=', 'documents.id')).as(
+          'withdrawn',
+        ),
+      )
+      .where('document_versions.document_id', '=', documentId)
+      .where('document_versions.number', '=', number)
+      .executeTakeFirst();
+  }
+
   /** The matter's supervising partner, and whether they can still act: an active account holding the partner role. */
   async supervisor(matterId: string, trx: Kysely<Database>) {
     const row = await trx
@@ -399,10 +416,13 @@ export class MattersRepository {
   }
 
   /** Records a compliance access. The database checks the accessor holds the compliance role. */
-  async recordComplianceAccess(access: { matterId: string; accessedBy: string; reason: string }, trx: Kysely<Database>): Promise<string> {
+  async recordComplianceAccess(
+    access: { matterId: string; accessedBy: string; reason: string; documentVersionId?: string },
+    trx: Kysely<Database>,
+  ): Promise<string> {
     const { id } = await trx
       .insertInto('matter_compliance_accesses')
-      .values({ matter_id: access.matterId, accessed_by: access.accessedBy, reason: access.reason })
+      .values({ matter_id: access.matterId, accessed_by: access.accessedBy, reason: access.reason, document_version_id: access.documentVersionId ?? null })
       .returning('id')
       .executeTakeFirstOrThrow();
     return id;
@@ -413,12 +433,17 @@ export class MattersRepository {
     return this.db
       .selectFrom('matter_compliance_accesses')
       .innerJoin('accounts', 'accounts.id', 'matter_compliance_accesses.accessed_by')
+      .leftJoin('document_versions', 'document_versions.id', 'matter_compliance_accesses.document_version_id')
+      .leftJoin('documents', 'documents.id', 'document_versions.document_id')
       .select([
         'matter_compliance_accesses.id',
         'matter_compliance_accesses.accessed_by',
         'accounts.display_name',
         'matter_compliance_accesses.reason',
         'matter_compliance_accesses.accessed_at',
+        'documents.id as document_id',
+        'documents.title as document_title',
+        'document_versions.number as document_version',
       ])
       .where('matter_compliance_accesses.matter_id', '=', matterId)
       .orderBy('matter_compliance_accesses.accessed_at', 'desc')

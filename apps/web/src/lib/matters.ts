@@ -75,6 +75,8 @@ export interface ComplianceAccess {
   accessedBy: { accountId: string; displayName: string };
   reason: string;
   accessedAt: string;
+  /** The one version downloaded, when the access was a download. */
+  document: { id: string; title: string; version: number } | null;
 }
 
 /** The API's form for a matter reference, such as C-000123/001; it reads lower case as upper. */

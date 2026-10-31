@@ -13,6 +13,8 @@
     "invite:local": "node --env-file=.env --enable-source-maps dist/cli/invite.js",
     "retention:sweep": "node --enable-source-maps dist/cli/retention-sweep.js",
     "retention:sweep:local": "node --env-file=.env --enable-source-maps dist/cli/retention-sweep.js",
+    "audit:verify": "node --enable-source-maps dist/cli/audit-verify.js",
+    "audit:verify:local": "node --env-file=.env --enable-source-maps dist/cli/audit-verify.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

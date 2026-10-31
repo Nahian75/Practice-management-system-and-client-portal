@@ -91,8 +91,8 @@ export class RolesRepository {
   }
 
   /** Ids of the active accounts holding `role`. */
-  async activeHolders(role: StaffRole): Promise<string[]> {
-    const rows = await this.db
+  async activeHolders(role: StaffRole, executor: Kysely<Database> = this.db): Promise<string[]> {
+    const rows = await executor
       .selectFrom('account_roles')
       .innerJoin('accounts', 'accounts.id', 'account_roles.account_id')
       .select('accounts.id')

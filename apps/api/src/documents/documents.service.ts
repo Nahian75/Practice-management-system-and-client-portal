@@ -7,6 +7,7 @@ import type { RequestContext } from '../common/http/request-context.js';
 import { text } from '../common/validation/safe-text.js';
 import { sql, type Kysely } from 'kysely';
 import type { Database, DocumentCategory, DocumentMediaType } from '../database/schema.js';
+import { reachedByComplianceAccess, visibleTo } from '../matters/matters.repository.js';
 import { DocumentVault, type StoredFile } from './document-vault.js';
 import { DocumentsRepository, type DocumentDetails, type DocumentSummary } from './documents.repository.js';
 import { FileInspection, FileRefusedError, type InspectedFile, type RefusalReason } from './file-inspection.js';
@@ -359,11 +360,19 @@ export class DocumentsService {
 
   /** One page of the matter's documents; undefined if `viewerId` is not on its team. */
   async list(matterId: string, viewerId: string, before?: string): Promise<{ documents: DocumentSummary[]; next: string | null } | undefined> {
-    const documents = await this.documents.listForMatter(matterId, viewerId, { before, limit: DOCUMENTS_PAGE_SIZE });
+    const documents = await this.documents.listForMatter(matterId, visibleTo(viewerId), { before, limit: DOCUMENTS_PAGE_SIZE });
     if (!documents) {
       return undefined;
     }
     return { documents, next: documents.length === DOCUMENTS_PAGE_SIZE ? (documents.at(-1)?.id ?? null) : null };
+  }
+
+  /**
+   * The matter's documents, read through a compliance access to it.
+   * shortcut: newest DOCUMENTS_PAGE_SIZE only, add paging if a reviewed matter ever holds more.
+   */
+  async listThroughComplianceAccess(matterId: string, accessId: string): Promise<DocumentSummary[]> {
+    return (await this.documents.listForMatter(matterId, reachedByComplianceAccess(accessId), { limit: DOCUMENTS_PAGE_SIZE })) ?? [];
   }
 
   find(documentId: string, viewerId: string): Promise<DocumentDetails | undefined> {
@@ -371,12 +380,13 @@ export class DocumentsService {
   }
 
   /**
-   * One version, decrypted as it streams, for the matter's team. The download
+   * One version, decrypted as it streams, for the matter's team, or through
+   * the compliance access `accessId` recorded for that version. The download
    * is recorded before any of it is sent. An error part-way through the stream
    * means the stored file was changed: the caller must abandon the response.
    */
-  async download(documentId: string, number: number, by: DocumentActor): Promise<DownloadResult> {
-    const version = await this.documents.findVersionToDownload(documentId, number, by.accountId);
+  async download(documentId: string, number: number, by: DocumentActor, accessId?: string): Promise<DownloadResult> {
+    const version = await this.documents.findVersionToDownload(documentId, number, accessId ? { accessId } : { viewerId: by.accountId });
     if (!version) {
       return { outcome: 'not_found' };
     }
@@ -392,7 +402,7 @@ export class DocumentsService {
       action: 'document.downloaded',
       outcome: 'success',
       resource: { type: 'document', id: documentId },
-      metadata: { matterId: version.matter_id, version: number },
+      metadata: { matterId: version.matter_id, version: number, ...(accessId && { accessId }) },
       ...by.context,
     });
     return { outcome: 'ready', file, fileName: version.file_name, mediaType: version.media_type, sizeBytes: version.size_bytes };

@@ -163,6 +163,7 @@ export default async function MatterPage({
                 <tr>
                   <th scope="col">When</th>
                   <th scope="col">Who</th>
+                  <th scope="col">What</th>
                   <th scope="col">Reason</th>
                 </tr>
               </thead>
@@ -171,6 +172,7 @@ export default async function MatterPage({
                   <tr key={access.id}>
                     <td>{formatDateTime(access.accessedAt)}</td>
                     <td>{access.accessedBy.displayName}</td>
+                    <td>{access.document ? <>Downloaded &ldquo;{access.document.title}&rdquo;, version {access.document.version}</> : 'Opened the matter'}</td>
                     <td>{access.reason}</td>
                   </tr>
                 ))}

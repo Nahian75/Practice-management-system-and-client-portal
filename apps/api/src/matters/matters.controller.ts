@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -23,9 +24,10 @@ import { z } from 'zod';
 import { RequirePermission } from '../auth/permissions/require-permission.decorator.js';
 import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/sessions/authenticated-session.js';
 import { requestContext } from '../common/http/request-context.js';
-import { NO_CONTENT, ResponseSchema } from '../common/serialization/response-schema.decorator.js';
+import { NO_CONTENT, ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { SEARCH_LIMIT_MESSAGE, SEARCH_WINDOW_SECONDS } from '../clients/search-quota.js';
 import { text } from '../common/validation/safe-text.js';
+import { DOCUMENT_NOT_FOUND_MESSAGE, sendDownload, WITHDRAWN_MESSAGE } from '../documents/send-download.js';
 import type { ConflictCheck } from './matter.js';
 import {
   COMPLIANCE_ACCESSES_PER_HOUR,
@@ -128,9 +130,22 @@ const complianceAccessesSchema = z.object({
       accessedBy: z.object({ accountId: z.uuid(), displayName: z.string() }),
       reason: z.string(),
       accessedAt: z.iso.datetime(),
+      document: z.object({ id: z.uuid(), title: z.string(), version: z.number().int() }).nullable(),
     }),
   ),
 });
+const complianceViewSchema = matterSchema.extend({
+  documents: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      category: z.string(),
+      createdAt: z.iso.datetime(),
+      latest: z.object({ number: z.number().int(), fileName: z.string(), mediaType: z.string(), sizeBytes: z.number().int(), uploadedAt: z.iso.datetime() }),
+    }),
+  ),
+});
+const complianceDownloadSchema = z.strictObject({ reason: text(500, 10) });
 const openedSchema = z.object({ id: z.uuid(), reference: z.string(), status: z.enum(MATTER_STATUSES) });
 const listSchema = z.object({ matters: z.array(summarySchema), next: z.uuid().nullable() });
 const clientMattersSchema = z.object({ matters: z.array(summarySchema) });
@@ -176,6 +191,8 @@ function actorFor(session: ResolvedSession, request: Request): MatterActor {
 
 @Controller()
 export class MattersController {
+  private readonly logger = new Logger(MattersController.name);
+
   constructor(private readonly matters: MattersService) {}
 
   @Post('matters')
@@ -389,7 +406,7 @@ export class MattersController {
   @Post('matter-compliance-accesses')
   @RequirePermission('matters.access_with_reason')
   @HttpCode(HttpStatus.OK)
-  @ResponseSchema(matterSchema)
+  @ResponseSchema(complianceViewSchema)
   async accessWithReason(
     @Body({ schema: referenceWithReasonSchema }) body: z.infer<typeof referenceWithReasonSchema>,
     @CurrentSession() session: ResolvedSession,
@@ -407,7 +424,44 @@ export class MattersController {
           HttpStatus.TOO_MANY_REQUESTS,
         );
       case 'accessed':
-        return { ...result.matter, openedAt: result.matter.openedAt.toISOString() };
+        return {
+          ...result.matter,
+          openedAt: result.matter.openedAt.toISOString(),
+          documents: result.documents.map((document) => ({
+            ...document,
+            createdAt: document.createdAt.toISOString(),
+            latest: { ...document.latest, uploadedAt: document.latest.uploadedAt.toISOString() },
+          })),
+        };
+    }
+  }
+
+  /** Compliance only: one version of a document on any matter, with a reason for this download alone. */
+  @Post('documents/:documentId/versions/:number/compliance-downloads')
+  @RequirePermission('matters.access_with_reason')
+  @ResponseSchema(STREAMED)
+  async downloadWithReason(
+    @Param('documentId', { schema: z.uuid() }) documentId: string,
+    @Param('number', { schema: z.coerce.number().int().min(1).max(1_000_000) }) number: number,
+    @Body({ schema: complianceDownloadSchema }) body: z.infer<typeof complianceDownloadSchema>,
+    @CurrentSession() session: ResolvedSession,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    const result = await this.matters.downloadWithReason(documentId, number, body.reason, actorFor(session, request));
+    switch (result.outcome) {
+      case 'not_found':
+        throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
+      case 'withdrawn':
+        throw new HttpException(WITHDRAWN_MESSAGE, HttpStatus.GONE);
+      case 'limited':
+        response.setHeader('Retry-After', String(COMPLIANCE_WINDOW_SECONDS));
+        throw new HttpException(
+          `At most ${COMPLIANCE_ACCESSES_PER_HOUR} compliance accesses an hour. Try again later`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      case 'ready':
+        await sendDownload(result, response, this.logger, `document ${documentId} version ${number} by compliance`);
     }
   }
 

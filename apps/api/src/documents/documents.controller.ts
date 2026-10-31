@@ -1,4 +1,3 @@
-import { pipeline } from 'node:stream/promises';
 import {
   BadRequestException,
   Body,
@@ -27,7 +26,6 @@ import { auditActorFor, CurrentSession, type ResolvedSession } from '../auth/ses
 import { requestContext } from '../common/http/request-context.js';
 import { NO_CONTENT, ResponseSchema, STREAMED } from '../common/serialization/response-schema.decorator.js';
 import { text } from '../common/validation/safe-text.js';
-import { attachmentDisposition } from './content-disposition.js';
 import {
   DocumentsService,
   UPLOAD_BYTES_PER_HOUR,
@@ -36,6 +34,7 @@ import {
   type DocumentActor,
   type UploadRefusal,
 } from './documents.service.js';
+import { DOCUMENT_NOT_FOUND_MESSAGE, sendDownload, WITHDRAWN_MESSAGE } from './send-download.js';
 import { discardUpload, readUpload, UploadFormError } from './upload-request.js';
 
 const CATEGORIES = ['correspondence', 'contract', 'evidence', 'identity', 'court', 'other'] as const;
@@ -93,9 +92,6 @@ const detailsSchema = z.object({
 });
 
 const withdrawalSchema = z.strictObject({ reason: text(500, 10) });
-
-const DOCUMENT_NOT_FOUND_MESSAGE = 'No document with this id';
-const WITHDRAWN_MESSAGE = 'This document was withdrawn';
 
 const REFUSALS: Readonly<Record<UploadRefusal, () => HttpException>> = {
   empty: () => new BadRequestException('The file is empty'),
@@ -337,11 +333,6 @@ export class DocumentsController {
     }
   }
 
-  /**
-   * The file, decrypted as it is sent, always as a download. If the stored
-   * file fails its integrity check part-way, the connection is cut: the
-   * browser sees an incomplete download, never altered content.
-   */
   @Get('documents/:documentId/versions/:number/content')
   @RequirePermission('documents.view')
   @ResponseSchema(STREAMED)
@@ -359,17 +350,6 @@ export class DocumentsController {
     if (result.outcome === 'withdrawn') {
       throw new HttpException(WITHDRAWN_MESSAGE, HttpStatus.GONE);
     }
-    response.status(HttpStatus.OK);
-    response.setHeader('Content-Type', result.mediaType);
-    response.setHeader('Content-Length', String(result.sizeBytes));
-    response.setHeader('Content-Disposition', attachmentDisposition(result.fileName));
-    // Should a browser ever show it anyway: no script, no requests, its own origin.
-    response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-    try {
-      await pipeline(result.file, response);
-    } catch (error) {
-      // pipeline has already cut the connection: with Content-Length set, the browser sees a failed download.
-      this.logger.error(`Download of document ${documentId} version ${number} stopped: ${error instanceof Error ? error.name : 'unknown error'}`);
-    }
+    await sendDownload(result, response, this.logger, `document ${documentId} version ${number}`);
   }
 }

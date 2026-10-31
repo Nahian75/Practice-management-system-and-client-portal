@@ -3,7 +3,7 @@ import { sql, type Kysely } from 'kysely';
 import type { SealedSecret } from '../common/crypto/secret-box.js';
 import { DATABASE } from '../database/database.module.js';
 import type { Database, DocumentCategory, DocumentMediaType, MatterStatus } from '../database/schema.js';
-import { visibleTo } from '../matters/matters.repository.js';
+import { visibleTo, type MatterFilter } from '../matters/matters.repository.js';
 
 export interface VersionSummary {
   number: number;
@@ -90,11 +90,11 @@ export class DocumentsRepository {
 
   /**
    * One page of the matter's documents, newest first, each with its latest
-   * version, if `viewerId` is on its team. Ids are time-ordered (uuidv7), so
-   * `before` (an id from the previous page) continues where it stopped.
+   * version, if `reach` lets the caller reach the matter. Ids are time-ordered
+   * (uuidv7), so `before` (an id from the previous page) continues where it stopped.
    */
-  async listForMatter(matterId: string, viewerId: string, page: { before?: string; limit: number }): Promise<DocumentSummary[] | undefined> {
-    if (!(await this.matterOnTeam(matterId, viewerId))) {
+  async listForMatter(matterId: string, reach: MatterFilter, page: { before?: string; limit: number }): Promise<DocumentSummary[] | undefined> {
+    if (!(await this.db.selectFrom('matters').select('matters.id').where('matters.id', '=', matterId).where(reach).executeTakeFirst())) {
       return undefined;
     }
     const rows = await this.db
@@ -269,8 +269,12 @@ export class DocumentsRepository {
     return change !== undefined;
   }
 
-  /** What is needed to send one version as a download, if `viewerId` is on its matter's team. */
-  findVersionToDownload(documentId: string, number: number, viewerId: string) {
+  /**
+   * What is needed to send one version as a download: for someone on its
+   * matter's team, or through the compliance access recorded for exactly
+   * this version.
+   */
+  findVersionToDownload(documentId: string, number: number, reach: { viewerId: string } | { accessId: string }) {
     return this.db
       .selectFrom('document_versions')
       .innerJoin('documents', 'documents.id', 'document_versions.document_id')
@@ -293,7 +297,18 @@ export class DocumentsRepository {
       )
       .where('document_versions.document_id', '=', documentId)
       .where('document_versions.number', '=', number)
-      .where(visibleTo(viewerId))
+      .$call((query) =>
+        'viewerId' in reach
+          ? query.where(visibleTo(reach.viewerId))
+          : query.where(({ exists, selectFrom }) =>
+              exists(
+                selectFrom('matter_compliance_accesses')
+                  .select('matter_compliance_accesses.id')
+                  .where('matter_compliance_accesses.id', '=', reach.accessId)
+                  .whereRef('matter_compliance_accesses.document_version_id', '=', 'document_versions.id'),
+              ),
+            ),
+      )
       .executeTakeFirst();
   }
 }
