@@ -6,7 +6,7 @@ Stass is a security-focused practice management system and client portal for leg
 
 Current verification: [security fixes and remaining production requirements](docs/reviews/2026-10-30-security-remediation.md).
 
-Latest cleanup verification (31 October 2026): both builds and type checks passed, along with 101 browser tests, 47 focused AI tests and 10 script tests. The full API run had 2,094 passing and 44 failing tests; the hidden-character check also reports an existing documentation BOM. See the [cleanup review](docs/reviews/2026-10-31-code-cleanup.md) for changes, failures and verification limits.
+Latest cleanup verification (31 October 2026): both builds and type checks passed, along with 101 browser tests, 47 focused AI tests and 10 script tests. The full API run had 2,094 passing and 44 failing tests. The documentation BOM that blocked GitHub Actions was removed on 1 November 2026 without changing requirement text. See the [cleanup review](docs/reviews/2026-10-31-code-cleanup.md) for changes, failures and verification limits.
 
 The supplied Clio, LEAP and Reglify scope is tracked in the [192-item integration checklist](docs/requirements/combined-feature-checklist.md), with an [implementation learning guide](docs/requirements/implementation-learning-guide.md). This deployment is for one client law firm; external provider choices remain open. The checklist records incomplete work explicitly and is not a claim of complete feature parity.
 

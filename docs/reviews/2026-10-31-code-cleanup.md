@@ -56,6 +56,10 @@ The initial full API baseline was stopped after repeated integration failures. I
 
 Browser validation initially needed Docker access. An intermediate browser run overlapped an API rebuild and was stopped after invitation CLI files were temporarily absent. The final run used completed builds and reported all 101 tests passing. PowerShell returned exit 1 while redirecting warning output despite the passing summary; the same wrapper behavior was independently reproduced with a successful Node command that only wrote a warning to stderr.
 
-The hidden-character script reads committed `HEAD` for `--all`, rather than uncommitted working-tree content. Its reported BOM predates this cleanup and remains unresolved. Historical verification counts in earlier reviews describe their original runs and do not override these results.
+The hidden-character script reads committed `HEAD` for `--all`, rather than uncommitted working-tree content. Its reported BOM predated this cleanup. Historical verification counts in earlier reviews describe their original runs and do not override these results.
+
+### Follow-up - 1 November 2026
+
+GitHub Actions run `41232637120` stopped at the hidden-character check because of that BOM. The leading three UTF-8 BOM bytes were removed from `docs/requirements/combined-checklist-source.txt`; the remaining bytes match the previously committed source exactly. The checker and its rules were not weakened. This fixes that workflow blocker; the earlier API failures remain separate, and later CI steps still need their own results.
 
 Ignored local evidence is available in `logs/cleanup-api-tests.log`, `logs/cleanup-ai-tests.log`, `logs/cleanup-e2e.log` and `logs/cleanup-web-build.log`. Logs, configuration, browser traces and credentials are not part of the commit.

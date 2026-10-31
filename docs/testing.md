@@ -1,6 +1,6 @@
 # Testing
 
-Latest cleanup run (31 October 2026): 101 browser tests, 47 focused AI tests and 10 script tests passed; both applications passed type checks and builds. The full API run finished with 2,094 passed and 44 failed tests across 9 files. Email delivery and reconciliation fixture failures were also observed during baseline checks. The all-files hidden-character check reports an existing BOM in `docs/requirements/combined-checklist-source.txt`. See the [cleanup review](reviews/2026-10-31-code-cleanup.md) for commands and limits. Older verification counts below describe their original runs.
+Latest cleanup run (31 October 2026): 101 browser tests, 47 focused AI tests and 10 script tests passed; both applications passed type checks and builds. The full API run finished with 2,094 passed and 44 failed tests across 9 files. Email delivery and reconciliation fixture failures were also observed during baseline checks. The BOM reported in `docs/requirements/combined-checklist-source.txt` was removed on 1 November 2026 without changing requirement text. See the [cleanup review](reviews/2026-10-31-code-cleanup.md) for commands and limits. Older verification counts below describe their original runs.
 
 **Current state (2026-10-14):** Unit, HTTP and database integration tests for
 the API, including the security-reviewed Tasks and Notifications modules,
