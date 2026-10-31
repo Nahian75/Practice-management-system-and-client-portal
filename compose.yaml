@@ -55,10 +55,10 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # Scans every upload before it is stored. It downloads its virus definitions
-  # on first start, which takes a few minutes, and keeps them up to date.
+  # The base image downloads current definitions before ClamD starts on an empty volume,
+  # so first-run readiness cannot pass with stale bundled signatures.
   clamav:
-    image: clamav/clamav:1.5.4@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    image: clamav/clamav:1.5.4_base@sha256:a01a78acf14e356f9d95c0eeb640ac9fa48a98a59933dea877f5a4d01573a0eb
     restart: unless-stopped
     environment:
       # Report a file it could not fully scan (past its size, depth or count limits) instead of calling it clean (review D3).
