@@ -4,8 +4,9 @@ import { formatCalendarDate } from '@/lib/format';
 import { pounds, type IssuedBillSummary, type TimeEntry } from '@/lib/finance';
 import type { Matter } from '@/lib/matters';
 import { TimeEntryForm } from './time-entry-form';
+import { ExpensesSection } from '@/components/expenses-section';
 
-export async function FinanceSection({ matter }: { matter: Matter }) {
+export async function FinanceSection({ matter,expensesBefore }: { matter: Matter;expensesBefore?:string }) {
   const [time, bills] = await Promise.all([
     apiGet<{ timeEntries: TimeEntry[]; next: string | null }>(`/matters/${encodeURIComponent(matter.id)}/time-entries`),
     apiGet<{ bills: IssuedBillSummary[] }>(`/matters/${encodeURIComponent(matter.id)}/bills`),
@@ -26,6 +27,7 @@ export async function FinanceSection({ matter }: { matter: Matter }) {
         </table>
       )}
       {matter.status === 'open' && <TimeEntryForm matterId={matter.id} />}
+      <ExpensesSection matterId={matter.id} open={matter.status === 'open'} before={expensesBefore} paginationPath={`/matters/${matter.id}`} />
       <h3>Issued bills</h3>
       {bills.body.bills.length === 0 ? <p>No bills have been issued.</p> : (
         <table className="table"><thead><tr><th scope="col">Bill</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col">Total</th><th scope="col">File</th></tr></thead>

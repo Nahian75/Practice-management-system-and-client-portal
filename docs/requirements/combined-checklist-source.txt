@@ -1,0 +1,996 @@
+﻿Combined Legal Platform Master Checklist
+Clio and LEAP requirements with the Reglify business planPrepared 31 October 2026
+One platform for running a law firm, handling legal matters and recording compliance decisions. This checklist combines the two uploaded documents into one tracker with 192 checks across 24 sections. Shared features appear once.
+What each source adds
+Clio requirements in prompts.docx: dashboard, contacts, matters, time recording, billing, payments and financial reports.
+LEAP requirements in prompts.docx: matter workspaces, document templates, workflows, trust accounting and Office integrations.
+Reglify Business Plan v2.docx: client due diligence, independent risk rating, challenges, human reasoning, sealed evidence and compliance oversight.
+These are source requirements and product ideas, not a verified catalogue of every current vendor feature. No source code, live services or prototype test results have been validated for this checklist.
+How to track your work
+Tick Done after the feature works and its completion check passes. The boxes can be ticked in Word or on a printed copy.
+Write Left, In progress, Blocked, Later or N/A in Status. Later remains unfinished; N/A means an approved exclusion.
+Keep proof by item ID, such as a test result, screenshot or short recording. All statuses start blank.
+Core or launch describes the proposed role of a section, not an agreed deadline. Later modules need separate release approval.
+Progress record
+Project or repository  __________________________________________________
+Version  ____________________   Reviewed on  __________________________
+Done  _____ / 192     In progress  _____     Left  _____     Blocked  _____
+Later  _____     Approved N/A  _____     Next review  _____________________
+Completion = Done ÷ (192 minus approved N/A items) × 100. This is a manual tracker.
+
+How the three parts become one platform
+A contact becomes a client and is linked to a matter. The same matter holds legal work, tasks, documents, time, invoices and compliance status. The compliance module assesses the recorded facts, challenges weak conclusions and records the solicitor's signed decision. Approved clearance is then visible wherever the matter is used.
+Shared records prevent duplicate entry. Restricted SAR information still needs tighter access than ordinary matter data. A person able to view a matter must not automatically see every suspicion report.
+Architecture decisions to record
+Use one modular application with shared firm, user, contact and matter IDs. The backend enforces permissions and clearance rules.
+The original prompt names PostgreSQL with Prisma; Reglify describes a document oriented store. This combined plan proposes PostgreSQL with versioned structured assessment data. Record the final design before building.
+Use one private document store. The compliance module binds decisions to exact evidence versions or approved external references, rather than collecting a second copy of every identity document.
+The internal practice and compliance modules communicate directly. Connecting to external Clio or LEAP is optional for import, migration or coexistence.
+Keep ordinary audit logs and sealed compliance evidence distinct. Sealing makes specified changes detectable; it does not make a wrong decision correct.
+Source conflicts and scope decisions
+Pricing needs approval. Reglify lists Solo at £69 in its product table and £49 in its forecasts. It also describes both included AI drafting and a later AI add on. Its Small Firm top up figure needs arithmetic review. None of these prices is adopted as the price for your combined platform.
+Legal rules need review. Regulatory citations, mandatory risk floors, reporting clocks and CQS requirements in the plan are proposed content for professional validation. This checklist does not certify their legal accuracy or currency.
+Delivery timing needs a new estimate. Reglify's six month build covers its core compliance product. It does not estimate the complete practice, accounting and compliance platform. Its SAR and CQS modules are scheduled after the core launch; corporate checks and adjacent regulatory modules are later work.
+AI drafting is included as a requirement with a full manual option. RAG is a separate scope decision. No extra RAG subsystem is assumed here.
+Suggested delivery order
+1. Shared foundation, firm isolation, contacts and matters.2. Core matter work, documents, time and basic billing.3. Compliance intake, approved rules, challenge flow and sealed decisions.4. Trust accounting, oversight and complete workflow verification.5. Security review, restore test, pilot and launch.6. Agreed SAR, CQS, corporate checks and external integrations.
+
+1 Project setup and architecture
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+001
+☐
+Record the shared architecture: one modular application, one login and one client and matter record across practice and compliance.
+
+002
+☐
+Set up Next.js, TypeScript, Tailwind, icons and the chart library. Start the frontend locally.
+
+003
+☐
+Use PostgreSQL and Prisma for shared records. Store flexible assessment facts in versioned JSON or another agreed schema; keep passwords private.
+
+004
+☐
+Organise folders for web, API, database, shared code, tests and documentation.
+
+005
+☐
+Create REST API routes, input validation and consistent error responses.
+
+006
+☐
+Set up WebSockets for live updates and verify an authorised connection works.
+
+007
+☐
+Define modules for practice, billing, documents, risk rules, challenges, sealed evidence, reporting and provider integrations.
+
+008
+☐
+Write setup instructions. A clean checkout can start locally using those instructions.
+
+
+2 Firm access and database protection
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+009
+☐
+Create Firm and User records with firm settings, email, role and hourly rate.
+
+010
+☐
+Implement sign in, password recovery, sign out, session expiry and multi factor authentication; test expired or revoked access.
+
+011
+☐
+Define Admin, Lawyer, Staff, MLRO and COLP permissions; separate financial and restricted SAR permissions where needed.
+
+012
+☐
+Enable PostgreSQL row level security for firm owned records, including writes.
+
+013
+☐
+Set firm context from the authenticated session. Reject a changed firm ID from the browser.
+
+014
+☐
+Use links that cannot connect a matter, contact, invoice or file to another firm.
+
+015
+☐
+Test Firm A against Firm B through APIs, search, files, reports and live updates; access is denied.
+
+016
+☐
+Test each role with allowed and forbidden actions. Hiding a menu alone is not a permission check.
+
+
+Evidence or next action  __________________________________________________________
+
+3 Contacts intake and conflict checks
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+017
+☐
+Create, view, edit and search contacts with name, email, phone, company and contact type.
+
+018
+☐
+Support people and companies, including Client, Lead and Expert types.
+
+019
+☐
+Detect duplicate contacts and offer a safe review or merge process.
+
+020
+☐
+Link people by relationship, such as spouse, witness, judge or opposing lawyer.
+
+021
+☐
+Capture an intake form and convert an accepted lead into a client or draft matter.
+
+022
+☐
+Search current and former clients, adverse parties, matter roles and relevant notes for conflicts.
+
+023
+☐
+Test exact and fuzzy name matching. Similar names appear for a person to review.
+
+024
+☐
+Record conflict results, the reviewer and the decision before opening the matter.
+
+
+4 Matters and the case workspace
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+025
+☐
+Create a unique matter number per firm and link it to the correct client.
+
+026
+☐
+Save title, description, practice area, responsible lawyer and assigned staff.
+
+027
+☐
+Define and test matter states, including open, pending, closed and archived as agreed.
+
+028
+☐
+Add custom fields and templates for practice areas such as immigration or conveyancing.
+
+029
+☐
+Link clients, witnesses and adverse parties with their roles and adverse status.
+
+030
+☐
+Build the matter list with client, practice area, owner, status, unbilled work and trust balance.
+
+031
+☐
+Add filters for fee earner, branch, practice type and age where these fields are used.
+
+032
+☐
+Build one matter workspace with timeline, documents, time, billing, tasks, risk assessment, challenges and clearance status.
+
+
+Evidence or next action  __________________________________________________________
+
+5 Navigation and personal dashboard
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+033
+☐
+Build a responsive layout with a top bar and sidebar that work on smaller screens.
+
+034
+☐
+Add Dashboard, Calendar, Tasks, Matters, Contacts and Activities navigation.
+
+035
+☐
+Add Billing, Payments, Accounts, Documents, Communications, Reports, Compliance, Integrations and Settings.
+
+036
+☐
+Implement global search and the Ctrl or Cmd plus K search dialog with permission filtering.
+
+037
+☐
+Add Create New actions and notifications. Sensitive compliance alerts reveal detail only to authorised reviewers.
+
+038
+☐
+Show today's task count and event count using the user's timezone.
+
+039
+☐
+Show billable hours against targets for today, this week, this month and this year.
+
+040
+☐
+Check loading, empty, error and access denied states. Menu links open working features.
+
+
+6 Timers time entries and expenses
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+041
+☐
+Implement timer start, pause, resume and reset with an hours minutes seconds display.
+
+042
+☐
+Calculate elapsed time from timestamps so a background tab does not lose time.
+
+043
+☐
+Keep the timer across route changes and restore it after reload.
+
+044
+☐
+Synchronise timer updates and resolve multiple tab or device changes without duplicate entries.
+
+045
+☐
+Save time with firm, user, matter, date, duration, rate, billable flag and description.
+
+046
+☐
+Let permitted users add or correct time manually and distinguish billed from unbilled work.
+
+047
+☐
+Record expenses and disbursements against matters. Add UTBMS or LEDES codes if selected.
+
+048
+☐
+Test time rounding, rate changes and conversion of a stopped timer into one saved entry.
+
+
+Evidence or next action  __________________________________________________________
+
+7 Billing invoices and online payments
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+049
+☐
+Support the agreed fee models: hourly, fixed stages and contingency where selected.
+
+050
+☐
+Create draft bills from time and expenses without billing the same entry twice.
+
+051
+☐
+Allow authorised pre bill review, edits and write offs with a recorded reason.
+
+052
+☐
+Save invoice totals, due date and Draft, Unpaid, Overdue or Paid status.
+
+053
+☐
+Generate a readable invoice PDF with the correct client, matter, items and totals.
+
+054
+☐
+Connect the chosen payment provider, such as Stripe or LawPay, using its test environment.
+
+055
+☐
+Handle payment success, failure, refunds and repeated provider notifications safely.
+
+056
+☐
+Verify draft, unpaid and overdue lists and totals match the underlying invoices.
+
+
+8 Trust and operating accounts
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+057
+☐
+Keep client trust funds separate from operating money in accounts and reports.
+
+058
+☐
+Use balanced double entry journal records. A transaction cannot post only one side.
+
+059
+☐
+Track deposits, payments, disbursements and the balance for each client and matter.
+
+060
+☐
+Reject a withdrawal or invoice transfer when available client trust funds are insufficient.
+
+061
+☐
+Post related ledger entries and payment updates together in one database transaction.
+
+062
+☐
+Test simultaneous payments and retries so they cannot overspend or duplicate a transfer.
+
+063
+☐
+Keep posted entries traceable; corrections use authorised reversals rather than silent edits.
+
+064
+☐
+Produce bank, main trust ledger and client ledger reconciliation; obtain the required professional review.
+
+
+Evidence or next action  __________________________________________________________
+
+9 Documents templates and file search
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+065
+☐
+Keep private matter documents in S3 compatible storage. Link assessments to exact evidence versions or external references, using the same firm and matter IDs.
+
+066
+☐
+Authorise every file action and use signed links with an expiry time for permitted downloads.
+
+067
+☐
+Apply the chosen storage encryption and key settings. Keep credentials private.
+
+068
+☐
+Show folders or tags, file details and searchable document lists inside each matter.
+
+069
+☐
+Keep file versions and let permitted users view or restore a previous version.
+
+070
+☐
+Implement check out and check in or another clear rule for simultaneous edits.
+
+071
+☐
+Merge client and matter fields into DOCX or PDF templates and verify the generated content.
+
+072
+☐
+Add agreed OCR, text indexing, PDF merging and document bundles; test firm filtered search.
+
+
+10 Tasks calendar and communications
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+073
+☐
+Create tasks linked to a user and matter with due date, priority and completion state.
+
+074
+☐
+Create matter calendar events with attendees, time, timezone and reminders.
+
+075
+☐
+Build matter workflow templates with milestones and sequential tasks.
+
+076
+☐
+Send reminders through background jobs and make failures or retries visible.
+
+077
+☐
+Implement deadline calculators only for agreed rules, with the rule source and human review.
+
+078
+☐
+Add limitation date alerts and test date boundaries and timezone changes.
+
+079
+☐
+Keep matter notes, calls, emails and filings in a reverse chronological timeline.
+
+080
+☐
+Capture communications against the matter. Keep restricted suspicion records out of routine timelines, letters and client messages.
+
+
+Evidence or next action  __________________________________________________________
+
+11 Reports financial queries and sample data
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+081
+☐
+Calculate daily, weekly, monthly and yearly billable totals for one user and the whole firm.
+
+082
+☐
+Use appropriate indexes and pagination; measure query response times with realistic records.
+
+083
+☐
+Create the annual target and actual revenue chart with a clear legend and usable tooltips.
+
+084
+☐
+Build the matching Date, Target and Actual table. Both views show the same data.
+
+085
+☐
+In sample data, show the stated draft amount of £150.00 and the 17 unpaid bills totalling £3,948.16.
+
+086
+☐
+In sample data, verify 17 overdue bills totalling £3,948.16; overdue and unpaid may overlap.
+
+087
+☐
+In sample data, verify January target £8,333.33 and actual £20,200.94, reaching a £100,000 December target.
+
+088
+☐
+Calculate production metrics from real records. Clearly label cumulative targets and the revenue basis.
+
+
+12 Guided compliance intake and client due diligence
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+089
+☐
+Use one intake for contacts and matters. Capture instructions, service requested, practice area and responsible fee earner.
+
+090
+☐
+Provide separate individual and corporate paths. Do not ask a company to complete inappropriate personal client fields.
+
+091
+☐
+For companies, record entity details, officers and beneficial owners, with links to people and evidence sources.
+
+092
+☐
+Generate the agreed client due diligence checklist from client type, matter type and assessed risk.
+
+093
+☐
+Record source of funds and source of wealth where required, including business sale and relevant corporate sources.
+
+094
+☐
+For each required item, distinguish requested, collected, assessed, accepted, rejected and missing evidence.
+
+095
+☐
+Generate the client care letter at matter opening using approved content and the correct reviewed source references.
+
+096
+☐
+Obtain specialist identity verification results from the chosen provider or firm records; do not treat an assessment as an identity check.
+
+
+Evidence or next action  __________________________________________________________
+
+13 Risk rules screening and regulatory content
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+097
+☐
+Maintain a versioned obligation catalogue by practice area, client type and jurisdiction, with source references and reviewer approval.
+
+098
+☐
+Treat the plan's 24 obligations across eight practice areas as a demonstration scope; document actual coverage and remaining gaps.
+
+099
+☐
+Implement deterministic risk scoring from recorded facts and attributable weights, separate from the fee earner's proposed rating.
+
+100
+☐
+Have a qualified reviewer define mandatory due diligence triggers and floors. Validate the plan's PEP and country examples before activation.
+
+101
+☐
+Connect the agreed PEP and sanctions provider. Store match details, query time, source and human review outcome.
+
+102
+☐
+Show potential matches and provider failures for review. Missing or failed screening must not silently become a clear result.
+
+103
+☐
+Version rules and citations so a historic assessment can be reproduced under its original ruleset.
+
+104
+☐
+Test boundary cases and regulatory updates; approve and record rule changes before deploying them to live matters.
+
+
+14 Challenges answers and clearance controls
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+105
+☐
+Compare the fee earner's proposed risk rating with the independent engine rating and explain the difference.
+
+106
+☐
+Raise a challenge when the proposed rating is lower than the engine rating under the approved rules.
+
+107
+☐
+Raise approved red flag combination challenges, including the plan's cash, outside investor and trading history example.
+
+108
+☐
+Raise a challenge when evidence has been collected but no assessment of it is recorded.
+
+109
+☐
+Block sign off through both the API and screen while a required challenge remains unanswered.
+
+110
+☐
+Record each answer and evidence link. An override requires a named person, reason and route to the MLRO or COLP.
+
+111
+☐
+Define second review and the sole practitioner process. Do not present self review as independent second person approval.
+
+112
+☐
+Enforce agreed clearance gates on matter actions in the backend. Reassessment after material changes updates status and preserves history.
+
+
+Evidence or next action  __________________________________________________________
+
+15 Recorded reasoning with AI or manual entry
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+113
+☐
+Build a fact to statement map so each rationale statement traces to recorded facts, evidence and approved source references.
+
+114
+☐
+Generate a record derived rationale; the signed narrative must match the decision and evidence snapshot.
+
+115
+☐
+Use AI only for the agreed drafting or readability step. It cannot set the final rating or approve a matter.
+
+116
+☐
+Provide manual reasoning with the same challenge, citation, evidence and sealing functions and no forced AI usage.
+
+117
+☐
+Validate citations and evidence links on the server. Reject unsupported statements, invented references and cross matter links.
+
+118
+☐
+Require the named solicitor to review and approve the exact final text before sealing; retain the approved text and version.
+
+119
+☐
+Limit provider access to necessary authorised data. Agree retention settings, data location and firm AI preferences.
+
+120
+☐
+Test prompt injection, provider failure, cost limits and manual fallback. Do not add a RAG subsystem unless separately selected.
+
+
+16 Sealed evidence and independent verification
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+121
+☐
+Save a complete decision snapshot containing facts, evidence references, rule version, ratings, challenges, answers, rationale and sign off.
+
+122
+☐
+Bind evidence to its exact version or content hash so replacing an attachment cannot silently change the signed record.
+
+123
+☐
+Write sealed records through one controlled path with append only permissions; administrators cannot silently rewrite decision history.
+
+124
+☐
+Use deterministic record encoding and cryptographic chaining. Test that independent implementations calculate the same chain result.
+
+125
+☐
+Keep approvals, promotion to final status and audit recording consistent in one transaction or a documented recoverable process.
+
+126
+☐
+Anchor the chain head outside the editable database at an agreed frequency; retain proof and surface delayed or failed anchoring.
+
+127
+☐
+Test record edits, deletion, reordering, truncation and complete chain replacement against trusted anchors; document remaining limits.
+
+128
+☐
+Export a readable PDF plus the agreed verification data. A verifier can check the decision, evidence references, rules and anchor proof.
+
+
+Evidence or next action  __________________________________________________________
+
+17 Compliance oversight and incident registers
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+129
+☐
+Build a firm dashboard for open assessments, risk levels, clearance, missing items and overdue reviews.
+
+130
+☐
+Show challenge counts, rating changes, overrides, responsible users and second review outcomes.
+
+131
+☐
+Send outstanding document alerts to fee earners and firm summaries to authorised MLRO or COLP users.
+
+132
+☐
+Generate daily exceptions reports and periodic compliance reports from the same live matter data.
+
+133
+☐
+Keep a controlled SAR register, data breach register and complaints register with owners, dates and follow up actions.
+
+134
+☐
+Exclude restricted suspicion information from routine exports, global search, notifications and client facing content.
+
+135
+☐
+Add the agreed firm wide risk and policy evidence workflow, or record its scope gap; do not substitute matter assessments for it.
+
+136
+☐
+Use only authorised and suitably protected data for cross firm analytics or risk calibration; keep client and firm information isolated.
+
+
+18 Suspicious activity reporting workflow
+Source: Reglify plus integration checks  |  Stage: Later module
+ID
+Done
+What to check
+Status
+137
+☐
+Capture a suspicion with time, reporter, matter, relevant facts and supporting evidence in a restricted workspace.
+
+138
+☐
+Route the report to the authorised MLRO and record acknowledgement, review and decisions.
+
+139
+☐
+Apply tipping off controls to messages, task labels, search, exports and notification previews.
+
+140
+☐
+Record the decision to report or not report, who made it and the supporting reason.
+
+141
+☐
+Record any NCA submission reference, filing time and response; do not imply automatic filing unless an approved integration exists.
+
+142
+☐
+Implement any statutory clock only from reviewed rules and recorded trigger events, including calendars, pauses and extensions where applicable.
+
+143
+☐
+Show required holds and review dates to authorised users. Clock expiry alone must not automatically authorise a transaction.
+
+144
+☐
+Test SAR access separation, escalation, clock boundaries and the complete MLRO workflow before enabling the module.
+
+
+Evidence or next action  __________________________________________________________
+
+19 Conveyancing and later compliance modules
+Source: Reglify plus integration checks  |  Stage: Later module
+ID
+Done
+What to check
+Status
+145
+☐
+Build the agreed CQS conveyancing workflow on the shared matter, rules and evidence engine.
+
+146
+☐
+Have a qualified reviewer approve conveyancing obligations, source references, evidence requirements and supported practice scope.
+
+147
+☐
+Create matter milestones and required document checks, with assessed source of funds evidence linked to the transaction.
+
+148
+☐
+Generate a CQS evidence pack with traceable records; do not label an export as accreditation or regulatory approval.
+
+149
+☐
+Prototype the proposed Corporate Client Check using Companies House, screening, filed accounts and online research.
+
+150
+☐
+Display source dates, matching uncertainty and reviewer conclusions; treat corporate check demand as unvalidated until tested.
+
+151
+☐
+Keep CILEx, BSB, immigration advice and transition specific packs as later options with separate approved rule libraries.
+
+152
+☐
+Release each added module only after scope approval, rule review, permission tests and end to end evidence verification.
+
+
+20 Platform subscriptions and usage billing
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+153
+☐
+Decide the combined platform's plans and prices. Do not copy Reglify standalone prices as an approved price for all three feature sets.
+
+154
+☐
+Resolve the source conflict: Solo is £69 in the product table but £49 in financial forecasts; AI is included in one place and a later add on elsewhere.
+
+155
+☐
+If adopting the plan structure, configure user limits, included AI matters, overage rates and expiring top up packs from one approved price list.
+
+156
+☐
+Test top up arithmetic and rounding; the quoted Small Firm £28.15 pack differs from a direct 10 percent discount on 25 × £1.25.
+
+157
+☐
+Define what counts as one chargeable AI matter and prevent retries or repeated drafting from accidentally charging twice.
+
+158
+☐
+Keep deterministic rules, manual reasoning and evidence functions available under the agreed policy; quota exhaustion must not block a solicitor mid matter.
+
+159
+☐
+If adopted, support the three month no card pilot and the separate monthly billing cycle and annual contract term with clear notices.
+
+160
+☐
+Bill platform subscriptions separately from a law firm's client invoices and trust accounts; test tax settings, failed payments, changes and cancellation.
+
+
+Evidence or next action  __________________________________________________________
+
+21 Integrations and optional extensions
+Source: Clio and LEAP prompt plus build checks  |  Stage: Optional extensions
+ID
+Done
+What to check
+Status
+161
+☐
+Treat external Clio or LEAP connectors as optional imports or sync tools; internal modules share records without an external connector.
+
+162
+☐
+If selected, connect Outlook and archive emails to the right matter with permission checks.
+
+163
+☐
+If selected, connect Word templates and document editing with version handling.
+
+164
+☐
+If selected, synchronise Google Calendar or Microsoft Exchange in both directions.
+
+165
+☐
+Test integration consent, token refresh, revoked access, retries and duplicate prevention.
+
+166
+☐
+If selected, build and test the Electron or Tauri desktop document handler and local sync.
+
+167
+☐
+Choose Office.js or VSTO only where needed and verify the supported Office environments.
+
+168
+☐
+Show connection status and failures in integration settings. Mark deferred features as Later.
+
+
+22 Security audit logs and verification
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+169
+☐
+Log important sign ins, access changes, record changes, file actions and financial actions.
+
+170
+☐
+Include time, actor, firm, action, affected record and outcome without exposing secrets.
+
+171
+☐
+Keep application error logs with a request reference so a failed action can be traced.
+
+172
+☐
+Protect audit records from unauthorised changes and restrict who can view or export them.
+
+173
+☐
+Test input validation, file type and size restrictions, and malicious upload handling.
+
+174
+☐
+Check dependencies and secret handling; resolve critical issues before release.
+
+175
+☐
+Test the full joined workflow: intake, conflict check, assessment, challenge, sign off, clearance, matter work, invoice and payment.
+
+176
+☐
+Complete the planned security assessment and retest fixes. Record findings and remaining risks.
+
+
+Evidence or next action  __________________________________________________________
+
+23 Deployment backups and handover
+Source: Clio and LEAP prompt plus build checks  |  Stage: Shared foundation
+ID
+Done
+What to check
+Status
+177
+☐
+Keep development, test and production configuration separate, with a safe example environment file.
+
+178
+☐
+Run automated build and test checks before deploying a version.
+
+179
+☐
+Apply versioned database migrations and verify them against the release.
+
+180
+☐
+Configure HTTPS, private secrets, health checks and worker monitoring. Agree hosting region, backups and provider data locations.
+
+181
+☐
+Back up the database and documents. Restore them in a test environment and record the result.
+
+182
+☐
+Test realistic user load and record supported capacity and the main performance limits.
+
+183
+☐
+Document deployment, rollback, recovery, support ownership and recurring service costs.
+
+184
+☐
+Complete client acceptance and staff guidance. Record approval and any agreed unfinished items.
+
+
+24 Pilot acceptance and delivery decisions
+Source: Reglify plus integration checks  |  Stage: Core or launch
+ID
+Done
+What to check
+Status
+185
+☐
+Agree your combined first release and Later list. The source's six month Reglify core build is not a schedule for the entire combined platform.
+
+186
+☐
+Keep proof of concept claims and historical test counts separate from tests run on your own integrated build.
+
+187
+☐
+Obtain regulatory content review and the planned penetration test; record fixes and Cyber Essentials status before live data, as the plan requires.
+
+188
+☐
+Agree pilot permissions, data handling, support, exit and export arrangements; recruit firms without assuming the source's letters belong to this project.
+
+189
+☐
+Before launch, record pilot success measures: paid retention, assessment time, challenge effects, override rate and independent file quality review.
+
+190
+☐
+If adopting the plan's thresholds, record 60 percent or more as proceed, 30 to 59 percent as iterate, and below 30 percent as reposition.
+
+191
+☐
+Review 20 files per pilot firm if adopting that protocol. Approve calibrated risk weights as a new version without changing sealed history.
+
+192
+☐
+Complete final acceptance across practice, finance and compliance; document remaining work, owners, evidence links and the release decision.
+
+
+Evidence or next action  __________________________________________________________

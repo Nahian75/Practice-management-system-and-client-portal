@@ -1,5 +1,7 @@
 # Clio Manage reference and Stass implementation
 
+Update, 31 October 2026: persistent cross-device timers and matter expense/disbursement recording with fixed receipt references and duplicate-safe invoice links are implemented. See the [expense review](reviews/2026-10-31-expenses.md) and [integration tracker](requirements/combined-feature-checklist.md). The earlier validation counts below remain historical.
+
 Reference reviewed: 30 October 2026. Scope: **Clio Manage first**, as selected by the project owner. Clio Grow, Clio Draft, Clio Work and enterprise products are separate future decisions.
 
 The dashboard layout follows the supplied authenticated-screen screenshot: global toolbar, sidebar, dashboard tabs, agenda tiles, hours ring, six billing cards and four financial-period charts. The current colour scheme uses cool slate surfaces, a graphite navigation sidebar and matching toolbar, navy buttons, and blue decorative highlights. Stass displays its own records, account name and branding.
@@ -44,7 +46,7 @@ Shared implementation: `apps/web/src/app/manage.css`, `components/nav-links.tsx`
 | Court deadline rules | No rules provider | Pending jurisdiction-specific calculation and review workflows. The calendar does not calculate legal deadlines. |
 | Activities / time register | `/activities`, `/workspace/activities` | Added cross-matter time register, description/date filters and entry links. Existing rates, corrections and void history remain in force. |
 | Time recording | `/activities/new` | Reuses the existing matter time form. The toolbar timer hands rounded minutes to the form; a user chooses the matter/date/description and confirms recording. |
-| Live timers and expenses | Toolbar timer | Added a per-account browser-tab timer with session persistence, start/pause/reset and time-entry handoff. Cross-device timers, expense entries, categories and supporting receipt flows remain gaps. |
+| Live timers and expenses | Toolbar timer; matter Expenses and disbursements | Server-backed per-worker timers persist across reloads, tabs and devices, with revision conflicts and idempotent time-entry conversion. Expense/disbursement records support fixed receipt versions, billable classification, reasoned voids and duplicate-safe invoice linkage. UTBMS/LEDES coding and exports remain unselected. |
 | Documents | `/documents`, `/workspace/documents` | Added cross-matter latest-version view, title search, pagination and explicit client-sharing state. Withdrawn/inaccessible records are excluded. |
 | Document upload and versions | `/documents/new`, `/documents/[id]` | Reuses existing malware scanning, envelope encryption, versions, downloads and controlled sharing. |
 | Document automation and signatures | Existing engagement signing | Partial. Engagement workflows exist; generic document templates, merge fields, folder management, external-drive sync and general e-signature integrations remain gaps. |
@@ -85,4 +87,4 @@ Hosting remains compatible with the prepared Render and Linux Docker configurati
 
 ## Remaining work toward broader Manage parity
 
-The implemented workspace is the first functional adaptation. The gaps above should be developed as real workflows, with their own permissions, migrations and meaningful tests. The next substantial areas are communications, shared calendars/integrations, expenses, advanced report metrics and document automation. Connected payments requires an actual processor account and verified webhook/payment handling. No provider should be represented as connected before it is configured and exercised.
+The implemented workspace is the first functional adaptation. The gaps above should be developed as real workflows, with their own permissions, migrations and meaningful tests. The next substantial areas are communications, shared calendars/integrations, advanced report metrics and document automation. Connected payments requires an actual processor account and verified webhook/payment handling. No provider should be represented as connected before it is configured and exercised.

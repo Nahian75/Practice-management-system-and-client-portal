@@ -1,0 +1,56 @@
+name: Integrated application checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate disposable test configuration
+        run: npm run setup:local
+      - name: Validate requirements and source safeguards
+        run: |
+          npm run check:features
+          npm run check:hidden-characters
+          npm run check:security-source
+      - name: Check types and build both applications
+        run: |
+          npm run typecheck -w @practice/api
+          npm run typecheck -w @practice/web
+          npm run build -w @practice/api
+          npm run build -w @practice/web
+      - name: Start private test dependencies
+        run: docker compose up -d --wait --wait-timeout 900
+      - name: Run API, database and authorization tests
+        run: npm test -w @practice/api -- --maxWorkers=4
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Prepare isolated browser database
+        run: node e2e/prepare-database.mjs
+        working-directory: apps/web
+      - name: Run joined browser acceptance
+        run: npx playwright test --workers=2
+        working-directory: apps/web
+      # Never upload traces, configuration or database contents as CI artifacts.
+      - name: Stop test dependencies
+        if: always()
+        run: docker compose down

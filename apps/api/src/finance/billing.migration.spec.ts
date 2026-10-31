@@ -231,7 +231,7 @@ describe('bill database rules', () => {
       const other = await openMatter();
       const otherTime = await addTime(other.matterId);
       await expect(createDraft({ lineValues: lines({ time_entry_id: otherTime }) })).rejects.toThrow(/time entry/i);
-      await expect(createDraft({ lineValues: lines({ kind: 'recharge' }) })).rejects.toThrow(/time entry/i);
+      await expect(createDraft({ lineValues: lines({ kind: 'recharge' }) })).rejects.toThrow(/time.*fee line/i);
       await sql`insert into time_entry_corrections (time_entry_id, reason, corrected_by) values (${timeEntryId}, 'Entered on the wrong matter', ${feeEarner.id})`.execute(db);
       await expect(createDraft()).rejects.toThrow(/time entry/i);
     });

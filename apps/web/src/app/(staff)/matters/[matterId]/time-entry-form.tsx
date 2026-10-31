@@ -6,7 +6,7 @@ import { ErrorSummary } from '@/components/error-summary';
 import { DateFields, dateFrom } from '@/components/fields';
 import { messagesOf, postJson } from '@/lib/requests';
 
-export function TimeEntryForm({ matterId,initialMinutes }: { matterId: string;initialMinutes?:number }) {
+export function TimeEntryForm({ matterId,initialMinutes,timer }: { matterId: string;initialMinutes?:number;timer?:{timerId:string;revision:string} }) {
   const router = useRouter();
   const [errors, setErrors] = useState<string[]>();
   const [saved, setSaved] = useState(false);
@@ -27,15 +27,19 @@ export function TimeEntryForm({ matterId,initialMinutes }: { matterId: string;in
     if (problems.length) { setErrors(problems); return; }
     setSending(true); setErrors(undefined); setSaved(false);
     try {
-      const response = await postJson(`/api/matters/${encodeURIComponent(matterId)}/time-entries`, { workedOn, minutes, description });
+      const response = timer
+        ? await postJson('/api/workspace/timer/record', {...timer,matterId,workedOn,minutes,description})
+        : await postJson(`/api/matters/${encodeURIComponent(matterId)}/time-entries`, { workedOn, minutes, description });
       if (!response.ok) { setErrors(response.status === 400 ? ['Check the time entry details'] : await messagesOf(response)); return; }
-      await response.json(); formElement.reset(); setSaved(true); window.dispatchEvent(new Event('stass-time-recorded')); router.refresh();
-    } finally { setSending(false); }
+      await response.json(); formElement.reset(); setSaved(true); if(timer)window.dispatchEvent(new Event('stass-time-recorded')); router.refresh();
+    } catch { setErrors([timer?'Could not confirm the save. Retry the same details to check the result.':'Could not confirm the save. Check the matter time entries before trying again.']); }
+    finally { setSending(false); }
   }
 
   return (
     <form onSubmit={submit} noValidate aria-labelledby="record-time-heading">
       <h3 id="record-time-heading">Record time</h3>
+      {timer && <p className="secondary">Review the rounded timer minutes. Saving consumes this paused timer once; retrying the same details will not duplicate it.</p>}
       {errors && <ErrorSummary messages={errors} />}
       {saved && <p className="notice" role="status">Time recorded.</p>}
       <DateFields name="workedOn" legend="Work date" hint="For example 9 10 2026" />
@@ -47,7 +51,7 @@ export function TimeEntryForm({ matterId,initialMinutes }: { matterId: string;in
         <label className="label" htmlFor="timeDescription">Work description</label>
         <textarea className="input" id="timeDescription" name="timeDescription" rows={3} maxLength={1000} />
       </div>
-      <button className="button" type="submit" disabled={sending}>{sending ? 'Recording…' : 'Record time'}</button>
+      <button className="button" type="submit" disabled={sending||(!!timer&&saved)}>{sending ? 'Recording…' : 'Record time'}</button>
     </form>
   );
 }

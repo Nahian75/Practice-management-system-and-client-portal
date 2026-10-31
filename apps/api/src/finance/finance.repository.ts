@@ -198,7 +198,7 @@ export class FinanceRepository {
       issuedOn: row.issued_on, issuedAt: row.issued_at,
       lines: lines.map((line) => ({
         id: line.id, position: line.position, kind: line.kind, description: line.description,
-        netPence: line.net_pence, vatTreatment: line.vat_treatment, timeEntryId: line.source_time_entry_id,
+        netPence: line.net_pence, vatTreatment: line.vat_treatment, timeEntryId: line.source_time_entry_id, expenseEntryId: line.source_expense_entry_id,
         vatPence: line.vat_pence, grossPence: line.gross_pence,
         ...(line.time_worker_name === null ? {} : { time: {
           workerName: line.time_worker_name, workedOn: line.time_worked_on!, minutes: line.time_minutes!,
@@ -528,6 +528,7 @@ function toLineJson(line: BillLineInput) {
   return {
     kind: line.kind, description: line.description, net_pence: line.netPence,
     vat_treatment: line.vatTreatment, time_entry_id: line.timeEntryId,
+    expense_entry_id: line.expenseEntryId ?? null,
   };
 }
 
@@ -540,7 +541,7 @@ function toDraftLine(row: Selectable<Database['bill_draft_lines']>): BillLine {
   const vatPence = vatFor(row.net_pence, row.vat_treatment);
   return {
     id: row.id, position: row.position, kind: row.kind, description: row.description,
-    netPence: row.net_pence, vatTreatment: row.vat_treatment, timeEntryId: row.time_entry_id,
+    netPence: row.net_pence, vatTreatment: row.vat_treatment, timeEntryId: row.time_entry_id, expenseEntryId: row.expense_entry_id,
     vatPence, grossPence: (BigInt(row.net_pence) + BigInt(vatPence)).toString(),
   };
 }

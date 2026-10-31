@@ -744,6 +744,7 @@ export interface BillDraftsTable {
 }
 
 export interface BillDraftLinesTable {
+  expense_entry_id: DatabaseSet<string|null>;
   id: DatabaseSet<string>;
   draft_id: DatabaseSet<string>;
   position: DatabaseSet<number>;
@@ -787,6 +788,7 @@ export interface IssuedBillsTable {
 }
 
 export interface IssuedBillLinesTable {
+  source_expense_entry_id: DatabaseSet<string|null>;
   id: DatabaseSet<string>;
   bill_id: DatabaseSet<string>;
   position: DatabaseSet<number>;
@@ -1711,6 +1713,23 @@ export interface CalendarEventCancellationsTable {
 }
 
 export interface Database {
+  matter_expenses: {
+    id: DatabaseSet<string>; matter_id: DatabaseSet<string>; incurred_on: DatabaseSet<string>;
+    kind: DatabaseSet<'recharge'|'disbursement'>; description: DatabaseSet<string>; net_pence: DatabaseSet<string>;
+    vat_treatment: DatabaseSet<'standard'|'reduced'|'zero'|'exempt'|'outside_scope'>; billable: DatabaseSet<boolean>;
+    receipt_version_id: DatabaseSet<string|null>; recorded_by: DatabaseSet<string>; recorded_at: DatabaseSet<Date>; request_id: DatabaseSet<string>;
+  };
+  matter_expense_voids: {
+    expense_id: DatabaseSet<string>; reason: DatabaseSet<string>; voided_by: DatabaseSet<string>; voided_at: DatabaseSet<Date>;
+  };
+  work_timers: {
+    account_id: InsertOnly<string>; timer_id: Writable<string>; revision: Writable<string>;
+    elapsed_ms: Writable<string>; started_at: Writable<Date|null>; updated_at: DatabaseSet<Date>;
+  };
+  work_timer_receipts: {
+    timer_id: InsertOnly<string>; account_id: InsertOnly<string>; time_entry_id: InsertOnly<string>;
+    request_sha256: InsertOnly<string>; recorded_at: DatabaseSet<Date>;
+  };
   performance_preferences: { account_id: InsertOnly<string>; daily_target_minutes: Writable<number|null>; updated_at: DatabaseSet<Date> };
   calendar_events: CalendarEventsTable;
   calendar_event_cancellations: CalendarEventCancellationsTable;

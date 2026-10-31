@@ -1,5 +1,7 @@
 # Authorization
 
+Expense recording adds `expenses.record` for Partner and Fee earner on their current matter teams, and for Accounts firm-wide. Compliance retains read access through `finance.view_all` but cannot record or void an expense. Receipt options also require existing document permission and matter-team access; expense access alone never grants document access. See [the expense review](reviews/2026-10-31-expenses.md).
+
 **Current state (2026-10-13):** Layers 1 and 2 built, including the
 staff-management endpoints. Layer 3 (records) built for clients, matter teams,
 compliance access with a reason, client portal links, matter tasks, time and

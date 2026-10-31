@@ -1,0 +1,2564 @@
+{
+  "sourceDocument": "Combined_Clio_LEAP_Reglify_Checklist.docx",
+  "reviewedOn": "2026-10-31",
+  "scope": "Single client law firm per installation. External providers undecided; retain integration requirements as open. All other source items remain in target scope.",
+  "scopeDecisionEvidence": "Owner reply in this session, 31 October 2026",
+  "items": [
+    {
+      "id": "001",
+      "section": "1 Project setup and architecture",
+      "requirement": "Record the shared architecture: one modular application, one login and one client and matter record across practice and compliance.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "Confirm the existing modular API, shared records and documented local setup against this checklist.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "002",
+      "section": "1 Project setup and architecture",
+      "requirement": "Set up Next.js, TypeScript, Tailwind, icons and the chart library. Start the frontend locally.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Next.js, TypeScript, Tailwind and SVG icons exist; verify chart-library requirement and clean local startup.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "003",
+      "section": "1 Project setup and architecture",
+      "requirement": "Use PostgreSQL and Prisma for shared records. Store flexible assessment facts in versioned JSON or another agreed schema; keep passwords private.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "PostgreSQL and versioned JSON exist. The established ORM is Kysely; retain its protected SQL functions and record the Prisma requirement as an unresolved architecture difference.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "004",
+      "section": "1 Project setup and architecture",
+      "requirement": "Organise folders for web, API, database, shared code, tests and documentation.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "Confirm the existing modular API, shared records and documented local setup against this checklist.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "005",
+      "section": "1 Project setup and architecture",
+      "requirement": "Create REST API routes, input validation and consistent error responses.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "Confirm the existing modular API, shared records and documented local setup against this checklist.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "006",
+      "section": "1 Project setup and architecture",
+      "requirement": "Set up WebSockets for live updates and verify an authorised connection works.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add authenticated live updates with record-level authorization, reconnect and revoked-access tests; existing polling is not WebSockets.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "007",
+      "section": "1 Project setup and architecture",
+      "requirement": "Define modules for practice, billing, documents, risk rules, challenges, sealed evidence, reporting and provider integrations.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "Practice, finance, document and AML modules exist; add dedicated risk-rule, challenge, sealed-evidence and integration modules.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "008",
+      "section": "1 Project setup and architecture",
+      "requirement": "Write setup instructions. A clean checkout can start locally using those instructions.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "docs/architecture.md",
+        "docs/decisions.md"
+      ],
+      "nextAction": "Confirm the existing modular API, shared records and documented local setup against this checklist.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "009",
+      "section": "2 Firm access and database protection",
+      "requirement": "Create Firm and User records with firm settings, email, role and hourly rate.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Verify single-firm staff/client isolation and role enforcement; shared-database tenants are outside the approved scope.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "010",
+      "section": "2 Firm access and database protection",
+      "requirement": "Implement sign in, password recovery, sign out, session expiry and multi factor authentication; test expired or revoked access.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Rerun sign-in/recovery/MFA/session and granular-role tests for this integrated version. Existing compliance role represents MLRO/COLP oversight with separate nominated-officer appointments.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "011",
+      "section": "2 Firm access and database protection",
+      "requirement": "Define Admin, Lawyer, Staff, MLRO and COLP permissions; separate financial and restricted SAR permissions where needed.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Rerun sign-in/recovery/MFA/session and granular-role tests for this integrated version. Existing compliance role represents MLRO/COLP oversight with separate nominated-officer appointments.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "012",
+      "section": "2 Firm access and database protection",
+      "requirement": "Enable PostgreSQL row level security for firm owned records, including writes.",
+      "status": "approved_exclusion",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Owner confirmed on 31 October 2026 that this installation is for one client law firm. Shared-database Firm A/Firm B tenancy is excluded; retain staff, team and client-portal authorization regression checks.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "013",
+      "section": "2 Firm access and database protection",
+      "requirement": "Set firm context from the authenticated session. Reject a changed firm ID from the browser.",
+      "status": "approved_exclusion",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Owner confirmed on 31 October 2026 that this installation is for one client law firm. Shared-database Firm A/Firm B tenancy is excluded; retain staff, team and client-portal authorization regression checks.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "014",
+      "section": "2 Firm access and database protection",
+      "requirement": "Use links that cannot connect a matter, contact, invoice or file to another firm.",
+      "status": "approved_exclusion",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Owner confirmed on 31 October 2026 that this installation is for one client law firm. Shared-database Firm A/Firm B tenancy is excluded; retain staff, team and client-portal authorization regression checks.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "015",
+      "section": "2 Firm access and database protection",
+      "requirement": "Test Firm A against Firm B through APIs, search, files, reports and live updates; access is denied.",
+      "status": "approved_exclusion",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Owner confirmed on 31 October 2026 that this installation is for one client law firm. Shared-database Firm A/Firm B tenancy is excluded; retain staff, team and client-portal authorization regression checks.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "016",
+      "section": "2 Firm access and database protection",
+      "requirement": "Test each role with allowed and forbidden actions. Hiding a menu alone is not a permission check.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Rerun sign-in/recovery/MFA/session and granular-role tests for this integrated version. Existing compliance role represents MLRO/COLP oversight with separate nominated-officer appointments.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "017",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Create, view, edit and search contacts with name, email, phone, company and contact type.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/clients/clients.controller.ts",
+        "apps/api/src/clients/clients.repository.ts"
+      ],
+      "nextAction": "People/organisations and client contacts exist; add independent lead/expert/contact records without requiring a client record.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "018",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Support people and companies, including Client, Lead and Expert types.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/clients/clients.controller.ts",
+        "apps/api/src/clients/clients.repository.ts"
+      ],
+      "nextAction": "People/organisations and client contacts exist; add independent lead/expert/contact records without requiring a client record.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "019",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Detect duplicate contacts and offer a safe review or merge process.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Duplicate review exists in onboarding/conflicts; add an explicit safe merge with reference preservation and audit.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "020",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Link people by relationship, such as spouse, witness, judge or opposing lawyer.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Matter parties exist; add reusable typed person/company relationships across the contact directory.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "021",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Capture an intake form and convert an accepted lead into a client or draft matter.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Onboarding exists; add lead capture, acceptance and conversion with history.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "022",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Search current and former clients, adverse parties, matter roles and relevant notes for conflicts.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "023",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Test exact and fuzzy name matching. Similar names appear for a person to review.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "024",
+      "section": "3 Contacts intake and conflict checks",
+      "requirement": "Record conflict results, the reviewer and the decision before opening the matter.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "025",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Create a unique matter number per firm and link it to the correct client.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "026",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Save title, description, practice area, responsible lawyer and assigned staff.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "027",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Define and test matter states, including open, pending, closed and archived as agreed.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "028",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Add custom fields and templates for practice areas such as immigration or conveyancing.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add validated practice-area custom-field definitions and matter templates, preserving historical values.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "029",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Link clients, witnesses and adverse parties with their roles and adverse status.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "030",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Build the matter list with client, practice area, owner, status, unbilled work and trust balance.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "031",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Add filters for fee earner, branch, practice type and age where these fields are used.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Verify current matter/conflict/party lifecycle and permissions against the exact requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "032",
+      "section": "4 Matters and the case workspace",
+      "requirement": "Build one matter workspace with timeline, documents, time, billing, tasks, risk assessment, challenges and clearance status.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Matter work, documents, tasks and clearance exist; add challenge and sealed-decision views in the same matter.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "033",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Build a responsive layout with a top bar and sidebar that work on smaller screens.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Verify keyboard/mobile behavior, permissions and loading/empty/error states in current browser acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "034",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Add Dashboard, Calendar, Tasks, Matters, Contacts and Activities navigation.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Verify keyboard/mobile behavior, permissions and loading/empty/error states in current browser acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "035",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Add Billing, Payments, Accounts, Documents, Communications, Reports, Compliance, Integrations and Settings.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Core navigation exists; add working Communications, Payments and Integrations workspaces as their services are implemented.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "036",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Implement global search and the Ctrl or Cmd plus K search dialog with permission filtering.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Verify keyboard/mobile behavior, permissions and loading/empty/error states in current browser acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "037",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Add Create New actions and notifications. Sensitive compliance alerts reveal detail only to authorised reviewers.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Verify keyboard/mobile behavior, permissions and loading/empty/error states in current browser acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "038",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Show today's task count and event count using the user's timezone.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Agenda exists; appointments currently use Europe/London. Store a user timezone and test local-day boundaries.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "039",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Show billable hours against targets for today, this week, this month and this year.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Hours and weekday target preferences exist; verify period targets and billable versus nonbillable classification.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "040",
+      "section": "5 Navigation and personal dashboard",
+      "requirement": "Check loading, empty, error and access denied states. Menu links open working features.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Verify keyboard/mobile behavior, permissions and loading/empty/error states in current browser acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "041",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Implement timer start, pause, resume and reset with an hours minutes seconds display.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0081_durable_work_timers.sql",
+        "apps/api/src/workspace/work-timer.service.ts",
+        "apps/web/src/components/workspace-timer.tsx",
+        "apps/api/src/workspace/workspace.controller.spec.ts"
+      ],
+      "nextAction": "Accepted against the durable timer API/database and Chromium reload/two-tab journey on 31 October 2026. Continue regression checks as the remaining features are integrated.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-checklist-integration.md",
+        "apps/api/src/workspace/workspace.controller.spec.ts",
+        "apps/web/e2e/work-timer.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "042",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Calculate elapsed time from timestamps so a background tab does not lose time.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0081_durable_work_timers.sql",
+        "apps/api/src/workspace/work-timer.service.ts",
+        "apps/web/src/components/workspace-timer.tsx",
+        "apps/api/src/workspace/workspace.controller.spec.ts"
+      ],
+      "nextAction": "Accepted against the durable timer API/database and Chromium reload/two-tab journey on 31 October 2026. Continue regression checks as the remaining features are integrated.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-checklist-integration.md",
+        "apps/api/src/workspace/workspace.controller.spec.ts",
+        "apps/web/e2e/work-timer.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "043",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Keep the timer across route changes and restore it after reload.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0081_durable_work_timers.sql",
+        "apps/api/src/workspace/work-timer.service.ts",
+        "apps/web/src/components/workspace-timer.tsx",
+        "apps/api/src/workspace/workspace.controller.spec.ts"
+      ],
+      "nextAction": "Accepted against the durable timer API/database and Chromium reload/two-tab journey on 31 October 2026. Continue regression checks as the remaining features are integrated.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-checklist-integration.md",
+        "apps/api/src/workspace/workspace.controller.spec.ts",
+        "apps/web/e2e/work-timer.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "044",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Synchronise timer updates and resolve multiple tab or device changes without duplicate entries.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0081_durable_work_timers.sql",
+        "apps/api/src/workspace/work-timer.service.ts",
+        "apps/web/src/components/workspace-timer.tsx",
+        "apps/api/src/workspace/workspace.controller.spec.ts"
+      ],
+      "nextAction": "Accepted against the durable timer API/database and Chromium reload/two-tab journey on 31 October 2026. Continue regression checks as the remaining features are integrated.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-checklist-integration.md",
+        "apps/api/src/workspace/workspace.controller.spec.ts",
+        "apps/web/e2e/work-timer.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "045",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Save time with firm, user, matter, date, duration, rate, billable flag and description.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Time records retain worker, matter, date, minutes, rate and description; add an explicit billable flag and reviewed migration for existing entries. Firm tenant IDs are excluded.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "046",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Let permitted users add or correct time manually and distinguish billed from unbilled work.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Verify correction/void history and billed versus unbilled entry behavior.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "047",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Record expenses and disbursements against matters. Add UTBMS or LEDES codes if selected.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0082_matter_expenses.sql",
+        "apps/api/migrations/0083_expense_receipt_authorization.sql",
+        "apps/api/src/finance/expenses.service.ts",
+        "apps/api/src/finance/billing.controller.ts",
+        "apps/web/src/components/expenses-section.tsx",
+        "apps/web/src/app/(staff)/finance/bill-draft-form.tsx"
+      ],
+      "nextAction": "Core expense/disbursement capture, optional exact receipt versions, billable classification and reasoned voids verified. UTBMS/LEDES coding is unselected and remains outside this acceptance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-expenses.md",
+        "apps/api/src/finance/billing.controller.spec.ts",
+        "apps/web/e2e/expenses.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "048",
+      "section": "6 Timers time entries and expenses",
+      "requirement": "Test time rounding, rate changes and conversion of a stopped timer into one saved entry.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/migrations/0081_durable_work_timers.sql",
+        "apps/api/src/workspace/work-timer.service.ts",
+        "apps/web/src/components/workspace-timer.tsx",
+        "apps/api/src/workspace/workspace.controller.spec.ts"
+      ],
+      "nextAction": "Concurrent consume/retry tests pass; verify round-up boundaries, historical rate changes and manual minute adjustments with finance tests.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "049",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Support the agreed fee models: hourly, fixed stages and contingency where selected.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Hourly/manual fee lines exist; add agreed fixed-stage and contingency fee model configuration and calculations.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "050",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Create draft bills from time and expenses without billing the same entry twice.",
+      "status": "verified",
+      "codeEvidence": [
+        "apps/api/migrations/0082_matter_expenses.sql",
+        "apps/api/migrations/0083_expense_receipt_authorization.sql",
+        "apps/api/src/finance/expenses.service.ts",
+        "apps/api/src/finance/billing.controller.ts",
+        "apps/web/src/components/expenses-section.tsx",
+        "apps/web/src/app/(staff)/finance/bill-draft-form.tsx"
+      ],
+      "nextAction": "Combined time-and-expense drafting and issue verified, with immutable source links, concurrent duplicate-charge prevention and transactional audit rollback.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [
+        "docs/reviews/2026-10-31-expenses.md",
+        "apps/api/src/finance/billing.controller.spec.ts",
+        "apps/web/e2e/expenses.spec.ts"
+      ],
+      "verifiedAt": "2026-10-31"
+    },
+    {
+      "id": "051",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Allow authorised pre bill review, edits and write offs with a recorded reason.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Draft editing and expense void/credit paths exist; complete the pre-bill review and write-off workflow with recorded reasons.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "052",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Save invoice totals, due date and Draft, Unpaid, Overdue or Paid status.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Issued totals exist; add bill-level settlement/allocation, unpaid/overdue balances and refund/retry handling.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "053",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Generate a readable invoice PDF with the correct client, matter, items and totals.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Generate an authorized invoice PDF from the immutable issued-bill snapshot.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "054",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Connect the chosen payment provider, such as Stripe or LawPay, using its test environment.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Payment processor intentionally undecided. Implement and test hosted checkout and signed idempotent webhooks once selected.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "055",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Handle payment success, failure, refunds and repeated provider notifications safely.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Issued totals exist; add bill-level settlement/allocation, unpaid/overdue balances and refund/retry handling.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "056",
+      "section": "7 Billing invoices and online payments",
+      "requirement": "Verify draft, unpaid and overdue lists and totals match the underlying invoices.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/finance/finance.service.ts",
+        "apps/api/src/finance/finance.controller.ts"
+      ],
+      "nextAction": "Issued totals exist; add bill-level settlement/allocation, unpaid/overdue balances and refund/retry handling.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "057",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Keep client trust funds separate from operating money in accounts and reports.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "058",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Use balanced double entry journal records. A transaction cannot post only one side.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "059",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Track deposits, payments, disbursements and the balance for each client and matter.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "060",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Reject a withdrawal or invoice transfer when available client trust funds are insufficient.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "061",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Post related ledger entries and payment updates together in one database transaction.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "062",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Test simultaneous payments and retries so they cannot overspend or duplicate a transfer.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "063",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Keep posted entries traceable; corrections use authorised reversals rather than silent edits.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Rerun ledger/payment/reconciliation acceptance and obtain professional finance review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "064",
+      "section": "8 Trust and operating accounts",
+      "requirement": "Produce bank, main trust ledger and client ledger reconciliation; obtain the required professional review.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/migrations/0044_finance_ledgers.sql",
+        "apps/api/src/finance/payment.service.ts",
+        "apps/api/src/finance/reconciliation.service.ts"
+      ],
+      "nextAction": "Reconciliation and independent sign-off code exist; run current acceptance and obtain the required professional review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "065",
+      "section": "9 Documents templates and file search",
+      "requirement": "Keep private matter documents in S3 compatible storage. Link assessments to exact evidence versions or external references, using the same firm and matter IDs.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/documents/documents.service.ts",
+        "apps/api/src/documents/documents.repository.ts"
+      ],
+      "nextAction": "Verify private encrypted versioned storage, evidence references and authorized previous-version access.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "066",
+      "section": "9 Documents templates and file search",
+      "requirement": "Authorise every file action and use signed links with an expiry time for permitted downloads.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/documents/documents.service.ts",
+        "apps/api/src/documents/documents.repository.ts"
+      ],
+      "nextAction": "Authenticated streamed downloads exist; implement scoped expiring download tokens if signed-link behavior is retained as a requirement.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "067",
+      "section": "9 Documents templates and file search",
+      "requirement": "Apply the chosen storage encryption and key settings. Keep credentials private.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/documents/documents.service.ts",
+        "apps/api/src/documents/documents.repository.ts"
+      ],
+      "nextAction": "Verify private encrypted versioned storage, evidence references and authorized previous-version access.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "068",
+      "section": "9 Documents templates and file search",
+      "requirement": "Show folders or tags, file details and searchable document lists inside each matter.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/documents/documents.service.ts",
+        "apps/api/src/documents/documents.repository.ts"
+      ],
+      "nextAction": "Document title/category lists exist; complete folders/tags and full requested search behavior.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "069",
+      "section": "9 Documents templates and file search",
+      "requirement": "Keep file versions and let permitted users view or restore a previous version.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/documents/documents.service.ts",
+        "apps/api/src/documents/documents.repository.ts"
+      ],
+      "nextAction": "Verify private encrypted versioned storage, evidence references and authorized previous-version access.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "070",
+      "section": "9 Documents templates and file search",
+      "requirement": "Implement check out and check in or another clear rule for simultaneous edits.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add document checkout/concurrent-edit policy, general DOCX/PDF merge templates, OCR, full-text index, PDF merge and bundle verification. Engagement templates alone do not complete this check.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "071",
+      "section": "9 Documents templates and file search",
+      "requirement": "Merge client and matter fields into DOCX or PDF templates and verify the generated content.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add document checkout/concurrent-edit policy, general DOCX/PDF merge templates, OCR, full-text index, PDF merge and bundle verification. Engagement templates alone do not complete this check.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "072",
+      "section": "9 Documents templates and file search",
+      "requirement": "Add agreed OCR, text indexing, PDF merging and document bundles; test firm filtered search.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add document checkout/concurrent-edit policy, general DOCX/PDF merge templates, OCR, full-text index, PDF merge and bundle verification. Engagement templates alone do not complete this check.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "073",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Create tasks linked to a user and matter with due date, priority and completion state.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/tasks/tasks.service.ts",
+        "apps/api/src/notifications/task-reminder.service.ts"
+      ],
+      "nextAction": "Verify task assignments, due dates, priorities and complete/reopen history.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "074",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Create matter calendar events with attendees, time, timezone and reminders.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Private timed appointments exist; add attendee/team sharing, explicit timezone and durable reminders.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "075",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Build matter workflow templates with milestones and sequential tasks.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add versioned workflow/milestone/deadline rules with approved source, review, date-boundary and timezone tests.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "076",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Send reminders through background jobs and make failures or retries visible.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/tasks/tasks.service.ts",
+        "apps/api/src/notifications/task-reminder.service.ts"
+      ],
+      "nextAction": "Verify durable task reminder jobs, retries and safe failure visibility.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "077",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Implement deadline calculators only for agreed rules, with the rule source and human review.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add versioned workflow/milestone/deadline rules with approved source, review, date-boundary and timezone tests.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "078",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Add limitation date alerts and test date boundaries and timezone changes.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add versioned workflow/milestone/deadline rules with approved source, review, date-boundary and timezone tests.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "079",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Keep matter notes, calls, emails and filings in a reverse chronological timeline.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Matter history and notifications exist; add calls, notes, filed email and secure matter communications, excluding restricted reports.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "080",
+      "section": "10 Tasks calendar and communications",
+      "requirement": "Capture communications against the matter. Keep restricted suspicion records out of routine timelines, letters and client messages.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/matters/matters.controller.ts",
+        "apps/api/src/matters/matters.repository.ts"
+      ],
+      "nextAction": "Matter history and notifications exist; add calls, notes, filed email and secure matter communications, excluding restricted reports.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "081",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "Calculate daily, weekly, monthly and yearly billable totals for one user and the whole firm.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Recorded-time value metrics exist; separate billable production, billed revenue and collected revenue and document each basis.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "082",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "Use appropriate indexes and pagination; measure query response times with realistic records.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Indexes, pagination and earlier load evidence exist; measure the current release and new report paths.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "083",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "Create the annual target and actual revenue chart with a clear legend and usable tooltips.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add annual target/actual chart and matching table plus isolated, clearly labelled exact-value sample fixtures; never fabricate live dashboard amounts.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "084",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "Build the matching Date, Target and Actual table. Both views show the same data.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add annual target/actual chart and matching table plus isolated, clearly labelled exact-value sample fixtures; never fabricate live dashboard amounts.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "085",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "In sample data, show the stated draft amount of £150.00 and the 17 unpaid bills totalling £3,948.16.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add annual target/actual chart and matching table plus isolated, clearly labelled exact-value sample fixtures; never fabricate live dashboard amounts.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "086",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "In sample data, verify 17 overdue bills totalling £3,948.16; overdue and unpaid may overlap.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add annual target/actual chart and matching table plus isolated, clearly labelled exact-value sample fixtures; never fabricate live dashboard amounts.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "087",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "In sample data, verify January target £8,333.33 and actual £20,200.94, reaching a £100,000 December target.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add annual target/actual chart and matching table plus isolated, clearly labelled exact-value sample fixtures; never fabricate live dashboard amounts.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "088",
+      "section": "11 Reports financial queries and sample data",
+      "requirement": "Calculate production metrics from real records. Clearly label cumulative targets and the revenue basis.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/workspace/workspace.service.ts",
+        "apps/web/src/components/workspace-toolbar.tsx"
+      ],
+      "nextAction": "Recorded-time value metrics exist; separate billable production, billed revenue and collected revenue and document each basis.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "089",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Use one intake for contacts and matters. Capture instructions, service requested, practice area and responsible fee earner.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verify shared onboarding, person/company paths, beneficial ownership, source conclusions and approved engagement content.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "090",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Provide separate individual and corporate paths. Do not ask a company to complete inappropriate personal client fields.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verify shared onboarding, person/company paths, beneficial ownership, source conclusions and approved engagement content.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "091",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "For companies, record entity details, officers and beneficial owners, with links to people and evidence sources.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verify shared onboarding, person/company paths, beneficial ownership, source conclusions and approved engagement content.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "092",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Generate the agreed client due diligence checklist from client type, matter type and assessed risk.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "CDD cases/evidence/measure results exist; generate requirements from approved risk rules and expose requested/collected/assessed/accepted/rejected/missing states.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "093",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Record source of funds and source of wealth where required, including business sale and relevant corporate sources.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verify shared onboarding, person/company paths, beneficial ownership, source conclusions and approved engagement content.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "094",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "For each required item, distinguish requested, collected, assessed, accepted, rejected and missing evidence.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "CDD cases/evidence/measure results exist; generate requirements from approved risk rules and expose requested/collected/assessed/accepted/rejected/missing states.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "095",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Generate the client care letter at matter opening using approved content and the correct reviewed source references.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verify shared onboarding, person/company paths, beneficial ownership, source conclusions and approved engagement content.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "096",
+      "section": "12 Guided compliance intake and client due diligence",
+      "requirement": "Obtain specialist identity verification results from the chosen provider or firm records; do not treat an assessment as an identity check.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Verification evidence/provider outcomes can be recorded; selected live identity-provider integration remains open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "097",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Maintain a versioned obligation catalogue by practice area, client type and jurisdiction, with source references and reviewer approval.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Implement approved versioned obligation catalogue and attributable deterministic engine scoring; document real practice-area coverage without assuming the source demonstration is delivered.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "098",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Treat the plan's 24 obligations across eight practice areas as a demonstration scope; document actual coverage and remaining gaps.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Implement approved versioned obligation catalogue and attributable deterministic engine scoring; document real practice-area coverage without assuming the source demonstration is delivered.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "099",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Implement deterministic risk scoring from recorded facts and attributable weights, separate from the fee earner's proposed rating.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Implement approved versioned obligation catalogue and attributable deterministic engine scoring; document real practice-area coverage without assuming the source demonstration is delivered.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "100",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Have a qualified reviewer define mandatory due diligence triggers and floors. Validate the plan's PEP and country examples before activation.",
+      "status": "external",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Qualified firm reviewer must approve triggers, floors and changed regulatory content. Retain current controls pending review; do not activate speculative rules.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "101",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Connect the agreed PEP and sanctions provider. Store match details, query time, source and human review outcome.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/sanctions-screening.service.ts",
+        "apps/api/src/compliance/sanctions.service.ts"
+      ],
+      "nextAction": "Official UK sanctions list imports/matching exist; PEP provider is intentionally undecided and remains open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "102",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Show potential matches and provider failures for review. Missing or failed screening must not silently become a clear result.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/sanctions-screening.service.ts",
+        "apps/api/src/compliance/sanctions.service.ts"
+      ],
+      "nextAction": "Verify unknown/failed/matched screening remains reviewable and cannot become implicit clearance.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "103",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Version rules and citations so a historic assessment can be reproduced under its original ruleset.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Immutable controls/country-list/risk versions exist; add independently executable historical scoring-rule versions.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "104",
+      "section": "13 Risk rules screening and regulatory content",
+      "requirement": "Test boundary cases and regulatory updates; approve and record rule changes before deploying them to live matters.",
+      "status": "external",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Qualified firm reviewer must approve triggers, floors and changed regulatory content. Retain current controls pending review; do not activate speculative rules.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "105",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Compare the fee earner's proposed risk rating with the independent engine rating and explain the difference.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "106",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Raise a challenge when the proposed rating is lower than the engine rating under the approved rules.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "107",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Raise approved red flag combination challenges, including the plan's cash, outside investor and trading history example.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "108",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Raise a challenge when evidence has been collected but no assessment of it is recorded.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "109",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Block sign off through both the API and screen while a required challenge remains unanswered.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "110",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Record each answer and evidence link. An override requires a named person, reason and route to the MLRO or COLP.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Add deterministic comparison and combination/evidence challenges, immutable linked answers, named override/escalation and transactional backend/UI sign-off blocking.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "111",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Define second review and the sole practitioner process. Do not present self review as independent second person approval.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Separate senior/partner approvals exist; define and implement the qualified sole-practitioner review route without claiming independent self-review.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "112",
+      "section": "14 Challenges answers and clearance controls",
+      "requirement": "Enforce agreed clearance gates on matter actions in the backend. Reassessment after material changes updates status and preserves history.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Verify existing PostgreSQL-enforced work/money clearance gates, material-change invalidation and preserved assessment history.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "113",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Build a fact to statement map so each rationale statement traces to recorded facts, evidence and approved source references.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Citation grounding and human approval exist for AI outputs; join compliance narrative statements to exact facts/evidence and final approved decision versions.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "114",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Generate a record derived rationale; the signed narrative must match the decision and evidence snapshot.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Citation grounding and human approval exist for AI outputs; join compliance narrative statements to exact facts/evidence and final approved decision versions.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "115",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Use AI only for the agreed drafting or readability step. It cannot set the final rating or approve a matter.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Rerun AI authorization, redaction, provider-failure, prompt-injection, budget and manual-fallback tests; record provider retention/location settings before connection.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "116",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Provide manual reasoning with the same challenge, citation, evidence and sealing functions and no forced AI usage.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Manual risk narratives and clearance exist; implement the same challenge, statement-citation and decision-seal flow without requiring AI.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "117",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Validate citations and evidence links on the server. Reject unsupported statements, invented references and cross matter links.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Citation grounding and human approval exist for AI outputs; join compliance narrative statements to exact facts/evidence and final approved decision versions.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "118",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Require the named solicitor to review and approve the exact final text before sealing; retain the approved text and version.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Citation grounding and human approval exist for AI outputs; join compliance narrative statements to exact facts/evidence and final approved decision versions.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "119",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Limit provider access to necessary authorised data. Agree retention settings, data location and firm AI preferences.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Rerun AI authorization, redaction, provider-failure, prompt-injection, budget and manual-fallback tests; record provider retention/location settings before connection.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "120",
+      "section": "15 Recorded reasoning with AI or manual entry",
+      "requirement": "Test prompt injection, provider failure, cost limits and manual fallback. Do not add a RAG subsystem unless separately selected.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/ai/ai.service.ts",
+        "apps/api/src/ai/citation-grounding.service.ts"
+      ],
+      "nextAction": "Rerun AI authorization, redaction, provider-failure, prompt-injection, budget and manual-fallback tests; record provider retention/location settings before connection.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "121",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Save a complete decision snapshot containing facts, evidence references, rule version, ratings, challenges, answers, rationale and sign off.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Immutable encrypted assessments, evidence hashes, result references and transactional clearances exist; a complete unified signed decision snapshot/sealing path is still required.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "122",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Bind evidence to its exact version or content hash so replacing an attachment cannot silently change the signed record.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Immutable encrypted assessments, evidence hashes, result references and transactional clearances exist; a complete unified signed decision snapshot/sealing path is still required.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "123",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Write sealed records through one controlled path with append only permissions; administrators cannot silently rewrite decision history.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Immutable encrypted assessments, evidence hashes, result references and transactional clearances exist; a complete unified signed decision snapshot/sealing path is still required.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "124",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Use deterministic record encoding and cryptographic chaining. Test that independent implementations calculate the same chain result.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Build canonical cryptographic decision chaining, trusted external anchoring, adversarial replacement/truncation tests and a readable independently verifiable PDF/data export.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "125",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Keep approvals, promotion to final status and audit recording consistent in one transaction or a documented recoverable process.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Immutable encrypted assessments, evidence hashes, result references and transactional clearances exist; a complete unified signed decision snapshot/sealing path is still required.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "126",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Anchor the chain head outside the editable database at an agreed frequency; retain proof and surface delayed or failed anchoring.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Build canonical cryptographic decision chaining, trusted external anchoring, adversarial replacement/truncation tests and a readable independently verifiable PDF/data export.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "127",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Test record edits, deletion, reordering, truncation and complete chain replacement against trusted anchors; document remaining limits.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Build canonical cryptographic decision chaining, trusted external anchoring, adversarial replacement/truncation tests and a readable independently verifiable PDF/data export.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "128",
+      "section": "16 Sealed evidence and independent verification",
+      "requirement": "Export a readable PDF plus the agreed verification data. A verifier can check the decision, evidence references, rules and anchor proof.",
+      "status": "missing",
+      "codeEvidence": [],
+      "nextAction": "Build canonical cryptographic decision chaining, trusted external anchoring, adversarial replacement/truncation tests and a readable independently verifiable PDF/data export.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "129",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Build a firm dashboard for open assessments, risk levels, clearance, missing items and overdue reviews.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Review queues, holds and notifications exist; add joined compliance metrics including challenge/override/outcome reporting and daily exception summaries.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "130",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Show challenge counts, rating changes, overrides, responsible users and second review outcomes.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Review queues, holds and notifications exist; add joined compliance metrics including challenge/override/outcome reporting and daily exception summaries.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "131",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Send outstanding document alerts to fee earners and firm summaries to authorised MLRO or COLP users.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Review queues, holds and notifications exist; add joined compliance metrics including challenge/override/outcome reporting and daily exception summaries.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "132",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Generate daily exceptions reports and periodic compliance reports from the same live matter data.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Review queues, holds and notifications exist; add joined compliance metrics including challenge/override/outcome reporting and daily exception summaries.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "133",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Keep a controlled SAR register, data breach register and complaints register with owners, dates and follow up actions.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Restricted suspicion reporting exists; add controlled breach and complaint incident registers with ownership/follow-up.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "134",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Exclude restricted suspicion information from routine exports, global search, notifications and client facing content.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Verify restricted-information exclusion and existing partner-approved firm-wide risk/policy version workflows.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "135",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Add the agreed firm wide risk and policy evidence workflow, or record its scope gap; do not substitute matter assessments for it.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/compliance.service.ts",
+        "apps/api/src/compliance/compliance.repository.ts"
+      ],
+      "nextAction": "Verify restricted-information exclusion and existing partner-approved firm-wide risk/policy version workflows.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "136",
+      "section": "17 Compliance oversight and incident registers",
+      "requirement": "Use only authorised and suitably protected data for cross firm analytics or risk calibration; keep client and firm information isolated.",
+      "status": "approved_exclusion",
+      "codeEvidence": [
+        "apps/api/src/auth/permissions/permissions.ts",
+        "apps/api/src/auth/sessions/sessions.service.ts"
+      ],
+      "nextAction": "Owner selected one client law firm per installation. Cross-firm analytics is excluded; do not pool client data from separate installations.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "137",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Capture a suspicion with time, reporter, matter, relevant facts and supporting evidence in a restricted workspace.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Verify confidential internal reporting, nominated-officer access, decisions and manually recorded NCA references; no automatic external filing is claimed.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "138",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Route the report to the authorised MLRO and record acknowledgement, review and decisions.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Verify confidential internal reporting, nominated-officer access, decisions and manually recorded NCA references; no automatic external filing is claimed.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "139",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Apply tipping off controls to messages, task labels, search, exports and notification previews.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Verify confidential internal reporting, nominated-officer access, decisions and manually recorded NCA references; no automatic external filing is claimed.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "140",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Record the decision to report or not report, who made it and the supporting reason.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Verify confidential internal reporting, nominated-officer access, decisions and manually recorded NCA references; no automatic external filing is claimed.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "141",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Record any NCA submission reference, filing time and response; do not imply automatic filing unless an approved integration exists.",
+      "status": "present_unverified",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Verify confidential internal reporting, nominated-officer access, decisions and manually recorded NCA references; no automatic external filing is claimed.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "142",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Implement any statutory clock only from reviewed rules and recorded trigger events, including calendars, pauses and extensions where applicable.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Restricted DAML/hold records exist; review source-backed clocks, pauses/extensions, access and end-to-end MLRO workflow before enabling automated calculations.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "143",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Show required holds and review dates to authorised users. Clock expiry alone must not automatically authorise a transaction.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Restricted DAML/hold records exist; review source-backed clocks, pauses/extensions, access and end-to-end MLRO workflow before enabling automated calculations.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "144",
+      "section": "18 Suspicious activity reporting workflow",
+      "requirement": "Test SAR access separation, escalation, clock boundaries and the complete MLRO workflow before enabling the module.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/compliance/restricted-reports.service.ts",
+        "apps/api/src/compliance/retention.service.ts"
+      ],
+      "nextAction": "Restricted DAML/hold records exist; review source-backed clocks, pauses/extensions, access and end-to-end MLRO workflow before enabling automated calculations.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "145",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Build the agreed CQS conveyancing workflow on the shared matter, rules and evidence engine.",
+      "status": "missing",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Build each approved practice pack on shared evidence and rules; do not claim professional accreditation.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "146",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Have a qualified reviewer approve conveyancing obligations, source references, evidence requirements and supported practice scope.",
+      "status": "missing",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Build each approved practice pack on shared evidence and rules; do not claim professional accreditation.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "147",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Create matter milestones and required document checks, with assessed source of funds evidence linked to the transaction.",
+      "status": "missing",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Build each approved practice pack on shared evidence and rules; do not claim professional accreditation.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "148",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Generate a CQS evidence pack with traceable records; do not label an export as accreditation or regulatory approval.",
+      "status": "missing",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Build each approved practice pack on shared evidence and rules; do not claim professional accreditation.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "149",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Prototype the proposed Corporate Client Check using Companies House, screening, filed accounts and online research.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Company verification records exist; complete provider-neutral Companies House/filed-account/research check workflow with source dates and uncertainty.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "150",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Display source dates, matching uncertainty and reviewer conclusions; treat corporate check demand as unvalidated until tested.",
+      "status": "partial",
+      "codeEvidence": [
+        "apps/api/src/onboarding/onboarding.service.ts",
+        "apps/api/src/onboarding/onboarding.repository.ts"
+      ],
+      "nextAction": "Company verification records exist; complete provider-neutral Companies House/filed-account/research check workflow with source dates and uncertainty.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "151",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Keep CILEx, BSB, immigration advice and transition specific packs as later options with separate approved rule libraries.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Retain later practice packs in target scope; obtain supported-practice/rule approval before releasing each pack.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "152",
+      "section": "19 Conveyancing and later compliance modules",
+      "requirement": "Release each added module only after scope approval, rule review, permission tests and end to end evidence verification.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Retain later practice packs in target scope; obtain supported-practice/rule approval before releasing each pack.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "153",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Decide the combined platform's plans and prices. Do not copy Reglify standalone prices as an approved price for all three feature sets.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "154",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Resolve the source conflict: Solo is £69 in the product table but £49 in financial forecasts; AI is included in one place and a later add on elsewhere.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "155",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "If adopting the plan structure, configure user limits, included AI matters, overage rates and expiring top up packs from one approved price list.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "156",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Test top up arithmetic and rounding; the quoted Small Firm £28.15 pack differs from a direct 10 percent discount on 25 × £1.25.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "157",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Define what counts as one chargeable AI matter and prevent retries or repeated drafting from accidentally charging twice.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "158",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Keep deterministic rules, manual reasoning and evidence functions available under the agreed policy; quota exhaustion must not block a solicitor mid matter.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "159",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "If adopted, support the three month no card pilot and the separate monthly billing cycle and annual contract term with clear notices.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "160",
+      "section": "20 Platform subscriptions and usage billing",
+      "requirement": "Bill platform subscriptions separately from a law firm's client invoices and trust accounts; test tax settings, failed payments, changes and cancellation.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Owner to decide whether platform subscription commerce applies to this single-client deployment and approve pricing before implementation.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "161",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "Treat external Clio or LEAP connectors as optional imports or sync tools; internal modules share records without an external connector.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Internal modules already share records; external Clio/LEAP import/sync remains an open provider decision, with no fake connection status.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "162",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "If selected, connect Outlook and archive emails to the right matter with permission checks.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "163",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "If selected, connect Word templates and document editing with version handling.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "164",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "If selected, synchronise Google Calendar or Microsoft Exchange in both directions.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "165",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "Test integration consent, token refresh, revoked access, retries and duplicate prevention.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "166",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "If selected, build and test the Electron or Tauri desktop document handler and local sync.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "167",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "Choose Office.js or VSTO only where needed and verify the supported Office environments.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "168",
+      "section": "21 Integrations and optional extensions",
+      "requirement": "Show connection status and failures in integration settings. Mark deferred features as Later.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Provider selection intentionally open per owner; retain requirement and document adapters, permissions, retries and verification.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "169",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Log important sign ins, access changes, record changes, file actions and financial actions.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "170",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Include time, actor, firm, action, affected record and outcome without exposing secrets.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "171",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Keep application error logs with a request reference so a failed action can be traced.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "172",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Protect audit records from unauthorised changes and restrict who can view or export them.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "173",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Test input validation, file type and size restrictions, and malicious upload handling.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "174",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Check dependencies and secret handling; resolve critical issues before release.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "175",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Test the full joined workflow: intake, conflict check, assessment, challenge, sign off, clearance, matter work, invoice and payment.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "176",
+      "section": "22 Security audit logs and verification",
+      "requirement": "Complete the planned security assessment and retest fixes. Record findings and remaining risks.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "177",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Keep development, test and production configuration separate, with a safe example environment file.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "178",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Run automated build and test checks before deploying a version.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "179",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Apply versioned database migrations and verify them against the release.",
+      "status": "present_unverified",
+      "codeEvidence": [],
+      "nextAction": "Rerun current audit/input/upload/configuration/CI/migration acceptance; historical reports are supporting references, not new test results.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "180",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Configure HTTPS, private secrets, health checks and worker monitoring. Agree hosting region, backups and provider data locations.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "181",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Back up the database and documents. Restore them in a test environment and record the result.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "182",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Test realistic user load and record supported capacity and the main performance limits.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "183",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Document deployment, rollback, recovery, support ownership and recurring service costs.",
+      "status": "partial",
+      "codeEvidence": [
+        "docs/deployment.md",
+        "docs/disaster-recovery.md",
+        ".github/workflows/ci.yml"
+      ],
+      "nextAction": "Run this release against dependency/security, full joined workflow, hosting/TLS, restore, realistic load and rollback/support requirements; retain external review as open.",
+      "owner": "implementation team",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "184",
+      "section": "23 Deployment backups and handover",
+      "requirement": "Complete client acceptance and staff guidance. Record approval and any agreed unfinished items.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Complete firm staff guidance and obtain client acceptance with every remaining item visible.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "185",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Agree your combined first release and Later list. The source's six month Reglify core build is not a schedule for the entire combined platform.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "186",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Keep proof of concept claims and historical test counts separate from tests run on your own integrated build.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "187",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Obtain regulatory content review and the planned penetration test; record fixes and Cyber Essentials status before live data, as the plan requires.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "188",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Agree pilot permissions, data handling, support, exit and export arrangements; recruit firms without assuming the source's letters belong to this project.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "189",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Before launch, record pilot success measures: paid retention, assessment time, challenge effects, override rate and independent file quality review.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "190",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "If adopting the plan's thresholds, record 60 percent or more as proceed, 30 to 59 percent as iterate, and below 30 percent as reposition.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "191",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Review 20 files per pilot firm if adopting that protocol. Approve calibrated risk weights as a new version without changing sealed history.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    },
+    {
+      "id": "192",
+      "section": "24 Pilot acceptance and delivery decisions",
+      "requirement": "Complete final acceptance across practice, finance and compliance; document remaining work, owners, evidence links and the release decision.",
+      "status": "external",
+      "codeEvidence": [],
+      "nextAction": "Record client-specific pilot, independent professional/security review and final acceptance evidence.",
+      "owner": "firm owner / provider / independent reviewer",
+      "acceptanceEvidence": [],
+      "verifiedAt": null
+    }
+  ]
+}

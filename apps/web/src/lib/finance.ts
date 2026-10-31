@@ -27,10 +27,20 @@ export interface BillDraftSummary {
   taxPoint: string; dueOn: string; gross: string; updatedAt: string;
 }
 export interface BillLine {
+  expenseEntryId?: string | null;
   id: string; position: number; kind: 'fee' | 'recharge' | 'disbursement'; description: string;
   net: string; vatTreatment: 'standard' | 'reduced' | 'zero' | 'exempt' | 'outside_scope';
   timeEntryId: string | null; vat: string; gross: string;
 }
+
+export interface MatterExpense {
+ id:string; matterId:string; incurredOn:string; kind:'recharge'|'disbursement'; description:string; net:string;
+ vatTreatment:'standard'|'reduced'|'zero'|'exempt'|'outside_scope'; billable:boolean; receiptVersionId:string|null;
+ recordedAt:string; recordedBy:FinancePerson; billId:string|null;
+ void:{reason:string;voidedAt:string;voidedBy:FinancePerson}|null;
+}
+export interface ExpensePage {expenses:MatterExpense[];next:string|null;canRecord:boolean;matterOpen:boolean}
+export interface ReceiptOption {id:string;documentId:string;title:string;number:number}
 export interface BillDraft {
   id: string; matterId: string; status: 'draft'; taxPoint: string; dueOn: string;
   supplier: { name: string; addressLine1: string; addressLine2: string | null; town: string; postcode: string | null; country: string; vatRegistrationNumber: string | null };

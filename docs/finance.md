@@ -1,5 +1,7 @@
 # Finance
 
+Matter expenses and disbursements now have immutable records, optional fixed receipt versions, billable classification, reasoned voids and invoice source links. See the [expense implementation and verification review](reviews/2026-10-31-expenses.md). Recording a cost does not itself move money or post a bank transaction.
+
 **Current state (2026-10-10):** First-version design approved by the project
 owner. Steps 14a to 14f and the dedicated security review are complete: exact GBP money strings, immutable staff
 rates and time entries, permanent corrections, billing, an encrypted bank

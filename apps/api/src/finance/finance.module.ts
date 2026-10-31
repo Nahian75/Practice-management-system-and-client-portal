@@ -10,6 +10,8 @@ import { FinanceController } from './finance.controller.js';
 import { BillingController } from './billing.controller.js';
 import { FinanceRepository } from './finance.repository.js';
 import { FinanceService } from './finance.service.js';
+import { ExpensesController } from './expenses.controller.js';
+import { ExpensesService } from './expenses.service.js';
 import { LedgerController } from './ledger.controller.js';
 import { PaymentController } from './payment.controller.js';
 import { PaymentDetailsCipher } from './payment-details-cipher.js';
@@ -21,7 +23,7 @@ import { ReconciliationService } from './reconciliation.service.js';
 
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule],
-  controllers: [FinanceController, BillingController, LedgerController, PaymentController, ReconciliationController],
+  controllers: [FinanceController, BillingController, LedgerController, PaymentController, ReconciliationController, ExpensesController],
   providers: [
     {
       provide: BankAccountCipher,
@@ -35,6 +37,7 @@ import { ReconciliationService } from './reconciliation.service.js';
     },
     FinanceRepository,
     FinanceService,
+    ExpensesService,
     PaymentRepository,
     PaymentService,
     ReconciliationRepository,

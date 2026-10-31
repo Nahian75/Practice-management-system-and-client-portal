@@ -25,6 +25,10 @@ report lists used by the staff screens.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| GET | `/matters/:matterId/expenses?before=UUID` | `finance.matter.view`; team or firm-finance access | Paginated expense records, void history, bill links and presentation capabilities |
+| GET | `/matters/:matterId/expenses/receipt-options` | Financial record access plus existing document/team permission | Up to 100 latest document versions available as receipts; does not broaden document access |
+| POST | `/matters/:matterId/expenses` | `expenses.record`; team or Accounts | Record a dated GBP recharge/disbursement with request UUID, chosen VAT treatment, billable flag and optional exact receipt version |
+| POST | `/matters/:matterId/expenses/:expenseId/void` | `expenses.record`; team or Accounts | Append a reasoned void for an unbilled expense; billed entries require credit notes |
 | GET | `/hr/access` | `hr.directory`; every active staff role | Presentation-only HR capabilities, linked person id and current direct-report count; route/database checks remain authoritative |
 | GET | `/hr/directory` | `hr.directory`; every active staff role | Safe staff directory: work identity, current job title, team and location only |
 | GET | `/hr/reports` | Active staff; current effective reporting lines in PostgreSQL | At most 500 safe direct-report directory rows; inactive engagements and superseded assignments disappear immediately |

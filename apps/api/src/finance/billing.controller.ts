@@ -23,6 +23,7 @@ const supplierBodySchema = z.strictObject({
 const lineBodySchema = z.strictObject({
   kind: z.enum(['fee', 'recharge', 'disbursement']), description: text(1_000), net: billMoney,
   vatTreatment: z.enum(['standard', 'reduced', 'zero', 'exempt', 'outside_scope']), timeEntryId: z.uuid().nullable(),
+  expenseEntryId: z.uuid().nullable().optional(),
 });
 const draftBodySchema = z.strictObject({
   taxPoint: calendarDate, dueOn: calendarDate, supplier: supplierBodySchema, lines: z.array(lineBodySchema).min(1).max(100),
@@ -36,6 +37,7 @@ const responseSupplierSchema = supplierBodySchema;
 const responseLineSchema = z.object({
   id: z.uuid(), position: z.number().int(), kind: z.string(), description: z.string(), net: z.string(),
   vatTreatment: z.string(), timeEntryId: z.uuid().nullable(), vat: z.string(), gross: z.string(),
+  expenseEntryId: z.uuid().nullable(),
   time: z.object({ workerName: z.string(), workedOn: calendarDate, minutes: z.number().int(), hourlyRate: z.string() }).optional(),
 });
 const draftSchema = z.object({
@@ -126,7 +128,7 @@ function details(body: z.infer<typeof draftBodySchema>) {
     taxPoint: body.taxPoint, dueOn: body.dueOn, supplier: body.supplier,
     lines: body.lines.map((line) => ({
       kind: line.kind, description: line.description, netPence: line.net,
-      vatTreatment: line.vatTreatment, timeEntryId: line.timeEntryId,
+      vatTreatment: line.vatTreatment, timeEntryId: line.timeEntryId, expenseEntryId: line.expenseEntryId ?? null,
     })),
   };
 }

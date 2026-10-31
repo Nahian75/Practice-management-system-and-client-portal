@@ -55,6 +55,7 @@ export interface SupplierSnapshot {
 }
 
 export interface BillLineInput {
+  expenseEntryId?: string | null;
   kind: BillLineKind;
   description: string;
   netPence: string;

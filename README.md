@@ -6,12 +6,14 @@ Stass is a security-focused practice management system and client portal for leg
 
 Current verification: [security fixes and remaining production requirements](docs/reviews/2026-10-30-security-remediation.md).
 
+The supplied Clio, LEAP and Reglify scope is tracked in the [192-item integration checklist](docs/requirements/combined-feature-checklist.md), with an [implementation learning guide](docs/requirements/implementation-learning-guide.md). This deployment is for one client law firm; external provider choices remain open. The checklist records incomplete work explicitly and is not a claim of complete feature parity.
+
 ## What it includes
 
 - Client onboarding, contacts, conflict checks, engagement documents, and matter activation gates
 - Matter teams, tasks, notifications, documents, versioning, and client sharing
 - Separate client portal with evidence requests, engagement signing, payment requests, and shared matter records
-- Time recording, billing, client-money controls, payment approvals, statement imports, and reconciliation
+- Time recording, matter expenses and disbursements, billing, client-money controls, payment approvals, statement imports, and reconciliation
 - AML, sanctions screening, compliance holds, restricted reports, retention, and audited exports
 - Personnel records, leave, lifecycle checks, competence records, confidential cases, and HR retention
 - Provider-neutral AI drafting tools with redaction, matter isolation, citation checks, budgets, audit, and human approval

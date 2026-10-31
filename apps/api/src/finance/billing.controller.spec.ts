@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { sql, type Kysely } from 'kysely';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearMatterForTests } from '../../test/aml.js';
+import { clearMatterForTests, imposeTestHold } from '../../test/aml.js';
 import { createTestAccount, grantTestRole, type TestAccount } from '../../test/accounts.js';
 import { createTestApp } from '../../test/create-test-app.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -78,6 +78,9 @@ describe('Billing API', () => {
   });
 
   const createDraft = (token = accountsToken, overrides: object = {}) => as(token).post(`/matters/${matterId}/bill-drafts`, body(overrides));
+  const expenseBody=(changes:object={})=>({requestId:randomUUID(),incurredOn:today,kind:'recharge',description:'Travel for a client meeting',net:'10.03',vatTreatment:'standard',billable:true,receiptVersionId:null,...changes});
+  const addExpense=(changes:object={})=>as(partnerToken).post(`/matters/${matterId}/expenses`,expenseBody(changes));
+  const expenseLine=(id:string,changes:object={})=>({expenseEntryId:id,timeEntryId:null,kind:'recharge',description:'Travel for a client meeting',net:'10.03',vatTreatment:'standard',...changes});
 
   beforeAll(async () => {
     app = await createTestApp(BillingTestModule);
@@ -85,7 +88,7 @@ describe('Billing API', () => {
     sessions = app.get(SessionsService);
   });
 
-  afterAll(async () => app.close());
+  afterAll(async () => app?.close());
 
   beforeEach(async () => {
     today = (await sql<{ today: string }>`select (clock_timestamp() at time zone 'Europe/London')::date::text as today`.execute(db)).rows[0]!.today;
@@ -207,5 +210,124 @@ describe('Billing API', () => {
     }
     expect(response!.status).toBe(500);
     expect(await db.selectFrom('issued_bills').select('id').where('draft_id', '=', draft.body.id).executeTakeFirst()).toBeUndefined();
+  });
+
+  it('records exact expenses once across concurrent retries and restricts each role and matter',async()=>{
+    const input=expenseBody();
+    expect((await request(app.getHttpServer()).get(`/matters/${matterId}/expenses`)).status).toBe(401);
+    const responses=await Promise.all([as(partnerToken).post(`/matters/${matterId}/expenses`,input),as(partnerToken).post(`/matters/${matterId}/expenses`,input)]);
+    expect(responses.map(r=>r.status)).toEqual([201,201]);expect(responses[0]!.body.id).toBe(responses[1]!.body.id);
+    const id=responses[0]!.body.id;
+    const listed=await as(partnerToken).get(`/matters/${matterId}/expenses`);expect(listed.status).toBe(200);
+    expect(listed.body).toMatchObject({canRecord:true,matterOpen:true,expenses:[{id,net:'10.03',billable:true,void:null,billId:null}]});
+    expect((await as(accountsToken).get(`/matters/${matterId}/expenses`)).body.expenses).toHaveLength(1);
+    expect((await as(await signedIn(compliance)).get(`/matters/${matterId}/expenses`)).body.canRecord).toBe(false);
+    expect((await as(await signedIn(compliance)).post(`/matters/${matterId}/expenses`,expenseBody())).status).toBe(403);
+    expect((await as(await signedIn(outsider)).get(`/matters/${matterId}/expenses`)).status).toBe(404);
+    expect((await as(await signedIn(outsider)).post(`/matters/${matterId}/expenses`,expenseBody())).status).toBe(404);
+    const client=await createTestAccount(db,'client');expect((await as(await signedIn(client)).get(`/matters/${matterId}/expenses`)).status).toBe(403);
+    expect((await as(accountsToken).post(`/matters/${matterId}/expenses`,expenseBody({billable:false,net:'7.50'}))).status).toBe(201);
+    expect((await as(partnerToken).post(`/matters/${matterId}/expenses`,{...input,net:'10.04'})).status).toBe(409);
+    const events=await db.selectFrom('audit_events').select(['metadata']).where('resource_id','=',id).where('action','=','expense.recorded').execute();
+    expect(events).toEqual([{metadata:{matterId}}]);
+    await expect(sql`UPDATE app.matter_expenses SET description='Silent overwrite' WHERE id=${id}::uuid`.execute(db)).rejects.toMatchObject({code:'42501'});
+    await expect(sql`INSERT INTO app.matter_expense_voids(expense_id,reason,voided_by) VALUES(${id}::uuid,'Bypass',${partner.id}::uuid)`.execute(db)).rejects.toMatchObject({code:'42501'});
+    await expect(sql`SELECT app.record_matter_expense(${matterId}::uuid,${today}::date,'recharge','Bypass',100::bigint,'standard',true,NULL,${randomUUID()}::uuid,${outsider.id}::uuid)`.execute(db)).rejects.toMatchObject({code:'42501'});
+  });
+
+  it('rejects unsafe expense input, unavailable receipts, future dates and missing clearance',async()=>{
+    for(const changes of [{net:'0.00'},{net:'-1.00'},{net:'1.001'},{net:'1000000.01'},{description:'bad\u0000text'},{accountId:outsider.id},{receiptVersionId:'nope'}]){
+      expect((await addExpense(changes)).status).toBe(400);
+    }
+    expect((await addExpense({incurredOn:'9999-12-31'})).status).toBe(409);
+    expect((await addExpense({receiptVersionId:randomUUID()})).status).toBe(409);
+    await imposeTestHold(db,{matterId},compliance.id);
+    expect((await addExpense()).status).toBe(409);
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).status).toBe(200);
+  });
+
+  it('binds a receipt to an exact matter version without granting Accounts document access',async()=>{
+    const version=async(documentId:string,trx:Kysely<Database>=db)=>trx.insertInto('document_versions').values({document_id:documentId,file_name:'receipt.pdf',media_type:'application/pdf',size_bytes:100,
+      sha256:randomBytes(32),storage_key:randomUUID(),key_version:1,key_nonce:randomBytes(12),wrapped_key:randomBytes(32),key_tag:randomBytes(16),uploaded_by:partner.id}).returning('id').executeTakeFirstOrThrow();
+    const {doc,first}=await db.transaction().execute(async trx=>{const doc=await trx.insertInto('documents').values({matter_id:matterId,title:'Travel receipt',category:'evidence',created_by:partner.id}).returning('id').executeTakeFirstOrThrow();return {doc,first:await version(doc.id,trx)};});
+    const expense=await addExpense({receiptVersionId:first.id});expect(expense.status).toBe(201);
+    const second=await version(doc.id);
+    const options=await as(partnerToken).get(`/matters/${matterId}/expenses/receipt-options`);expect(options.status).toBe(200);
+    expect(options.body.receipts).toEqual([{id:second.id,documentId:doc.id,title:'Travel receipt',number:2}]);
+    expect((await as(accountsToken).get(`/matters/${matterId}/expenses/receipt-options`)).body.receipts).toEqual([]);
+    expect((await as(accountsToken).post(`/matters/${matterId}/expenses`,expenseBody({receiptVersionId:first.id}))).status).toBe(403);
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses[0].receiptVersionId).toBe(first.id);
+    const another=await openMatter();expect((await as(partnerToken).post(`/matters/${another}/expenses`,expenseBody({receiptVersionId:first.id}))).status).toBe(409);
+    await db.insertInto('document_withdrawals').values({document_id:doc.id,withdrawn_by:partner.id,reason:'Wrong receipt uploaded'}).execute();
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses/receipt-options`)).body.receipts).toEqual([]);
+    expect((await addExpense({receiptVersionId:second.id})).status).toBe(409);
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses[0].receiptVersionId).toBe(first.id);
+  });
+
+  it('bills multiple expense and manual lines with exact VAT and rejects duplicate expense use',async()=>{
+    const recharge=await addExpense();const disbursement=await addExpense({kind:'disbursement',description:'Court filing',net:'25.00',vatTreatment:'outside_scope'});
+    const lines=[expenseLine(recharge.body.id),expenseLine(disbursement.body.id,{kind:'disbursement',description:'Court filing',net:'25.00',vatTreatment:'outside_scope'}),
+      {kind:'fee',description:'Professional fees',net:'100.03',vatTreatment:'standard',timeEntryId:null}];
+    const draft=await createDraft(accountsToken,{lines});expect(draft.status,JSON.stringify(draft.body)).toBe(201);
+    expect(draft.body).toMatchObject({net:'135.06',vat:'22.02',gross:'157.08',lines:[{expenseEntryId:recharge.body.id},{expenseEntryId:disbursement.body.id},{expenseEntryId:null}]});
+    const updated=await as(accountsToken).put(`/bill-drafts/${draft.body.id}`,body({lines}));expect(updated.status).toBe(200);
+    const bill=await as(accountsToken).post(`/bill-drafts/${draft.body.id}/issue`,{});expect(bill.status,JSON.stringify(bill.body)).toBe(201);
+    expect(bill.body).toMatchObject({gross:'157.08',lines:[{expenseEntryId:recharge.body.id},{expenseEntryId:disbursement.body.id},{expenseEntryId:null}]});
+    const expenses=await as(partnerToken).get(`/matters/${matterId}/expenses`);expect(expenses.body.expenses.every((e:{billId:string})=>e.billId===bill.body.id)).toBe(true);
+    expect((await createDraft(accountsToken,{lines:[expenseLine(recharge.body.id)]})).status).toBe(409);
+    expect((await as(partnerToken).post(`/matters/${matterId}/expenses/${recharge.body.id}/void`,{reason:'Cannot remove billed history'})).status).toBe(409);
+  });
+
+  it('serializes competing invoices so an expense is charged only once',async()=>{
+    const expense=await addExpense();const lines=[expenseLine(expense.body.id)];
+    const a=await createDraft(accountsToken,{lines}),b=await createDraft(accountsToken,{lines});expect(a.status).toBe(201);expect(b.status).toBe(201);
+    const results=await Promise.all([as(accountsToken).post(`/bill-drafts/${a.body.id}/issue`,{}),as(accountsToken).post(`/bill-drafts/${b.body.id}/issue`,{})]);
+    expect(results.map(r=>r.status).sort()).toEqual([201,409]);
+    expect(await db.selectFrom('issued_bill_lines').select('id').where('source_expense_entry_id','=',expense.body.id).execute()).toHaveLength(1);
+  });
+
+  it('combines recorded time and expenses in one invoice and preserves both source identities',async()=>{
+    await db.insertInto('staff_rates').values({account_id:partner.id,hourly_rate_pence:'12000',effective_from:today,created_by:accounts.id}).execute();
+    const time=await db.insertInto('time_entries').values({matter_id:matterId,worker_id:partner.id,recorded_by:partner.id,worked_on:today,minutes:5,description:'Five minutes of reviewed advice'}).returning('id').executeTakeFirstOrThrow();
+    const expense=await addExpense();
+    const lines=[{kind:'fee',description:'Reviewed advice',net:'10.00',vatTreatment:'standard',timeEntryId:time.id},expenseLine(expense.body.id)];
+    const draft=await createDraft(accountsToken,{lines});expect(draft.status,JSON.stringify(draft.body)).toBe(201);
+    const bill=await as(accountsToken).post(`/bill-drafts/${draft.body.id}/issue`,{});expect(bill.status).toBe(201);
+    expect(bill.body).toMatchObject({net:'20.03',vat:'4.01',gross:'24.04',lines:[{timeEntryId:time.id,expenseEntryId:null},{timeEntryId:null,expenseEntryId:expense.body.id}]});
+    const repeat=await createDraft(accountsToken,{lines:[lines[0]]});expect(repeat.status).toBe(201);
+    expect((await as(accountsToken).post(`/bill-drafts/${repeat.body.id}/issue`,{})).status).toBe(409);
+  });
+
+  it('serializes voiding against invoice issue without creating a billed-and-voided expense',async()=>{
+    const expense=await addExpense();const draft=await createDraft(accountsToken,{lines:[expenseLine(expense.body.id)]});expect(draft.status).toBe(201);
+    const [issued,voided]=await Promise.all([as(accountsToken).post(`/bill-drafts/${draft.body.id}/issue`,{}),
+      as(partnerToken).post(`/matters/${matterId}/expenses/${expense.body.id}/void`,{reason:'Correct the expense before issue'})]);
+    expect([issued.status,voided.status].sort()).toEqual([201,409]);
+    const result=(await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses[0];
+    expect(Boolean(result.billId)).not.toBe(Boolean(result.void));
+  });
+
+  it('refuses nonbillable, altered, duplicate and cross-matter sources and blocks a voided draft on issue',async()=>{
+    const expense=await addExpense();const nonbillable=await addExpense({billable:false});
+    for(const lines of [[expenseLine(nonbillable.body.id)],[expenseLine(expense.body.id,{net:'10.04'})],[expenseLine(expense.body.id),expenseLine(expense.body.id)]]){
+      expect((await createDraft(accountsToken,{lines})).status).toBe(409);
+    }
+    const another=await openMatter();expect((await as(accountsToken).post(`/matters/${another}/bill-drafts`,body({lines:[expenseLine(expense.body.id)]}))).status).toBe(409);
+    const draft=await createDraft(accountsToken,{lines:[expenseLine(expense.body.id)]});expect(draft.status).toBe(201);
+    const voided=await as(partnerToken).post(`/matters/${matterId}/expenses/${expense.body.id}/void`,{reason:'Recorded against the wrong visit'});expect(voided.status).toBe(201);
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses.find((e:{id:string})=>e.id===expense.body.id).void.reason).toBe('Recorded against the wrong visit');
+    expect((await as(accountsToken).post(`/bill-drafts/${draft.body.id}/issue`,{})).status).toBe(409);
+    expect(await db.selectFrom('issued_bills').select('id').where('draft_id','=',draft.body.id).execute()).toHaveLength(0);
+  });
+
+  it('rolls back expense records and voids when auditing fails',async()=>{
+    const audit=app.get(AuditService),original=audit.record.bind(audit);const input=expenseBody();
+    const failure=vi.spyOn(audit,'record').mockImplementation((event,trx)=>event.action.startsWith('expense.')?Promise.reject(new Error('audit unavailable')):original(event,trx));
+    try{expect((await as(partnerToken).post(`/matters/${matterId}/expenses`,input)).status).toBe(500);}finally{failure.mockRestore();}
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses).toHaveLength(0);
+    const expense=await as(partnerToken).post(`/matters/${matterId}/expenses`,input);expect(expense.status).toBe(201);
+    const voidFailure=vi.spyOn(audit,'record').mockImplementation((event,trx)=>event.action==='expense.voided'?Promise.reject(new Error('audit unavailable')):original(event,trx));
+    try{expect((await as(partnerToken).post(`/matters/${matterId}/expenses/${expense.body.id}/void`,{reason:'An audited correction'})).status).toBe(500);}finally{voidFailure.mockRestore();}
+    expect((await as(partnerToken).get(`/matters/${matterId}/expenses`)).body.expenses[0].void).toBeNull();
   });
 });

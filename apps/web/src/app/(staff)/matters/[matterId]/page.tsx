@@ -24,10 +24,10 @@ export default async function MatterPage({
   searchParams,
 }: {
   params: Promise<{ matterId: string }>;
-  searchParams: Promise<{ documentsBefore?: string | string[]; tasksBefore?: string | string[] }>;
+  searchParams: Promise<{ documentsBefore?: string | string[]; tasksBefore?: string | string[];expensesBefore?:string|string[] }>;
 }) {
   const { matterId } = await params;
-  const { documentsBefore, tasksBefore } = await searchParams;
+  const { documentsBefore, tasksBefore,expensesBefore } = await searchParams;
   const account = await currentAccount();
   if (!account) {
     redirect('/sign-in');
@@ -123,7 +123,7 @@ export default async function MatterPage({
         canAdd={matter.status === 'open'}
       />
 
-      <FinanceSection matter={matter} />
+      <FinanceSection matter={matter} expensesBefore={typeof expensesBefore==='string'?expensesBefore:undefined} />
 
       <h2>Conflict check</h2>
       {check.body ? (

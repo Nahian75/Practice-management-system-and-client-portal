@@ -1,5 +1,7 @@
 # Data Model
 
+Migration `0082_matter_expenses` adds immutable `matter_expenses` and `matter_expense_voids`, exact document-version receipt references and unique expense sources on issued bill lines. The catalog snapshot below describes an earlier release; see [the expense review](reviews/2026-10-31-expenses.md) for these additions.
+
 **Current state (2026-10-30):** The live schema has 178 tables and 75 applied
 forward-only migrations through `0075_security_ephemeral_retention`, including
 onboarding and AI drafting. See the [database design](database-design.md),

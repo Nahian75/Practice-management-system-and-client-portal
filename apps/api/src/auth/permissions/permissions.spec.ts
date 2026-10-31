@@ -29,6 +29,7 @@ const EXPECTED: Record<string, Record<string, boolean>> = {
   'tasks.view': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'tasks.create': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'tasks.manage': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
+  'expenses.record': { administrator: false, partner: true, fee_earner: true, accounts: true, compliance: false },
   'time.record': { administrator: false, partner: true, fee_earner: true, accounts: false, compliance: false },
   'finance.matter.view': { administrator: false, partner: true, fee_earner: true, accounts: true, compliance: true },
   'finance.view_all': { administrator: false, partner: false, fee_earner: false, accounts: true, compliance: true },
@@ -80,7 +81,7 @@ describe('role permissions', () => {
   });
 
   it('combines the permissions of every role held', () => {
-    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['ai.audit', 'ai.manage_config', 'ai.use', 'aml.approve', 'aml.assess', 'aml.export', 'aml.firm_approve', 'aml.firm_controls', 'aml.internal_report', 'aml.retention', 'aml.sanctions', 'aml.view_evidence', 'audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'finance.matter.view', 'finance.reconciliation_sign_off', 'finance.view_all', 'hr.directory', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
+    expect([...permissionsFor(['partner', 'compliance'])].sort()).toEqual(['ai.audit', 'ai.manage_config', 'ai.use', 'aml.approve', 'aml.assess', 'aml.export', 'aml.firm_approve', 'aml.firm_controls', 'aml.internal_report', 'aml.retention', 'aml.sanctions', 'aml.view_evidence', 'audit.view', 'clients.create', 'clients.edit', 'clients.search', 'clients.take_over', 'clients.view', 'documents.add', 'documents.share', 'documents.view', 'documents.withdraw', 'expenses.record', 'finance.matter.view', 'finance.reconciliation_sign_off', 'finance.view_all', 'hr.directory', 'matters.access_with_reason', 'matters.edit', 'matters.open', 'matters.supervise', 'matters.view', 'portal.invite', 'staff.view', 'tasks.create', 'tasks.manage', 'tasks.view', 'time.record']);
   });
 
   it('gives no permissions without roles', () => {
