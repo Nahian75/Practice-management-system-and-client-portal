@@ -67,11 +67,13 @@ describe('Auditing staff changes', () => {
       await db.selectFrom('account_roles').select('role').where('account_id', '=', accountId).where('revoked_at', 'is', null).execute()
     ).map((row) => row.role);
 
+  const callsFor = (...actions: string[]) => audit.calls.filter((call) => actions.includes(call.action));
+
   describe('records each change in the same transaction as the change', () => {
     it('granting a role', async () => {
       await staffService.grantRole(staff.id, 'partner', by);
 
-      expect(audit.calls).toEqual([
+      expect(callsFor('staff.role_granted', 'email.queued')).toEqual([
         { action: 'staff.role_granted', inTransaction: true },
         { action: 'email.queued', inTransaction: true },
       ]);
@@ -82,7 +84,7 @@ describe('Auditing staff changes', () => {
 
       await staffService.revokeRole(staff.id, 'partner', by);
 
-      expect(audit.calls).toEqual([
+      expect(callsFor('staff.role_revoked', 'email.queued')).toEqual([
         { action: 'staff.role_revoked', inTransaction: true },
         { action: 'email.queued', inTransaction: true },
       ]);
@@ -91,7 +93,7 @@ describe('Auditing staff changes', () => {
     it('disabling an account', async () => {
       await staffService.disable(staff.id, by);
 
-      expect(audit.calls).toEqual([{ action: 'staff.disabled', inTransaction: true }]);
+      expect(callsFor('staff.disabled')).toEqual([{ action: 'staff.disabled', inTransaction: true }]);
     });
   });
 

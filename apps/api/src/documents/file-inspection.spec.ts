@@ -141,8 +141,8 @@ describe('file inspection', () => {
 
     await expect(pipeline(source, new FileInspection('contract.pdf'), sink)).rejects.toThrow(expect.objectContaining({ reason: 'type' }));
     expect(passed).toBe(0);
-    // Streams read about 16 KB ahead before the refusal reaches the source; no more.
-    expect(produced).toBeLessThan(50);
+    // Node may fill its roughly 64 KB read buffer before the refusal reaches the source.
+    expect(produced).toBeLessThan(100);
   });
 
   it('finds the table of contents of a large Word file', async () => {
