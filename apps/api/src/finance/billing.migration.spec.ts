@@ -60,7 +60,7 @@ describe('bill database rules', () => {
     vat_registration_number: 'GB123456789',
   };
 
-  const uniqueName = () => randomUUID().replaceAll('-', '').slice(0, 16);
+  const uniqueName = () => randomUUID().replaceAll('-', '');
 
   async function staffWith(...roles: StaffRole[]): Promise<TestAccount> {
     const account = await createTestAccount(db, 'staff');
@@ -71,17 +71,23 @@ describe('bill database rules', () => {
   }
 
   async function openMatter(withAddress = true): Promise<{ matterId: string; clientId: string }> {
+    const givenNames = uniqueName();
+    const familyName = uniqueName();
     const client = await db.transaction().execute(async (trx) => {
       const row = await trx.insertInto('clients').values({ kind: 'individual', created_by: feeEarner.id }).returning('id').executeTakeFirstOrThrow();
       await trx.insertInto('client_individuals').values({
         client_id: row.id,
-        given_names: 'Jamie',
-        family_name: uniqueName(),
+        given_names: givenNames,
+        family_name: familyName,
         ...(withAddress ? { address_line1: '22 Client Road', town: 'Bristol', postcode: 'BS1 1AA', country: 'GB' } : {}),
       }).execute();
       return row;
     });
-    const check = await db.insertInto('conflict_checks').values({ client_id: client.id, requested_by: feeEarner.id, names: [uniqueName()] }).returning('id').executeTakeFirstOrThrow();
+    const check = await db.insertInto('conflict_checks').values({
+      client_id: client.id,
+      requested_by: feeEarner.id,
+      names: [`${givenNames} ${familyName}`],
+    }).returning('id').executeTakeFirstOrThrow();
     const matter = await db.transaction().execute(async (trx) => {
       const row = await trx.insertInto('matters').values({
         client_id: client.id,
