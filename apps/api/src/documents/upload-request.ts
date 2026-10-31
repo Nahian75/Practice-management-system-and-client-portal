@@ -114,6 +114,6 @@ export function discardUpload(file: Readable): void {
 }
 
 /** Some browsers send the full path the file came from; only its last part is the name. */
-function withoutFolders(fileName: string): string {
-  return fileName.split(/[/\\]/).pop()?.trim() ?? '';
+function withoutFolders(fileName: string | undefined): string {
+  return fileName?.split(/[/\\]/).pop()?.trim() ?? '';
 }
