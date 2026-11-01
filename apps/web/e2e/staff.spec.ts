@@ -6,6 +6,32 @@ import { emailedToken } from './support/staff';
 // Invitations and role changes send their email before answering, which is slow when every test worker sends at once.
 const afterEmail = expect.configure({ timeout: 15_000 });
 
+test('staff management is discoverable in navigation and workspace search', async ({ page, request }) => {
+  await signedInStaff(page, request, ['administrator']);
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Staff management', exact: true })).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'Search your workspace' });
+  await search.fill('staff');
+  const suggestions = page.getByRole('region', { name: 'Search suggestions' });
+  await expect(suggestions.getByRole('link', { name: /Staff management/ })).toBeVisible();
+  await noAxeViolations(page);
+  await search.press('Escape');
+  await expect(suggestions).toHaveCount(0);
+  await search.fill('users');
+  await suggestions.getByRole('link', { name: /Staff management/ }).click();
+  await expect(page.getByRole('heading', { name: 'Staff', exact: true })).toBeVisible();
+  await search.fill('staff');
+  await search.press('Enter');
+  await expect(page.getByRole('main').getByRole('link', { name: /Staff management/ })).toBeVisible();
+});
+
+test('workspace search does not suggest staff management without staff access', async ({ page, request }) => {
+  await signedInStaff(page, request, ['fee_earner']);
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Staff management', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Search your workspace' }).fill('staff');
+  await expect(page.getByRole('region', { name: 'Search suggestions' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Search suggestions' }).getByRole('link', { name: /Staff management/ })).toHaveCount(0);
+});
+
 test('an administrator invites someone, then gives them a role', async ({ page, request }) => {
   await signedInStaff(page, request, ['administrator']);
   const email = `e2e-invite-${unique()}@example.com`;
@@ -13,7 +39,7 @@ test('an administrator invites someone, then gives them a role', async ({ page, 
   await follow(page, page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings', exact: true }));
   await follow(page, page.getByRole('link', { name: /Users & permissions/ }));
   await noAxeViolations(page);
-  await follow(page, page.getByRole('link', { name: 'Invite someone' }));
+  await follow(page, page.getByRole('link', { name: 'Add user' }));
   await noAxeViolations(page);
   await page.getByLabel('Name').fill('Morgan Hale');
   await page.getByLabel('Email address').fill(email);
@@ -28,7 +54,7 @@ test('an administrator invites someone, then gives them a role', async ({ page, 
   expect(await emailedToken(email, '/accept-invitation')).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
   await page.getByRole('link', { name: 'Back to staff' }).click();
-  await expect(page.getByRole('row', { name: `Morgan Hale ${email} Invited Fee earner` })).toBeVisible();
+  await expect(page.getByRole('row', { name: new RegExp(`Morgan Hale ${email.replaceAll('.', '\\.')} Invited Fee earner`) })).toBeVisible();
 });
 
 test('says what is wrong with an invitation before sending it', async ({ page, request }) => {
@@ -70,15 +96,17 @@ test('an administrator cannot change their own account', async ({ page, request 
   await expect(page.getByRole('button', { name: /role|account/ })).toHaveCount(0);
 });
 
-test('a partner sees the staff list, but changes are refused', async ({ page, request }) => {
+test('a partner sees read-only staff controls and cannot change accounts', async ({ page, request }) => {
   const person = await apiSessionFor(request, ['fee_earner']);
   await signedInStaff(page, request, ['partner']);
 
   await page.goto(`/staff/${person.accountId}`);
-  await page.getByRole('button', { name: 'Give the Partner role' }).click();
-
-  await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('Only administrators can change staff accounts');
-  await expect(page.getByRole('row', { name: /^Partner .* No/ })).toBeVisible();
+  await expect(page.getByText('Your access is read-only.', {exact:false})).toBeVisible();
+  await expect(page.getByRole('button', {name:/role|account/})).toHaveCount(0);
+  const refused=await page.request.put(`/api/staff/${person.accountId}/roles/partner`);
+  expect(refused.status()).toBe(403);
+  await page.goto('/staff');
+  await expect(page.getByRole('link',{name:'Add user',exact:true})).toHaveCount(0);
 });
 
 test('a fee earner cannot see the staff list', async ({ page, request }) => {
@@ -87,4 +115,24 @@ test('a fee earner cannot see the staff list', async ({ page, request }) => {
   await page.goto('/staff');
 
   await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible();
+});
+
+
+test('staff list exposes status tabs, access actions and the HR role',async({page,request})=>{
+ const person=await apiSessionFor(request,['fee_earner']);
+ await signedInStaff(page,request,['administrator']);
+ await page.goto('/staff');
+ await expect(page.getByRole('link',{name:'Add user',exact:true})).toBeVisible();
+ const tabs=page.getByRole('navigation',{name:'Staff status'});
+ for(const name of ['All users','Active','Invited','Disabled'])await expect(tabs.getByRole('link',{name:new RegExp('^'+name+' [(]')})).toBeVisible();
+ const row=page.getByRole('row').filter({hasText:person.staff.email});
+ await row.getByRole('link',{name:/Manage roles/}).click();
+ await expect(page.getByRole('button',{name:'Give the HR role',exact:true})).toBeVisible();
+ await page.getByRole('link',{name:'Back to staff'}).click();
+ await row.getByRole('link',{name:/Disable account/}).click();
+ await expect(page.getByRole('heading',{name:'Account access',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Disable the account',exact:true})).toBeVisible();
+ await page.goto('/staff?status=disabled');
+ await expect(tabs.getByRole('link',{name:/^Disabled/})).toHaveAttribute('aria-current','page');
+ await expect(page.getByRole('row').filter({hasText:person.staff.email})).toHaveCount(0);
 });

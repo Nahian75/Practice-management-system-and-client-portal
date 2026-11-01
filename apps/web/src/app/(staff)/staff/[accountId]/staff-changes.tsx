@@ -47,7 +47,7 @@ export function StaffChanges({ member }: { member: StaffMember }) {
       {errors && <ErrorSummary messages={errors} />}
       <div role="status">{done && <p className="notice">{done}</p>}</div>
 
-      <h2>Roles</h2>
+      <h2 id="staff-roles">Roles</h2>
       <table className="table">
         <thead>
           <tr>
@@ -84,7 +84,7 @@ export function StaffChanges({ member }: { member: StaffMember }) {
         Giving the Administrator, Compliance or Accounts role is also emailed to everyone in compliance.
       </p>
 
-      <h2>Account</h2>
+      <h2 id="staff-account">Account access</h2>
       {member.status === 'disabled' ? (
         <>
           <p>

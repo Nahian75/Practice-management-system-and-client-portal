@@ -6,6 +6,7 @@ export const STAFF_ROLE_LABELS = {
   fee_earner: 'Fee earner',
   accounts: 'Accounts',
   compliance: 'Compliance',
+  hr: 'HR',
 } as const;
 
 /** What each role is for, as docs/authorization.md describes it. */
@@ -15,6 +16,7 @@ export const STAFF_ROLE_PURPOSES: Record<StaffRole, string> = {
   fee_earner: 'Runs matters day to day',
   accounts: 'Client and office money, bills, reconciliation',
   compliance: 'Regulatory oversight and the audit log',
+  hr: 'Personnel records, leave and confidential employment work',
 };
 
 export const ACCOUNT_STATUS_LABELS = { invited: 'Invited', active: 'Active', disabled: 'Disabled' } as const;

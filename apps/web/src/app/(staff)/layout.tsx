@@ -26,12 +26,13 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   if (account.kind !== 'staff') {
     redirect('/portal');
   }
-  const [{ body: notifications }, finance, compliance, hr, work] = await Promise.all([
+  const [{ body: notifications }, finance, compliance, hr, work, staff] = await Promise.all([
     apiGet<NotificationPage>('/notifications'),
     apiGet('/finance/access'),
     apiGet<ComplianceAccess>('/compliance/access'),
     apiGet<HrAccess>('/hr/access'),
     apiGet('/workspace/tasks'),
+    apiGet('/staff'),
   ]);
 
   return (
@@ -63,11 +64,12 @@ export default async function StaffLayout({ children }: { children: ReactNode })
               complianceAttention={compliance.body?.attentionCount ?? 0}
               canViewHr={!!hr.body && hasHrWorkspace(hr.body)}
               canViewWork={work.status===200}
+              canViewStaff={staff.status===200}
             />
           </div>
         </div>
       </aside>
-      <WorkspaceToolbar name={account.displayName} accountId={account.id} unread={notifications?.unreadCount??0} canViewWork={work.status===200}/>
+      <WorkspaceToolbar name={account.displayName} accountId={account.id} unread={notifications?.unreadCount??0} canViewWork={work.status===200} canViewStaff={staff.status===200} pageAccess={{canViewFinance:finance.status===200,canViewCompliance:compliance.status===200,canViewHr:!!hr.body&&hasHrWorkspace(hr.body)}}/>
       <main id="main" className="main">
         <PageGuide />
         {children}

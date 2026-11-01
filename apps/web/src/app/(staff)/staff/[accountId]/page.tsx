@@ -26,6 +26,7 @@ export default async function StaffMemberPage({
     return <NoAccess what="the staff list" />;
   }
   const member = body.staff.find((candidate) => candidate.id === accountId);
+  const canManage = body.staff.find(candidate => candidate.id === account.id)?.roles.includes('administrator') ?? false;
   if (!member) {
     return (
       <>
@@ -59,8 +60,10 @@ export default async function StaffMemberPage({
       </dl>
       {member.id === account.id ? (
         <p>This is your own account. Another administrator changes your roles or disables it, so nobody can lock out the firm alone.</p>
-      ) : (
+      ) : canManage ? (
         <StaffChanges member={member} />
+      ) : (
+        <p>Your access is read-only. An administrator can change roles or disable this account.</p>
       )}
     </>
   );

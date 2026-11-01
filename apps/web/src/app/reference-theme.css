@@ -109,3 +109,14 @@
 @keyframes workspace-menu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes workspace-page-in{from{transform:translateY(4px)}to{transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.manage-shell,.manage-shell *,.manage-shell *::before,.manage-shell *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.workspace-global-search{position:relative}
+.workspace-search-suggestions{position:absolute;top:calc(100% + 8px);left:0;width:min(480px,calc(100vw - 32px));max-height:65vh;overflow-y:auto;background:#fff;color:#253449;border:1px solid #c7d2df;border-radius:6px;box-shadow:0 8px 24px #14263826;padding:8px;z-index:50}
+.workspace-search-suggestions h2{font-size:12px;line-height:20px;margin:8px;color:#52637a}
+.workspace-search-suggestions ul{list-style:none;margin:0;padding:0}
+.workspace-search-suggestions a{display:block;padding:10px 12px;min-height:44px;color:#174f91;text-decoration:none;border-radius:4px;overflow-wrap:anywhere}
+.workspace-search-suggestions a:hover,.workspace-search-suggestions a:focus-visible{background:#eaf2fc}
+.workspace-search-suggestions a span{display:block;font-size:12px;color:#52637a}
+.workspace-search-suggestions p{font-size:13px;margin:8px 12px}
+.workspace-search-suggestions p:empty{display:none}
+.workspace-search-all{border-top:1px solid #dbe1e9}
