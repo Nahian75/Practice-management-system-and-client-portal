@@ -57,6 +57,8 @@ jobs:
         run: docker compose up -d --wait --wait-timeout 900
       - name: Run API, database and authorization tests
         run: npm test -w @practice/api -- --maxWorkers=4
+      - name: Run hosting, recovery and scaling regression tests
+        run: node --test scripts/*.test.mjs
       - name: Install browser test runtime
         run: npx playwright install --with-deps chromium
         working-directory: apps/web

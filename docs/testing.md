@@ -1,5 +1,7 @@
 # Testing
 
+CI follow-up (1 November 2026): remote baseline `e7f37b1` passed 2,167 API tests across 126 files, both type checks and builds, secret scanning and source safeguards. It failed one of 101 browser tests on the size of the compliance screen's link button. The follow-up adds desktop/mobile target-size and axe coverage and includes all hosting, recovery and scaling script tests in CI after the API suite prepares their fixtures. See the [CI and branch review](reviews/2026-11-01-main-ci-remediation.md). The cleanup results below are historical.
+
 Latest cleanup run (31 October 2026): 101 browser tests, 47 focused AI tests and 10 script tests passed; both applications passed type checks and builds. The full API run finished with 2,094 passed and 44 failed tests across 9 files. Email delivery and reconciliation fixture failures were also observed during baseline checks. The BOM reported in `docs/requirements/combined-checklist-source.txt` was removed on 1 November 2026 without changing requirement text. See the [cleanup review](reviews/2026-10-31-code-cleanup.md) for commands and limits. Older verification counts below describe their original runs.
 
 **Current state (2026-10-14):** Unit, HTTP and database integration tests for

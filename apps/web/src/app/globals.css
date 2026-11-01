@@ -649,6 +649,9 @@ input[type='file'].input {
 }
 
 .link-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
   border: 0;
   background: none;
   color: var(--colour-brand-accent-dark);

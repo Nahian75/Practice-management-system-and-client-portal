@@ -6,7 +6,9 @@ Stass is a security-focused practice management system and client portal for leg
 
 Current verification: [security fixes and remaining production requirements](docs/reviews/2026-10-30-security-remediation.md).
 
-Latest cleanup verification (31 October 2026): both builds and type checks passed, along with 101 browser tests, 47 focused AI tests and 10 script tests. The full API run had 2,094 passing and 44 failing tests. The documentation BOM that blocked GitHub Actions was removed on 1 November 2026 without changing requirement text. See the [cleanup review](docs/reviews/2026-10-31-code-cleanup.md) for changes, failures and verification limits.
+CI follow-up (1 November 2026): the latest remote baseline passed all 2,167 API tests and both application builds; its remaining failure was a browser accessibility target-size check. The follow-up increases link-button targets, tests desktop and mobile widths, and adds hosting/recovery/scaling tests to CI. All 101 browser tests and 10 operational script tests passed locally after the repair. GitHub and the local checkout now retain only `main`. See the [CI and branch review](docs/reviews/2026-11-01-main-ci-remediation.md) for evidence and production release limits.
+
+Historical cleanup verification (31 October 2026): both builds and type checks passed, along with 101 browser tests, 47 focused AI tests and 10 script tests. That API run had 2,094 passing and 44 failing tests; the newer remote baseline above supersedes those API results. The documentation BOM that blocked GitHub Actions was removed on 1 November 2026 without changing requirement text. See the [cleanup review](docs/reviews/2026-10-31-code-cleanup.md) for changes, failures and verification limits.
 
 The supplied Clio, LEAP and Reglify scope is tracked in the [192-item integration checklist](docs/requirements/combined-feature-checklist.md), with an [implementation learning guide](docs/requirements/implementation-learning-guide.md). This deployment is for one client law firm; external provider choices remain open. The checklist records incomplete work explicitly and is not a claim of complete feature parity.
 

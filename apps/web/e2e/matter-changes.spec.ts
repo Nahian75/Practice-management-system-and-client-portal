@@ -124,7 +124,13 @@ test('compliance looks at a matter with a reason, and its supervising partner se
   await page.getByRole('button', { name: 'Show the matter' }).click();
   await expect(page.getByRole('heading', { name: matter.title })).toBeVisible();
   await expect(page.getByText('Read-only. This look has been recorded')).toBeVisible();
-  await noAxeViolations(page);
+  const anotherMatter = page.getByRole('button', { name: 'Look at another matter' });
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => anotherMatter.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(24);
+    await noAxeViolations(page);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByLabel('Document', { exact: true }).selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Download' }).click();
   await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText('Give a reason of 10 to 500 characters');
